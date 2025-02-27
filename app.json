@@ -1,28 +1,37 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "MindCare",
+    "slug": "mindcare",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "icon": "./assets/images/logo_mindcare.png",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/images/logo_mindcare.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/logo_mindcare.png",
         "backgroundColor": "#ffffff"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/images/logo_mindcare.png"
+    },
+    "fonts": [
+      {
+        "asset": "node_modules/react-native-vector-icons/Fonts/FontAwesome.ttf",
+        "fontFamily": "FontAwesome"
+      }
+    ]
   }
 }
