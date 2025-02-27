@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import Logo from "../assets/images/logo_mindcare.svg"; // Import the SVG logo
+import Logo from "../../assets/images/logo_mindcare.svg";
 
 type SignupScreenProps = {
   navigation: NavigationProp<any>;
