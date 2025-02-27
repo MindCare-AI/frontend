@@ -8,39 +8,45 @@ import {
   SafeAreaView,
   ScrollView,
   Animated,
+  Alert,
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
-import Logo from "../assets/images/logo_mindcare.svg"; // Import the SVG logo
+import Icon from "react-native-vector-icons/FontAwesome";
+import Logo from "../../assets/images/logo_mindcare.svg"; // Fixed path
 
-type SetNewPasswordScreenProps = {
+type ForgotPasswordScreenProps = {
   navigation: NavigationProp<any>;
-  route: {
-    params: {
-      uid: string;
-      token: string;
-    };
-  };
 };
 
-const SetNewPasswordScreen = ({ navigation, route }: SetNewPasswordScreenProps) => {
-  const { uid, token } = route.params;
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
+  const [email, setEmail] = useState("");
+  const [isEmailValid, setIsEmailValid] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
+  const [showResetInstructions, setShowResetInstructions] = useState(false);
+  
   const shakeAnimation = useRef(new Animated.Value(0)).current;
 
-  const handleChangePassword = (value: string) => {
-    setPassword(value);
-    if (error) setError(null);
-    if (successMessage) setSuccessMessage(null);
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
   };
 
-  const handleChangeConfirmPassword = (value: string) => {
-    setConfirmPassword(value);
+  const handleChange = (value: string) => {
+    setEmail(value);
+    
+    if (value.length > 0) {
+      setIsEmailValid(validateEmail(value));
+    } else {
+      setIsEmailValid(null);
+    }
+    
+    // Clear any messages when user starts typing again
     if (error) setError(null);
-    if (successMessage) setSuccessMessage(null);
+    if (successMessage) {
+      setSuccessMessage(null);
+      setShowResetInstructions(false);
+    }
   };
 
   const shakeError = () => {
@@ -68,39 +74,39 @@ const SetNewPasswordScreen = ({ navigation, route }: SetNewPasswordScreenProps) 
     ]).start();
   };
 
-  const handleSetNewPassword = async () => {
-    // Check for empty passwords
-    if (!password || !confirmPassword) {
-      setError("Please enter both password fields");
+  const handleSendResetLink = async () => {
+    // Check for empty email
+    if (!email) {
+      setError("Please enter your email address");
       shakeError();
       return;
     }
-
-    // Check if passwords match
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+  
+    // Check email format
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address");
       shakeError();
       return;
     }
-
+  
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/password/reset/confirm/", {
+      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/password/reset/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ uid, token, new_password1: password, new_password2: confirmPassword }),
+        body: JSON.stringify({ email }),
       });
 
       console.log("Response status:", response.status);
-      console.log("Response headers:", response.headers);
 
       if (response.ok) {
-        setSuccessMessage("Password has been reset successfully");
+        setSuccessMessage("Password reset link sent to your email");
+        setShowResetInstructions(true);
       } else {
         const data = await response.json();
         console.log("Response data:", data);
-        setError(data.detail || "Failed to reset password");
+        setError(data.detail || "Failed to send reset link");
         shakeError();
       }
     } catch (error) {
@@ -108,6 +114,10 @@ const SetNewPasswordScreen = ({ navigation, route }: SetNewPasswordScreenProps) 
       setError("An error occurred. Please try again.");
       shakeError();
     }
+  };
+
+  const handleManualReset = () => {
+    navigation.navigate("ManualResetEntry");
   };
 
   return (
@@ -124,39 +134,58 @@ const SetNewPasswordScreen = ({ navigation, route }: SetNewPasswordScreenProps) 
             { transform: [{ translateX: shakeAnimation }] },
           ]}
         >
-          <Text style={styles.title}>Set New Password</Text>
+          <Text style={styles.title}>Forgot Password</Text>
           <Text style={styles.subtitle}>
-            Enter your new password below
+            Enter your email and we'll send you a link to reset your password
           </Text>
 
           <View style={styles.inputContainer}>
             <TextInput
               style={[styles.input, error && styles.inputError]}
-              placeholder="New Password"
+              placeholder="Email Address"
               placeholderTextColor="#888888"
-              secureTextEntry
-              value={password}
-              onChangeText={handleChangePassword}
+              keyboardType="email-address"
+              value={email}
+              onChangeText={handleChange}
             />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, error && styles.inputError]}
-              placeholder="Confirm New Password"
-              placeholderTextColor="#888888"
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={handleChangeConfirmPassword}
-            />
+            {isEmailValid !== null && (
+              <Icon
+                name={isEmailValid ? "check" : "times"}
+                size={20}
+                color={isEmailValid ? "#27AE60" : "#E74C3C"}
+                style={styles.inputIcon}
+              />
+            )}
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
           {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
+          
+          {showResetInstructions && (
+            <View style={styles.instructionsContainer}>
+              <Text style={styles.instructionsText}>
+                1. Check your email inbox for the reset link
+              </Text>
+              <Text style={styles.instructionsText}>
+                2. Open the link and copy the UID and token values from the URL
+              </Text>
+              <Text style={styles.instructionsText}>
+                3. Return to this app to complete the password reset
+              </Text>
+              <TouchableOpacity 
+                style={styles.manualResetButton} 
+                onPress={() => navigation.navigate("SetNewPassword", { uid: "", token: "" })}
+              >
+                <Text style={styles.manualResetButtonText}>Enter Reset Information</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-          <TouchableOpacity style={styles.button} onPress={handleSetNewPassword}>
-            <Text style={styles.buttonText}>SET NEW PASSWORD</Text>
-          </TouchableOpacity>
+          {!showResetInstructions && (
+            <TouchableOpacity style={styles.button} onPress={handleSendResetLink}>
+              <Text style={styles.buttonText}>SEND RESET LINK</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity onPress={() => navigation.navigate("Login")}>
             <Text style={styles.backToLogin}>Back to Login</Text>
@@ -226,6 +255,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
   },
+  inputIcon: {
+    padding: 10,
+  },
   inputError: {
     borderColor: "#E74C3C",
   },
@@ -240,6 +272,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 15,
     textAlign: "center",
+  },
+  instructionsContainer: {
+    marginTop: 20,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
+  manualResetButton: {
+    backgroundColor: "#002D62",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  manualResetButtonText: {
+    color: "#fff",
+    fontSize: 14,
   },
   button: {
     width: "100%",
@@ -266,4 +317,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SetNewPasswordScreen;
+export default ForgotPasswordScreen;

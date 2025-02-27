@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { View, StyleSheet, Text } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
-import Logo from '../assets/images/logo_mindcare.svg'; // Adjust the path based on your file structure
+import Logo from '../assets/images/logo_mindcare.svg'
 
 type SplashScreenProps = {
   navigation: NavigationProp<any>;

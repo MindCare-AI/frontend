@@ -108,9 +108,14 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       const data = await response.json();
   
       if (response.ok) {
-       
         console.log("Login success:", data);
-        
+        // Store authentication tokens if returned from the API
+        // AsyncStorage.setItem("authToken", data.token);
+        navigation.navigate("Home"); // If Home is in the same navigator
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
       } else {
         setLoginError(data.message || "Login failed");
         shakeError();
