@@ -81,7 +81,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     ]).start();
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     console.log("Form data:", formData);
 
     // Basic validation
@@ -112,7 +112,43 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       return;
     }
 
-    // Here you would make an API call to your backend
+    // Prepare payload as expected by the backend's CustomRegisterSerializer
+    const payload = {
+      username: formData.username,
+      email: formData.email,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      password1: formData.password1,
+      password2: formData.password2,   
+    };
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/register/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("Signup success:", data);
+        navigation.navigate("Login");
+      } else {
+        console.error("Signup error details:", data);
+        setSignupError(
+          data.detail ||
+            data.email ||
+            data.username ||
+            "Signup failed"
+        );
+        shakeError();
+      }
+    } catch (error) {
+      console.error("Network error during signup:", error);
+      setSignupError("Network error, please try again");
+      shakeError();
+    }
   };
 
   return (
