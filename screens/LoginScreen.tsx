@@ -77,26 +77,49 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     ]).start();
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    // Log current form data for debugging
     console.log("Login data:", formData);
+    
     // Check for empty fields
     if (!formData.email || !formData.password) {
       setLoginError("Please fill in all fields");
       shakeError();
       return;
     }
-
+  
     // Check email format
     if (!validateEmail(formData.email)) {
       setLoginError("Please enter a valid email address");
       shakeError();
       return;
     }
-
-    // Here you would make an API call to your backend
-    // Example of error handling:
-    // setLoginError("Invalid email or password");
-    // shakeError();
+  
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+  
+      const data = await response.json();
+  
+      if (response.ok) {
+       
+        console.log("Login success:", data);
+        
+      } else {
+        setLoginError(data.message || "Login failed");
+        shakeError();
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+      setLoginError("Network error, please try again");
+      shakeError();
+    }
   };
 
   return (
