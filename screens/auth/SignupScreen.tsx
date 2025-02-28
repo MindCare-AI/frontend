@@ -1,3 +1,4 @@
+//screens/auth/SignupScreen.tsx
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -36,6 +37,21 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
+  };
+
+  const validatePassword = (password: string) => {
+    // At least 8 characters
+    const minLength = password.length >= 8;
+    // At least one uppercase letter
+    const hasUpperCase = /[A-Z]/.test(password);
+    // At least one lowercase letter
+    const hasLowerCase = /[a-z]/.test(password);
+    // At least one number
+    const hasNumber = /\d/.test(password);
+    // At least one special character
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecial;
   };
 
   const handleChange = (field: string, value: string) => {
@@ -101,6 +117,15 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     // Email validation
     if (!validateEmail(formData.email)) {
       setSignupError("Please enter a valid email address");
+      shakeError();
+      return;
+    }
+
+    // Add password validation check
+    if (!validatePassword(formData.password1)) {
+      setSignupError(
+        "Password must be at least 8 characters and contain uppercase, lowercase, number and special characters"
+      );
       shakeError();
       return;
     }

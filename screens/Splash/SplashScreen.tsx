@@ -1,3 +1,4 @@
+//screens/Splash/SplashScreen.tsx
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Image, Text } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
