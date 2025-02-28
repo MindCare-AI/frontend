@@ -1,42 +1,25 @@
-import React from "react";
-import { createStackNavigator } from "@react-navigation/stack";
+import React from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
+import { NavigationContainer } from '@react-navigation/native';
+import InitialLoadingScreen from '../screens/InitialLoadingScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import SignupScreen from '../screens/auth/SignupScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgetPasswordScreen';
+import SetNewPasswordScreen from '../screens/auth/SetNewPasswordScreen';
 
-import InitialLoadingScreen from "../screens/InitialLoadingScreen";
-import SplashScreen from "../screens/SplashScreen";
-import OnboardingScreen from "../screens/OnboardingScreen";
-import WelcomeScreen from "../screens/WelcomeScreen";
-import LoginScreen from "../screens/auth/LoginScreen";
-import SignupScreen from "../screens/auth/SignupScreen";
-import ForgotPasswordScreen from "../screens/auth/ForgetPasswordScreen";
-import SetNewPasswordScreen from "../screens/auth/SetNewPasswordScreen";
-
-type RootStackParamList = {
-  SetNewPassword: {
-    uid: string;
-    token: string;
-  };
+// Define the types for navigation params
+export type AuthStackParamList = {
   Login: undefined;
-  ForgotPassword: undefined;
   Signup: undefined;
-  Welcome: undefined;
-  InitialLoading: undefined;
-  Splash: undefined;
-  Onboarding: undefined;
+  ForgotPassword: undefined;
+  SetNewPassword: { uid: string; token: string };
 };
 
-// Create properly typed stack navigator
-const Stack = createStackNavigator<RootStackParamList>();
+const Stack = createStackNavigator<AuthStackParamList>();
 
 const AuthNavigator = () => {
   return (
-    <Stack.Navigator 
-      initialRouteName="InitialLoading"
-      screenOptions={{ headerShown: false }}
-    >
-      <Stack.Screen name="InitialLoading" component={InitialLoadingScreen} />
-      <Stack.Screen name="Splash" component={SplashScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />

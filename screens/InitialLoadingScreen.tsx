@@ -1,36 +1,20 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
-import { checkOnboardingStatus } from '../navigation/AppNavigator';
+import { isOnboardingComplete } from '../utils/onboarding';
 
-type InitialLoadingScreenProps = {
+type Props = {
   navigation: NavigationProp<any>;
 };
 
-const InitialLoadingScreen = ({ navigation }: InitialLoadingScreenProps) => {
+const InitialLoadingScreen = ({ navigation }: Props) => {
   useEffect(() => {
     const checkNavigationFlow = async () => {
-      try {
-        // Check if user has completed onboarding
-        const onboardingComplete = await checkOnboardingStatus();
-        
-        // Small delay to avoid flickering
-        setTimeout(() => {
-          if (onboardingComplete) {
-            // User has already seen onboarding
-            navigation.navigate('Splash');
-          } else {
-            // First time user, show onboarding
-            navigation.navigate('Onboarding');
-          }
-        }, 1000);
-      } catch (error) {
-        console.error(error);
-        // Default to splash if there's an error
-        navigation.navigate('Splash');
-      }
+      const onboardingComplete = await isOnboardingComplete();
+      setTimeout(() => {
+        navigation.navigate(onboardingComplete ? 'Splash' : 'Onboarding');
+      }, 1000);
     };
-
     checkNavigationFlow();
   }, [navigation]);
 

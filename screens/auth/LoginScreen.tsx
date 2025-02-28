@@ -1,3 +1,4 @@
+// LoginScreen.tsx
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -8,9 +9,10 @@ import {
   SafeAreaView,
   ScrollView,
   Animated,
-  Image,
+  Alert,
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Icon from "react-native-vector-icons/FontAwesome";
 import Logo from "../../assets/images/logo_mindcare.svg";
 
@@ -78,51 +80,61 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   };
 
   const handleLogin = async () => {
-    // Log current form data for debugging
-    console.log("Login data:", formData);
-    
-    // Check for empty fields
     if (!formData.email || !formData.password) {
-      setLoginError("Please fill in all fields");
+      setLoginError("Please fill in all fields.");
       shakeError();
       return;
     }
-  
-    // Check email format
+
     if (!validateEmail(formData.email)) {
-      setLoginError("Please enter a valid email address");
+      setLoginError("Please enter a valid email address.");
       shakeError();
       return;
     }
-  
+
     try {
+      console.log("Login data:", { email: formData.email, password: formData.password });
+      
+      // Update this to your actual backend URL
       const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
         }),
       });
-  
+
       const data = await response.json();
-  
+      console.log("Login response:", data);
+
       if (response.ok) {
-        console.log("Login success:", data);
-        // Store authentication tokens if returned from the API
-        // AsyncStorage.setItem("authToken", data.token);
-        navigation.navigate("Home"); // If Home is in the same navigator
+        // Save tokens to AsyncStorage
+        await AsyncStorage.setItem("@auth_token", data.access);
+        if (data.refresh) {
+          await AsyncStorage.setItem("@refresh_token", data.refresh);
+        }
+
+        console.log("Tokens saved successfully");
+        
+        // Navigate to the Welcome screen in the App navigator
+        console.log("Navigating to Welcome screen...");
+        
+        // Use this navigation if your Welcome screen is in AppNavigator
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: "App", params: { screen: "Welcome" } }],
         });
       } else {
-        setLoginError(data.message || "Login failed");
+        // Handle login errors
+        setLoginError(data.detail || "Invalid email or password.");
         shakeError();
       }
     } catch (error) {
-      console.error("Network error:", error);
-      setLoginError("Network error, please try again");
+      console.error("Login error:", error);
+      setLoginError("An error occurred during login. Please try again.");
       shakeError();
     }
   };
