@@ -371,6 +371,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     padding: 20,
+    paddingBottom: 40, // Add more bottom padding for better scrolling experience
   },
   logoContainer: {
     alignItems: "center",
@@ -382,28 +383,30 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#002D62",
     marginTop: 10,
+    letterSpacing: 0.5, // Add letter spacing for better readability
   },
   loginContainer: {
     backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 10,
+    padding: 24, // Increase padding for better spacing
+    borderRadius: 12, // Slightly increase border radius
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 }, // Enhance shadow effect
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5, // Increase elevation for better material design
+    marginHorizontal: 2, // Add slight horizontal margin
   },
   title: {
-    fontSize: 24,
+    fontSize: 26, // Slightly larger font
     fontWeight: "bold",
     color: "#002D62",
-    marginBottom: 20,
+    marginBottom: 24, // Increase spacing
     textAlign: "center",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 18, // Increase spacing between inputs
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#CFCFCF",
@@ -411,70 +414,83 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 50,
+    height: 54, // Slightly taller inputs
     paddingHorizontal: 16,
     fontSize: 16,
     color: "#333",
   },
   inputIcon: {
-    padding: 10,
+    padding: 12, // Increase touch target size
   },
   inputError: {
     borderColor: "#E74C3C",
+    borderWidth: 1.5, // Make error border slightly thicker
   },
   errorText: {
     color: "#E74C3C",
     fontSize: 14,
     marginBottom: 15,
     textAlign: "center",
+    fontWeight: "500", // Make error text slightly bolder
   },
   forgotPassword: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 15,
-    fontSize: 14,
+    marginTop: 18, // Increase spacing
+    fontSize: 15, // Slightly larger
     textDecorationLine: "underline",
+    fontWeight: "500", // Make it slightly bolder
   },
   loginButton: {
     width: "100%",
     backgroundColor: "#002D62",
-    padding: 15,
+    padding: 16, // Slightly taller button
     borderRadius: 10,
     alignItems: "center",
-    elevation: 3,
+    elevation: 4, // Enhance elevation
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    marginTop: 6, // Add some spacing from the input
   },
   loginButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+    letterSpacing: 0.5, // Add letter spacing for better readability
   },
   createAccount: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 20,
-    fontSize: 14,
+    marginTop: 22, // Increase spacing
+    marginBottom: 8, // Add bottom margin
+    fontSize: 15, // Slightly larger
+    fontWeight: "500", // Make it slightly bolder
   },
   socialButtonsContainer: {
-    marginTop: 20,
+    marginTop: 24, // Increase spacing
+    marginBottom: 4, // Add bottom margin
     width: '100%',
   },
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
+    padding: 14, // Increase padding
+    borderRadius: 10, // Match login button radius
     borderWidth: 1,
     borderColor: '#CFCFCF',
     marginVertical: 8,
     backgroundColor: '#FFFFFF',
+    elevation: 1, // Add subtle elevation
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   socialButtonText: {
-    marginLeft: 10,
+    marginLeft: 12, // Increase spacing from icon
     color: '#002D62',
     fontWeight: '500',
     fontSize: 16,
