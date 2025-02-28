@@ -1,5 +1,5 @@
 // LoginScreen.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,14 +10,19 @@ import {
   ScrollView,
   Animated,
   Alert,
+  Linking,
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
+import { RootStackParamList } from "../../types/navigation"; 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Icon from "react-native-vector-icons/FontAwesome";
 import Logo from "../../assets/images/logo_mindcare.svg";
+import { API_BASE_URL, SOCIAL_LOGIN_URLS, GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID, OAUTH_CONFIG } from "../../config";
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 
 type LoginScreenProps = {
-  navigation: NavigationProp<any>;
+  navigation: NavigationProp<RootStackParamList>;
 };
 
 const LoginScreen = ({ navigation }: LoginScreenProps) => {
@@ -95,8 +100,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     try {
       console.log("Login data:", { email: formData.email, password: formData.password });
       
-      // Update this to your actual backend URL
-      const response = await fetch("http://127.0.0.1:8000/api/v1/auth/login/", {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,24 +115,22 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       console.log("Login response:", data);
 
       if (response.ok) {
-        // Save tokens to AsyncStorage
-        await AsyncStorage.setItem("@auth_token", data.access);
+        // Fix token storage: Use consistent key names
+        await AsyncStorage.setItem("accessToken", data.access); // Match auth.tsx
         if (data.refresh) {
-          await AsyncStorage.setItem("@refresh_token", data.refresh);
+          await AsyncStorage.setItem("refreshToken", data.refresh);
         }
 
         console.log("Tokens saved successfully");
         
-        // Navigate to the Welcome screen in the App navigator
-        console.log("Navigating to Welcome screen...");
-        
-        // Use this navigation if your Welcome screen is in AppNavigator
         navigation.reset({
           index: 0,
-          routes: [{ name: "App", params: { screen: "Welcome" } }],
+          routes: [{ 
+            name: 'App',
+            params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
+          }],
         });
       } else {
-        // Handle login errors
         setLoginError(data.detail || "Invalid email or password.");
         shakeError();
       }
@@ -138,6 +140,131 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       shakeError();
     }
   };
+
+  const handleGoogleLogin = async () => {
+    try {
+      // Generate secure state
+      const state = uuidv4().replace(/-/g, '');
+      await AsyncStorage.setItem('oauth_state', state);
+
+      const params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: OAUTH_CONFIG.redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        state: state,
+        access_type: 'offline',
+        prompt: 'consent'
+      });
+
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+      await Linking.openURL(googleAuthUrl);
+    } catch (error) {
+      console.error('Google login error:', error);
+      Alert.alert('Error', 'Failed to initiate Google sign in');
+    }
+  };
+
+  const handleGithubLogin = async () => {
+    try {
+      // Generate secure state for CSRF protection
+      const state = uuidv4().replace(/-/g, '');
+      await AsyncStorage.setItem('oauth_state', state);
+
+      // Construct GitHub OAuth URL with correct redirect URI
+      const params = new URLSearchParams({
+        client_id: GITHUB_CLIENT_ID,
+        redirect_uri: 'com.mindcareai.app:/oauth2redirect',
+        scope: OAUTH_CONFIG.githubAuth.scope,
+        state: state,
+        allow_signup: OAUTH_CONFIG.githubAuth.allowSignup.toString()
+      });
+
+      const githubAuthUrl = `https://github.com/login/oauth/authorize?${params}`;
+      await Linking.openURL(githubAuthUrl);
+    } catch (error) {
+      console.error('GitHub login error:', error);
+      Alert.alert(
+        'Login Error',
+        'Failed to initiate GitHub login. Please try again.'
+      );
+    }
+  };
+
+  useEffect(() => {
+    // Create subscription object to handle cleanup
+    let subscription: any;
+
+    const setupDeepLinkHandler = () => {
+      subscription = Linking.addEventListener('url', handleDeepLink);
+    };
+
+    const handleDeepLink = async ({ url }: { url: string }) => {
+      if (url.includes('oauth_callback')) {
+        try {
+          const params = new URLSearchParams(url.split('?')[1]);
+          const code = params.get('code');
+          const state = params.get('state');
+          const storedState = await AsyncStorage.getItem('oauth_state');
+
+          // Verify state parameter to prevent CSRF attacks
+          if (!code || state !== storedState) {
+            throw new Error('Invalid authentication response');
+          }
+
+          // Determine OAuth provider and handle authentication
+          const isGoogle = url.toLowerCase().includes('google');
+          const endpoint = isGoogle ? 
+            `${API_BASE_URL}/api/v1/auth/login/google/callback/` :
+            `${API_BASE_URL}/api/v1/auth/login/github/callback/`;
+
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, state })
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail || 'OAuth login failed');
+          }
+
+          // Store tokens atomically
+          await AsyncStorage.multiSet([
+            ['accessToken', data.access],
+            ['refreshToken', data.refresh]
+          ]);
+
+          // Navigate to app
+          navigation.reset({
+            index: 0,
+            routes: [{ 
+              name: 'App',
+              params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
+            }]
+          });
+        } catch (error) {
+          console.error('OAuth callback error:', error);
+          Alert.alert(
+            'Login Error',
+            'Failed to complete authentication. Please try again.'
+          );
+          navigation.navigate('Auth', { screen: 'Login' });
+        } finally {
+          await AsyncStorage.removeItem('oauth_state');
+        }
+      }
+    };
+
+    setupDeepLinkHandler();
+
+    // Cleanup function
+    return () => {
+      if (subscription?.remove) {
+        subscription.remove();
+      }
+    };
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -201,13 +328,31 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             <Text style={styles.loginButtonText}>SIGN IN</Text>
           </TouchableOpacity>
 
+          <View style={styles.socialButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.socialButton}
+              onPress={handleGoogleLogin}
+            >
+              <Icon name="google" size={20} color="#DB4437" />
+              <Text style={styles.socialButtonText}>Continue with Google</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.socialButton}
+              onPress={handleGithubLogin}
+            >
+              <Icon name="github" size={20} color="#333" />
+              <Text style={styles.socialButtonText}>Continue with GitHub</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            onPress={() => navigation.navigate("ForgotPassword")}
+            onPress={() => navigation.navigate("Auth", { screen: "ForgotPassword" })}
           >
             <Text style={styles.forgotPassword}>Forgot password?</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
+          <TouchableOpacity onPress={() => navigation.navigate("Auth", { screen: "Signup" })}>
             <Text style={styles.createAccount}>
               Don't have an account? Sign Up
             </Text>
@@ -312,6 +457,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     fontSize: 14,
+  },
+  socialButtonsContainer: {
+    marginTop: 20,
+    width: '100%',
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CFCFCF',
+    marginVertical: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  socialButtonText: {
+    marginLeft: 10,
+    color: '#002D62',
+    fontWeight: '500',
+    fontSize: 16,
   },
 });
 

@@ -1,3 +1,4 @@
+//screens/InitialLoadingScreen.tsx
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
