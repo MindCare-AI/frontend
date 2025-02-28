@@ -1,40 +1,17 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useState, useEffect } from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
+import SplashScreen from '../screens/Splash/SplashScreen';
+import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
+import WelcomeScreen from '../screens/Welcome/WelcomeScreen';
 
-// Key for storing onboarding status in AsyncStorage
-const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
+const Stack = createStackNavigator();
 
-/**
- * Checks if the user has completed onboarding
- * @returns Promise<boolean> - true if onboarding has been completed
- */
-export const checkOnboardingStatus = async (): Promise<boolean> => {
-  try {
-    const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
-    return value === 'true';
-  } catch (error) {
-    console.error('Error checking onboarding status:', error);
-    return false;
-  }
-};
+const AppNavigator = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Splash" component={SplashScreen} />
+    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+    <Stack.Screen name="Welcome" component={WelcomeScreen} />
+  </Stack.Navigator>
+);
 
-/**
- * Marks onboarding as complete
- */
-export const markOnboardingComplete = async (): Promise<void> => {
-  try {
-    await AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
-  } catch (error) {
-    console.error('Error saving onboarding status:', error);
-  }
-};
-
-/**
- * Resets onboarding status (for testing/debugging)
- */
-export const resetOnboardingStatus = async (): Promise<void> => {
-  try {
-    await AsyncStorage.removeItem(ONBOARDING_COMPLETE_KEY);
-  } catch (error) {
-    console.error('Error resetting onboarding status:', error);
-  }
-};
+export default AppNavigator;

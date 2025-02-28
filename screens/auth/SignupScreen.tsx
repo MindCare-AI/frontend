@@ -61,22 +61,22 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       Animated.timing(shakeAnimation, {
         toValue: 10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: -10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: 10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: 0,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
   };
@@ -119,7 +119,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       first_name: formData.first_name,
       last_name: formData.last_name,
       password1: formData.password1,
-      password2: formData.password2,   
+      password2: formData.password2,
     };
 
     try {
@@ -133,6 +133,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
 
       if (response.ok) {
         console.log("Signup success:", data);
+        // Navigate to Login screen after successful registration
         navigation.navigate("Login");
       } else {
         console.error("Signup error details:", data);
