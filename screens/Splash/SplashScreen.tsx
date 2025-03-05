@@ -1,57 +1,70 @@
-//screens/Splash/SplashScreen.tsx
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Image, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { isOnboardingComplete } from '../../utils/onboarding';
-import Logo from '../../assets/images/logo_mindcare.svg';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import { RootStackParamList } from '../../navigation/types';
+import { isOnboardingComplete } from '../../utils/onboarding';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type SplashScreenProps = {
-  navigation: StackNavigationProp<any>;
-};
+type SplashScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Splash'>;
 
 const SplashScreen = () => {
-  const navigation = useNavigation();
-  
+  const navigation = useNavigation<SplashScreenNavigationProp>();
+
   useEffect(() => {
     console.log("SplashScreen mounted");
+
+    // Temporary: Force onboarding to be incomplete for testing
+    AsyncStorage.setItem('onboarding_complete', 'false').then(() => {
+      console.log('DEBUG - Forced onboarding status to false');
+    });
+
     const checkOnboarding = async () => {
-      // Add a timeout to show splash for at least 2 seconds
-      const timer = setTimeout(async () => {
+      try {
         const onboardingComplete = await isOnboardingComplete();
-        console.log('Onboarding complete:', onboardingComplete); // Debug log
-        
+        console.log('DEBUG - Onboarding complete:', onboardingComplete);
+
         if (onboardingComplete) {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'App', params: { screen: 'Welcome' } }],
+              routes: [{ name: 'App' }],
             })
           );
         } else {
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
-              routes: [{ name: 'Onboarding' }],
+              routes: [{ name: 'Auth' }], // Navigate to Auth if onboarding is not complete
             })
           );
         }
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        // Fallback navigation if something goes wrong
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Auth' }],
+          })
+        );
+      }
     };
 
-    checkOnboarding();
-    
+    const timer = setTimeout(checkOnboarding, 2000); // 2 seconds delay
     return () => {
       console.log("SplashScreen unmounted");
-      // clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [navigation]);
 
   return (
     <View style={styles.container}>
-      <Logo width={150} height={150} />
+      <Image
+        source={require('../../assets/images/logo_mindcare.png')}
+        style={{ width: 150, height: 150 }}
+        resizeMode="contain"
+      />
       <Text style={styles.appName}>MindCare AI</Text>
     </View>
   );
@@ -69,7 +82,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#002D62',
-  }
+  },
 });
 
 export default SplashScreen;

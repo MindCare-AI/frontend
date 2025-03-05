@@ -5,7 +5,7 @@
     "scheme": "mindcareai",
     "version": "1.0.0",
     "privacy": "unlisted",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/logo_mindcare.png",

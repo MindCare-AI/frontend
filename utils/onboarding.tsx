@@ -1,4 +1,3 @@
-//utils/onboarding.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
@@ -10,11 +9,11 @@ const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
 export const isOnboardingComplete = async (): Promise<boolean> => {
   try {
     const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
-    console.log('Onboarding status:', value); // Debug log
+    console.log('DEBUG - Onboarding value from storage:', value); // Debug log
     return value === 'true';
   } catch (error) {
     console.error('Failed to get onboarding status', error);
-    return false;
+    return false; // Default to false if there's an error
   }
 };
 

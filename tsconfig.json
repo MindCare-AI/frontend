@@ -3,14 +3,20 @@
     "allowSyntheticDefaultImports": true,
     "jsx": "react-native",
     "lib": [
+      "es6",
       "dom",
-      "esnext"
+      "es2017"
     ],
     "moduleResolution": "node",
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "strict": true
+    "strict": true,
+    "esModuleInterop": true,
+    "target": "es2017",
+    "module": "esnext",
+    "allowJs": true,
+    "isolatedModules": true
   },
   "include": [
     "**/*.ts",
