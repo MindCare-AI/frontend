@@ -1,24 +1,19 @@
-//navigation/AppNavigator.tsx
-
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import SplashScreen from '../screens/Splash/SplashScreen';
-import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
-import WelcomeScreen from '../screens/Welcome/WelcomeScreen';
-import HomeScreen from '../screens/Home/HomeScreen'
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
+import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
+import NotificationsScreen from '../screens/NotificationsScreen/NotificationsScreen';
+import SettingsScreen from '../screens/SettingsScreen/SettingsScreen';
 
-const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
 
 const AppNavigator = () => (
-  <Stack.Navigator 
-    initialRouteName="Splash"
-    screenOptions={{ headerShown: false }}
-  >
-    <Stack.Screen name="Splash" component={SplashScreen} />
-    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-    <Stack.Screen name="Welcome" component={WelcomeScreen} />
-    <Stack.Screen name="Home" component={HomeScreen} />
-  </Stack.Navigator>
+  <Tab.Navigator initialRouteName="Feeds" screenOptions={{ headerShown: false }}>
+    <Tab.Screen name="Feeds" component={FeedsScreen} />
+    <Tab.Screen name="Chatbot" component={ChatbotScreen} />
+    <Tab.Screen name="Notifications" component={NotificationsScreen} />
+    <Tab.Screen name="Settings" component={SettingsScreen} />
+  </Tab.Navigator>
 );
 
 export default AppNavigator;
