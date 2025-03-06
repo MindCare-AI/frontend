@@ -14,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_URL } from '../../config'; // Ensure this is properly defined in your config
 import { useAuth } from '../../contexts/AuthContext';
+import AnimatedBotMessage from '../../components/chatbot/AnimatedBotMessage';
+import TypingIndicator from '../../components/chatbot/TypingIndicator';
 
 interface Message {
   id: string;
@@ -104,14 +106,17 @@ export default function ChatbotScreen() {
     if (!input.trim() || !conversationId) return;
 
     try {
+      // Use a temporary ID for the optimistic update.
+      const tempId = 'temp-' + Date.now().toString();
       const userMessage = {
-        id: Date.now().toString(),
+        id: tempId,
         sender: 'You',
         content: input.trim(),
         timestamp: new Date().toISOString(),
         is_chatbot: false,
       };
 
+      // Optimistically add the user message
       setMessages((prev) => [...prev, userMessage]);
       setInput('');
       setIsTyping(true);
@@ -147,7 +152,12 @@ export default function ChatbotScreen() {
           timestamp: result.bot_response.timestamp,
           is_chatbot: true,
         };
-        setMessages((prev) => [...prev, formattedUser, formattedBot]);
+
+        // Replace the optimistic message with the server response and append the bot message.
+        setMessages((prev) => {
+          const updated = prev.map((msg) => (msg.id === tempId ? formattedUser : msg));
+          return [...updated, formattedBot];
+        });
         setIsTyping(false);
       } else {
         // Fallback: poll for messages
@@ -202,15 +212,15 @@ export default function ChatbotScreen() {
           {messages.map((msg, index) => (
             <View key={index} style={[styles.messageRow, msg.is_chatbot ? styles.botMessageRow : styles.userMessageRow]}>
               <View style={[styles.messageBubble, msg.is_chatbot ? styles.botBubble : styles.userBubble]}>
-                <Text style={msg.is_chatbot ? styles.botText : styles.userText}>{msg.content}</Text>
+                {msg.is_chatbot ? (
+                  <AnimatedBotMessage text={msg.content} />
+                ) : (
+                  <Text style={msg.is_chatbot ? styles.botText : styles.userText}>{msg.content}</Text>
+                )}
               </View>
             </View>
           ))}
-          {isTyping && (
-            <Animated.View style={[styles.typingIndicator, { opacity: typingOpacity }]}>
-              <Text style={styles.typingText}>Samantha is typing...</Text>
-            </Animated.View>
-          )}
+          {isTyping && <TypingIndicator visible={isTyping} />}
         </ScrollView>
 
         <View style={styles.inputContainer}>
