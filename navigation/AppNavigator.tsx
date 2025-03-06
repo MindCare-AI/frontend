@@ -1,40 +1,52 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { AppTabParamList } from '../types/navigation';
+import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
+import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
+import NotificationsScreen from '../screens/NotificationsScreen/NotificationsScreen';
+import SettingsScreen from '../screens/SettingsScreen/SettingsScreen';
 
-// Key for storing onboarding status in AsyncStorage
-const ONBOARDING_COMPLETE_KEY = 'onboarding_complete';
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
-/**
- * Checks if the user has completed onboarding
- * @returns Promise<boolean> - true if onboarding has been completed
- */
-export const checkOnboardingStatus = async (): Promise<boolean> => {
-  try {
-    const value = await AsyncStorage.getItem(ONBOARDING_COMPLETE_KEY);
-    return value === 'true';
-  } catch (error) {
-    console.error('Error checking onboarding status:', error);
-    return false;
-  }
+const Tab = createBottomTabNavigator<AppTabParamList>();
+
+const AppNavigator = () => {
+  return (
+    <Tab.Navigator 
+      initialRouteName="Feeds"
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: IoniconsName;
+          switch (route.name) {
+            case 'Feeds':
+              iconName = focused ? 'home' : 'home-outline';
+              break;
+            case 'Chatbot':
+              iconName = focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline';
+              break;
+            case 'Notifications':
+              iconName = focused ? 'notifications' : 'notifications-outline';
+              break;
+            case 'Settings':
+              iconName = focused ? 'settings' : 'settings-outline';
+              break;
+            default:
+              iconName = 'help-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#002D62',
+        tabBarInactiveTintColor: '#7A869A'
+      })}
+    >
+      <Tab.Screen name="Feeds" component={FeedsScreen} />
+      <Tab.Screen name="Chatbot" component={ChatbotScreen} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
 };
 
-/**
- * Marks onboarding as complete
- */
-export const markOnboardingComplete = async (): Promise<void> => {
-  try {
-    await AsyncStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
-  } catch (error) {
-    console.error('Error saving onboarding status:', error);
-  }
-};
-
-/**
- * Resets onboarding status (for testing/debugging)
- */
-export const resetOnboardingStatus = async (): Promise<void> => {
-  try {
-    await AsyncStorage.removeItem(ONBOARDING_COMPLETE_KEY);
-  } catch (error) {
-    console.error('Error resetting onboarding status:', error);
-  }
-};
+export default AppNavigator;

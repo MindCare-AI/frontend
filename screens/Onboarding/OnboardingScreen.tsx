@@ -1,3 +1,4 @@
+//screens/Onboarding/OnboardingScreen.tsx
 import React, { useState, useRef } from 'react';
 import { 
   View, 
@@ -10,7 +11,7 @@ import {
   SafeAreaView
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
-import { markOnboardingComplete } from '../navigation/AppNavigator';
+import { markOnboardingComplete } from "../../utils/onboarding"; // Fixed import
 
 interface OnboardingStep {
   title: string;
@@ -32,22 +33,22 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
     {
       title: "Welcome to MindCare AI",
       description: "Your AI companion for mental wellbeing and mindfulness",
-      image: require('../assets/images/logo_mindcare.png'), // Replace with actual images
+      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
     },
     {
       title: "Track Your Mood",
       description: "Log how you're feeling daily to recognize patterns and improve self-awareness",
-      image: require('../assets/images/logo_mindcare.png'), // Replace with actual images
+      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
     },
     {
       title: "Guided Meditation",
       description: "Access personalized meditation sessions to reduce stress and improve focus",
-      image: require('../assets/images/logo_mindcare.png'), // Replace with actual images
+      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
     },
     {
       title: "AI-Powered Support",
       description: "Chat with our AI assistant anytime you need someone to talk to",
-      image: require('../assets/images/logo_mindcare.png'), // Replace with actual images
+      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
     },
   ];
 
