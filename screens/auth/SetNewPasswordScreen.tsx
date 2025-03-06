@@ -10,16 +10,12 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { RouteProp, useNavigation } from "@react-navigation/native";
-import { AuthStackParamList } from "../../navigation/AuthNavigator";
+import { StackScreenProps } from '@react-navigation/stack';
+import { AuthStackParamList } from "../../types/navigation";
 
-// Define screen props with proper types
-type SetNewPasswordScreenProps = {
-  route: RouteProp<AuthStackParamList, "SetNewPassword">;
-};
+type SetNewPasswordScreenProps = StackScreenProps<AuthStackParamList, 'SetNewPassword'>;
 
-const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route }) => {
-  const navigation = useNavigation();
+const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route, navigation }) => {
   const { uid, token } = route.params;
 
   const [password, setPassword] = useState("");

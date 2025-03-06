@@ -3,6 +3,11 @@ export const API_BASE_URL = __DEV__
   ? 'http://127.0.0.1:8000' 
   : 'https://api.mindcareai.com';
 
+export const WS_BASE_URL = API_BASE_URL.replace(
+  'http',
+  __DEV__ ? 'ws' : 'wss'
+);
+
 export const API_URL = `${API_BASE_URL}/api/v1`;
 
 export const SOCIAL_LOGIN_URLS = {

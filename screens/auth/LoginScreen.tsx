@@ -20,6 +20,7 @@ import Logo from "../../assets/images/logo_mindcare.svg";
 import { API_BASE_URL, SOCIAL_LOGIN_URLS, GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID, OAUTH_CONFIG } from "../../config";
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '../../contexts/AuthContext';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -35,6 +36,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const { signIn } = useAuth();
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -115,13 +117,10 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       console.log("Login response:", data);
 
       if (response.ok) {
-        // Fix token storage: Use consistent key names
-        await AsyncStorage.setItem("accessToken", data.access); // Match auth.tsx
-        if (data.refresh) {
-          await AsyncStorage.setItem("refreshToken", data.refresh);
-        }
-
-        console.log("Tokens saved successfully");
+        await signIn({
+          access: data.access,
+          refresh: data.refresh,
+        });
         
         navigation.reset({
           index: 0,
