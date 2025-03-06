@@ -7,20 +7,22 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
-import { NavigationProp } from "@react-navigation/native";
-import Logo from "../assets/images/logo_mindcare.svg";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../../navigation/RootNavigator";
+import Logo from "../../assets/images/logo_mindcare.svg";
 
-type WelcomeScreenProps = {
-  navigation: NavigationProp<any>;
-};
+type WelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-const WelcomeScreen = ({ navigation }: WelcomeScreenProps) => {
-  const handleLogin = () => {
-    navigation.navigate("Login");
+const WelcomeScreen = () => {
+  const navigation = useNavigation<WelcomeScreenNavigationProp>();
+
+  const handleGoToLogin = () => {
+    navigation.navigate("Auth", { screen: "Login" });
   };
 
   const handleSignup = () => {
-    navigation.navigate("Signup");
+    navigation.navigate("Auth", { screen: "Signup" });
   };
 
   return (
@@ -39,7 +41,7 @@ const WelcomeScreen = ({ navigation }: WelcomeScreenProps) => {
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={handleLogin}
+            onPress={handleGoToLogin}
           >
             <Text style={styles.primaryButtonText}>SIGN IN</Text>
           </TouchableOpacity>

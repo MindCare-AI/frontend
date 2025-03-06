@@ -1,8 +1,13 @@
 {
   "expo": {
-    "name": "MindCare",
+    "name": "MindCare AI",
     "slug": "mindcare",
+    "scheme": "mindcareai",
     "version": "1.0.0",
+    "privacy": "unlisted",
+    "platforms": ["ios", "android", "web"],
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "icon": "./assets/images/logo_mindcare.png",
     "splash": {
       "image": "./assets/images/logo_mindcare.png",
@@ -16,16 +21,37 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mindcareai.app",
+      "buildNumber": "1.0.0",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo_mindcare.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.mindcareai.app",
+      "versionCode": 1,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "mindcareai"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
-      "favicon": "./assets/images/logo_mindcare.png"
+      "favicon": "./assets/images/logo_mindcare.png",
+      "config": {
+        "oauth": {
+          "redirectUrl": "mindcareai://oauth_callback"
+        }
+      }
     },
     "fonts": [
       {

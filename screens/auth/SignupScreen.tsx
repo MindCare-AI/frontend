@@ -1,3 +1,4 @@
+//screens/auth/SignupScreen.tsx
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -11,7 +12,7 @@ import {
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import Logo from "../assets/images/logo_mindcare.svg"; // Import the SVG logo
+import Logo from "../../assets/images/logo_mindcare.svg";
 
 type SignupScreenProps = {
   navigation: NavigationProp<any>;
@@ -38,6 +39,21 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     return re.test(email);
   };
 
+  const validatePassword = (password: string) => {
+    // At least 8 characters
+    const minLength = password.length >= 8;
+    // At least one uppercase letter
+    const hasUpperCase = /[A-Z]/.test(password);
+    // At least one lowercase letter
+    const hasLowerCase = /[a-z]/.test(password);
+    // At least one number
+    const hasNumber = /\d/.test(password);
+    // At least one special character
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    return minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecial;
+  };
+
   const handleChange = (field: string, value: string) => {
     setFormData({
       ...formData,
@@ -61,22 +77,22 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       Animated.timing(shakeAnimation, {
         toValue: 10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: -10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: 10,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(shakeAnimation, {
         toValue: 0,
         duration: 50,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
   };
@@ -105,6 +121,15 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       return;
     }
 
+    // Add password validation check
+    if (!validatePassword(formData.password1)) {
+      setSignupError(
+        "Password must be at least 8 characters and contain uppercase, lowercase, number and special characters"
+      );
+      shakeError();
+      return;
+    }
+
     // Password matching
     if (formData.password1 !== formData.password2) {
       setSignupError("Passwords do not match");
@@ -119,7 +144,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       first_name: formData.first_name,
       last_name: formData.last_name,
       password1: formData.password1,
-      password2: formData.password2,   
+      password2: formData.password2,
     };
 
     try {
@@ -133,6 +158,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
 
       if (response.ok) {
         console.log("Signup success:", data);
+        // Navigate to Login screen after successful registration
         navigation.navigate("Login");
       } else {
         console.error("Signup error details:", data);
