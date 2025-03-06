@@ -32,6 +32,7 @@ export default function NavigationBar({
     { title: 'Chatbot', screenName: 'Chatbot', icon: 'chatbubble-ellipses-outline', activeIcon: 'chatbubble-ellipses' },
     { title: 'Notifications', screenName: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
     { title: 'Settings', screenName: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
+    { title: 'Messaging', screenName: 'Messaging', icon: 'mail-outline', activeIcon: 'mail' }, // New item added here
   ];
   
   const navItems = items || defaultNavItems;

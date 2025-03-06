@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Platform, Animated } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
@@ -30,6 +30,7 @@ const NavigationArea = (props: NavigationAreaProps) => {
     { title: 'Chatbot', screenName: 'Chatbot', icon: 'chatbubble-ellipses-outline', activeIcon: 'chatbubble-ellipses' },
     { title: 'Notifications', screenName: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
     { title: 'Settings', screenName: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
+    { title: 'Messaging', screenName: 'Messaging', icon: 'mail-outline', activeIcon: 'mail' }, // New item added here
   ];
 
   if (isTabBarProps(props)) {
