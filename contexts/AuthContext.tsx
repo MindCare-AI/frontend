@@ -1,131 +1,124 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { API_URL } from '../config';
 
-interface User {
-  id: number;
-  username: string;
-  email: string;
-}
-
-interface LoginResponse {
-  token: string;
-  user: User;
-}
-
-interface AuthContextType {
-  authToken: string | null;
-  user: User | null;
+interface AuthState {
+  accessToken: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
-  signIn: (username: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  signUp: (username: string, email: string, password: string) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  authToken: null,
-  user: null,
-  isLoading: true,
-  signIn: async () => {},
-  signOut: async () => {},
-  signUp: async () => {},
-});
+interface AuthContextData extends AuthState {
+  signIn: (tokens: { access: string; refresh: string }) => Promise<void>;
+  signOut: () => Promise<void>;
+  updateTokens: (tokens: { access: string; refresh?: string }) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authToken, setAuthToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authState, setAuthState] = useState<AuthState>({
+    accessToken: null,
+    refreshToken: null,
+    isLoading: true,
+  });
 
   useEffect(() => {
-    loadStoredAuth();
+    loadStoredTokens();
   }, []);
 
-  const loadStoredAuth = async () => {
+  const loadStoredTokens = async () => {
     try {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem('authToken'),
-        AsyncStorage.getItem('user'),
+      const [accessToken, refreshToken] = await Promise.all([
+        AsyncStorage.getItem('accessToken'),
+        AsyncStorage.getItem('refreshToken'),
       ]);
 
-      if (storedToken && storedUser) {
-        setAuthToken(storedToken);
-        setUser(JSON.parse(storedUser));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      if (accessToken) {
+        setAuthState({
+          accessToken,
+          refreshToken,
+          isLoading: false,
+        });
+        setupAxiosInterceptor(accessToken);
       }
     } catch (error) {
-      console.error('Error loading auth info:', error);
+      console.error('Error loading auth tokens:', error);
     } finally {
-      setIsLoading(false);
+      setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
-  const signIn = async (username: string, password: string) => {
+  const setupAxiosInterceptor = (token: string) => {
+    axios.interceptors.request.use(
+      (config) => {
+        if (token) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+  };
+
+  const signIn = async (tokens: { access: string; refresh: string }) => {
     try {
-      const response = await axios.post<LoginResponse>(`${API_URL}/auth/login/`, {
-        username,
-        password,
-      });
-
-      const { token, user: userData } = response.data;
-
-      await Promise.all([
-        AsyncStorage.setItem('authToken', token),
-        AsyncStorage.setItem('user', JSON.stringify(userData)),
+      await AsyncStorage.multiSet([
+        ['accessToken', tokens.access],
+        ['refreshToken', tokens.refresh],
       ]);
 
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setAuthToken(token);
-      setUser(userData);
+      setAuthState({
+        accessToken: tokens.access,
+        refreshToken: tokens.refresh,
+        isLoading: false,
+      });
+
+      setupAxiosInterceptor(tokens.access);
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('Error storing auth tokens:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      await Promise.all([
-        AsyncStorage.removeItem('authToken'),
-        AsyncStorage.removeItem('user'),
-      ]);
-
-      delete axios.defaults.headers.common['Authorization'];
-      setAuthToken(null);
-      setUser(null);
+      await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+      setAuthState({
+        accessToken: null,
+        refreshToken: null,
+        isLoading: false,
+      });
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Error removing auth tokens:', error);
       throw error;
     }
   };
 
-  const signUp = async (username: string, email: string, password: string) => {
+  const updateTokens = async (tokens: { access: string; refresh?: string }) => {
     try {
-      await axios.post(`${API_URL}/auth/register/`, {
-        username,
-        email,
-        password,
-      });
+      const updates: [string, string][] = [['accessToken', tokens.access]];
+      if (tokens.refresh) {
+        updates.push(['refreshToken', tokens.refresh]);
+      }
 
-      // After successful registration, sign in the user
-      await signIn(username, password);
+      await AsyncStorage.multiSet(updates);
+      setAuthState(prev => ({
+        ...prev,
+        accessToken: tokens.access,
+        refreshToken: tokens.refresh ?? prev.refreshToken,
+      }));
+
+      setupAxiosInterceptor(tokens.access);
     } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('Error updating tokens:', error);
       throw error;
     }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        authToken,
-        user,
-        isLoading,
-        signIn,
-        signOut,
-        signUp,
-      }}
-    >
+    <AuthContext.Provider value={{ ...authState, signIn, signOut, updateTokens }}>
       {children}
     </AuthContext.Provider>
   );
@@ -138,5 +131,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;
