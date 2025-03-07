@@ -1,5 +1,5 @@
 //screens/auth/ForgetPasswordScreen.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,12 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  Animated,
   Alert,
 } from "react-native";
 import { NavigationProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
-import Logo from "../../assets/images/logo_mindcare.svg"; // Fixed path
+import Logo from "../../assets/images/logo_mindcare.svg";
+import { gsap } from 'gsap';
 
 type ForgotPasswordScreenProps = {
   navigation: NavigationProp<any>;
@@ -26,7 +26,33 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showResetInstructions, setShowResetInstructions] = useState(false);
   
-  const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const formRef = useRef(null);
+  const logoRef = useRef(null);
+  const titleRef = useRef(null);
+
+  // Add initial animation
+  useEffect(() => {
+    const tl = gsap.timeline();
+    
+    tl.from(logoRef.current, {
+      y: -30,
+      opacity: 0,
+      duration: 0.8,
+      ease: "power3.out"
+    })
+    .from(formRef.current, {
+      y: 30,
+      opacity: 0,
+      duration: 0.6,
+      ease: "power2.out"
+    }, "-=0.4")
+    .from(titleRef.current, {
+      scale: 0.9,
+      opacity: 0,
+      duration: 0.4,
+      ease: "back.out"
+    }, "-=0.3");
+  }, []);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,29 +76,15 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
     }
   };
 
+  // Replace shakeError with GSAP version
   const shakeError = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: -10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 0,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    gsap.to(formRef.current, {
+      x: 10,
+      duration: 0.1,
+      repeat: 3,
+      yoyo: true,
+      ease: "power2.inOut"
+    });
   };
 
   const handleSendResetLink = async () => {
@@ -91,6 +103,14 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
     }
   
     try {
+      // Add button press animation
+      gsap.to(formRef.current, {
+        scale: 0.98,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      });
+
       const response = await fetch("http://127.0.0.1:8000/api/v1/auth/password/reset/", {
         method: "POST",
         headers: {
@@ -102,6 +122,15 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
       console.log("Response status:", response.status);
 
       if (response.ok) {
+        // Success animation
+        gsap.to(formRef.current, {
+          y: -10,
+          opacity: 0.8,
+          duration: 0.3,
+          ease: "power2.inOut",
+          yoyo: true,
+          repeat: 1
+        });
         setSuccessMessage("Password reset link sent to your email");
         setShowResetInstructions(true);
       } else {
@@ -124,18 +153,13 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.logoContainer}>
+        <View ref={logoRef} style={styles.logoContainer}>
           <Logo width={120} height={120} />
           <Text style={styles.logoText}>MindCare AI</Text>
         </View>
 
-        <Animated.View
-          style={[
-            styles.formContainer,
-            { transform: [{ translateX: shakeAnimation }] },
-          ]}
-        >
-          <Text style={styles.title}>Forgot Password</Text>
+        <View ref={formRef} style={styles.formContainer}>
+          <Text ref={titleRef} style={styles.title}>Forgot Password</Text>
           <Text style={styles.subtitle}>
             Enter your email and we'll send you a link to reset your password
           </Text>
@@ -191,7 +215,7 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
           <TouchableOpacity onPress={() => navigation.navigate("Login")}>
             <Text style={styles.backToLogin}>Back to Login</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
