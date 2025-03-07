@@ -1,13 +1,40 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Linking, View, Text, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { gsap } from 'gsap';
 import { RootStackParamList } from '../../types/navigation';
 import { API_BASE_URL } from '../../config';
 import { OAUTH_CONFIG } from '../../config/oauth';
 
 const GoogleCallbackScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const containerRef = useRef(null);
+  const loadingRef = useRef(null);
+  const textRef = useRef(null);
+
+  // Add initial animation
+  useEffect(() => {
+    const tl = gsap.timeline();
+    
+    tl.from(containerRef.current, {
+      opacity: 0,
+      duration: 0.5,
+      ease: "power2.inOut"
+    })
+    .from(loadingRef.current, {
+      scale: 0.5,
+      opacity: 0,
+      duration: 0.4,
+      ease: "back.out"
+    })
+    .from(textRef.current, {
+      y: 20,
+      opacity: 0,
+      duration: 0.3,
+      ease: "power2.out"
+    }, "-=0.2");
+  }, []);
 
   useEffect(() => {
     const handleDeepLink = async ({ url }: { url: string }) => {
@@ -62,20 +89,39 @@ const GoogleCallbackScreen = () => {
             ['refreshToken', data.refresh]
           ]);
 
-          navigation.reset({
-            index: 0,
-            routes: [{ 
-              name: 'App',
-              params: { screen: 'Welcome' }
-            }]
+          // Add success animation before navigation
+          gsap.to([loadingRef.current, textRef.current], {
+            y: -20,
+            opacity: 0,
+            duration: 0.4,
+            ease: "power2.in",
+            stagger: 0.1,
+            onComplete: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ 
+                  name: 'App',
+                  params: { screen: 'Welcome' }
+                }]
+              });
+            }
           });
         } catch (error) {
-          console.error('OAuth callback error:', error);
-          Alert.alert(
-            'Authentication Error',
-            'Failed to complete authentication. Please try again.'
-          );
-          navigation.navigate('Auth', { screen: 'Login' });
+          // Add error animation
+          gsap.to([loadingRef.current, textRef.current], {
+            scale: 0.9,
+            opacity: 0,
+            duration: 0.3,
+            ease: "power2.in",
+            onComplete: () => {
+              console.error('OAuth callback error:', error);
+              Alert.alert(
+                'Authentication Error',
+                'Failed to complete authentication. Please try again.'
+              );
+              navigation.navigate('Auth', { screen: 'Login' });
+            }
+          });
         } finally {
           await AsyncStorage.removeItem('oauth_state');
         }
@@ -87,9 +133,13 @@ const GoogleCallbackScreen = () => {
   }, [navigation]);
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#002D62" />
-      <Text style={styles.text}>Completing Google Sign In...</Text>
+    <View ref={containerRef} style={styles.container}>
+      <View ref={loadingRef}>
+        <ActivityIndicator size="large" color="#002D62" />
+      </View>
+      <Text ref={textRef} style={styles.text}>
+        Completing Google Sign In...
+      </Text>
     </View>
   );
 };
@@ -105,6 +155,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
     color: '#002D62',
+    opacity: 0.9,
   },
 });
 

@@ -12,6 +12,7 @@ export type AppTabParamList = {
   Settings: {
     userId?: string;
   };
+  Messaging: undefined; // Add this line
 };
 
 export type AuthStackParamList = {
@@ -23,8 +24,6 @@ export type AuthStackParamList = {
     token: string;
   };
 };
-
-// Remove AppStackParamList since we're using AppTabParamList for main navigation
 
 declare global {
   namespace ReactNavigation {

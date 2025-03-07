@@ -4,7 +4,6 @@
     "slug": "mindcare",
     "scheme": "mindcareai",
     "version": "1.0.0",
-    "privacy": "unlisted",
     "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -26,7 +25,8 @@
       "buildNumber": "1.0.0",
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "newArchEnabled": true
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +35,7 @@
       },
       "package": "com.mindcareai.app",
       "versionCode": 1,
+      "newArchEnabled": true,
       "intentFilters": [
         {
           "action": "VIEW",
@@ -52,12 +53,6 @@
           "redirectUrl": "mindcareai://oauth_callback"
         }
       }
-    },
-    "fonts": [
-      {
-        "asset": "node_modules/react-native-vector-icons/Fonts/FontAwesome.ttf",
-        "fontFamily": "FontAwesome"
-      }
-    ]
+    }
   }
 }
