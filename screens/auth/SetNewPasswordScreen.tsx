@@ -1,5 +1,5 @@
 //screens/auth/SetNewPasswordScreen.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { StackScreenProps } from '@react-navigation/stack';
 import { AuthStackParamList } from "../../types/navigation";
+import { gsap } from 'gsap';
 
 type SetNewPasswordScreenProps = StackScreenProps<AuthStackParamList, 'SetNewPassword'>;
 
@@ -23,15 +24,35 @@ const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route, navi
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const formRef = useRef(null);
+  const titleRef = useRef(null);
+
+  useEffect(() => {
+    // Initial animation timeline
+    const tl = gsap.timeline();
+    
+    tl.from(titleRef.current, {
+      y: -30,
+      opacity: 0,
+      duration: 0.8,
+      ease: "power3.out"
+    })
+    .from(formRef.current, {
+      y: 30,
+      opacity: 0,
+      duration: 0.6,
+      ease: "power2.out"
+    }, "-=0.4");
+  }, []);
 
   const shakeError = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
-    ]).start();
+    gsap.to(formRef.current, {
+      x: 10,
+      duration: 0.1,
+      repeat: 3,
+      yoyo: true,
+      ease: "power2.inOut"
+    });
   };
 
   const handleSetNewPassword = async () => {
@@ -48,6 +69,14 @@ const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route, navi
     }
 
     try {
+      // Add button press animation
+      gsap.to(formRef.current, {
+        scale: 0.98,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      });
+
       const response = await fetch("http://127.0.0.1:8000/api/v1/auth/password/reset/confirm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -56,9 +85,18 @@ const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route, navi
 
       if (response.ok) {
         setSuccessMessage("Password reset successful!");
-        setTimeout(() => {
-          navigation.navigate("Login" as never);
-        }, 2000);
+        // Success animation
+        gsap.to(formRef.current, {
+          y: -20,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.in",
+          onComplete: () => {
+            setTimeout(() => {
+              navigation.navigate("Login" as never);
+            }, 1000);
+          }
+        });
       } else {
         const data = await response.json();
         setError(data.detail || "Password reset failed");
@@ -73,9 +111,9 @@ const SetNewPasswordScreen: React.FC<SetNewPasswordScreenProps> = ({ route, navi
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.formContainer}>
-          <Text style={styles.title}>Set New Password</Text>
-
+        <Text ref={titleRef} style={styles.title}>Set New Password</Text>
+        
+        <View ref={formRef} style={styles.formContainer}>
           <TextInput
             style={styles.input}
             placeholder="New Password"

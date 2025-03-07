@@ -21,6 +21,7 @@ import { API_BASE_URL, SOCIAL_LOGIN_URLS, GOOGLE_CLIENT_ID, GITHUB_CLIENT_ID, OA
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
+import { gsap } from 'gsap';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -37,6 +38,35 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const { signIn } = useAuth();
+
+  const logoRef = useRef(null);
+  const formRef = useRef(null);
+  const socialButtonsRef = useRef(null);
+
+  useEffect(() => {
+    // Initial animation timeline
+    const tl = gsap.timeline();
+    
+    tl.from(logoRef.current, {
+      y: -50,
+      opacity: 0,
+      duration: 1,
+      ease: "power3.out"
+    })
+    .from(formRef.current, {
+      y: 30,
+      opacity: 0,
+      duration: 0.8,
+      ease: "power2.out"
+    }, "-=0.5")
+    .from(socialButtonsRef.current?.children || [], {
+      y: 20,
+      opacity: 0,
+      duration: 0.4,
+      stagger: 0.1,
+      ease: "power2.out"
+    }, "-=0.3");
+  }, []);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -62,28 +92,13 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   };
 
   const shakeError = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: -10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 0,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    gsap.to(formRef.current, {
+      x: 10,
+      duration: 0.1,
+      repeat: 3,
+      yoyo: true,
+      ease: "power2.inOut"
+    });
   };
 
   const handleLogin = async () => {
@@ -100,6 +115,14 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     }
 
     try {
+      // Animate button press
+      gsap.to(formRef.current, {
+        scale: 0.98,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      });
+
       console.log("Login data:", { email: formData.email, password: formData.password });
       
       const response = await fetch(`${API_BASE_URL}/api/v1/auth/login/`, {
@@ -117,17 +140,26 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       console.log("Login response:", data);
 
       if (response.ok) {
-        await signIn({
-          access: data.access,
-          refresh: data.refresh,
-        });
-        
-        navigation.reset({
-          index: 0,
-          routes: [{ 
-            name: 'App',
-            params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
-          }],
+        // Success animation
+        gsap.to(formRef.current, {
+          y: -20,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.in",
+          onComplete: async () => {
+            await signIn({
+              access: data.access,
+              refresh: data.refresh,
+            });
+            
+            navigation.reset({
+              index: 0,
+              routes: [{ 
+                name: 'App',
+                params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
+              }],
+            });
+          }
         });
       } else {
         setLoginError(data.detail || "Invalid email or password.");
@@ -268,17 +300,12 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.logoContainer}>
+        <View ref={logoRef} style={styles.logoContainer}>
           <Logo width={120} height={120} />
           <Text style={styles.logoText}>MindCare AI</Text>
         </View>
 
-        <Animated.View
-          style={[
-            styles.loginContainer,
-            { transform: [{ translateX: shakeAnimation }] },
-          ]}
-        >
+        <View ref={formRef} style={styles.loginContainer}>
           <Text style={styles.title}>Sign In</Text>
 
           <View style={styles.inputContainer}>
@@ -327,7 +354,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             <Text style={styles.loginButtonText}>SIGN IN</Text>
           </TouchableOpacity>
 
-          <View style={styles.socialButtonsContainer}>
+          <View ref={socialButtonsRef} style={styles.socialButtonsContainer}>
             <TouchableOpacity 
               style={styles.socialButton}
               onPress={handleGoogleLogin}
@@ -356,7 +383,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
               Don't have an account? Sign Up
             </Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

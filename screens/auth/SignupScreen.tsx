@@ -1,5 +1,4 @@
-//screens/auth/SignupScreen.tsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +12,7 @@ import {
 import { NavigationProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import Logo from "../../assets/images/logo_mindcare.svg";
+import { gsap } from 'gsap';
 
 type SignupScreenProps = {
   navigation: NavigationProp<any>;
@@ -33,6 +33,26 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const [signupError, setSignupError] = useState<string | null>(null);
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const logoRef = useRef(null);
+  const formRef = useRef(null);
+  
+  useEffect(() => {
+    // Initial animation timeline
+    const tl = gsap.timeline();
+    
+    tl.from(logoRef.current, {
+      y: -50,
+      opacity: 0,
+      duration: 1,
+      ease: "power3.out"
+    })
+    .from(formRef.current, {
+      y: 30,
+      opacity: 0,
+      duration: 0.8,
+      ease: "power2.out"
+    }, "-=0.5");
+  }, []);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,29 +92,15 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     if (signupError) setSignupError(null);
   };
 
+  // Replace the existing shakeError function with this GSAP version
   const shakeError = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: false,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: -10,
-        duration: 50,
-        useNativeDriver: false,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 10,
-        duration: 50,
-        useNativeDriver: false,
-      }),
-      Animated.timing(shakeAnimation, {
-        toValue: 0,
-        duration: 50,
-        useNativeDriver: false,
-      }),
-    ]).start();
+    gsap.to(formRef.current, {
+      x: 10,
+      duration: 0.1,
+      repeat: 3,
+      yoyo: true,
+      ease: "power2.inOut"
+    });
   };
 
   const handleSignup = async () => {
@@ -148,6 +154,14 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     };
 
     try {
+      // Add button press animation
+      gsap.to(formRef.current, {
+        scale: 0.98,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1
+      });
+
       const response = await fetch("http://127.0.0.1:8000/api/v1/auth/register/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,8 +172,16 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
 
       if (response.ok) {
         console.log("Signup success:", data);
-        // Navigate to Login screen after successful registration
-        navigation.navigate("Login");
+        // Success animation
+        gsap.to(formRef.current, {
+          y: -20,
+          opacity: 0,
+          duration: 0.5,
+          ease: "power2.in",
+          onComplete: () => {
+            navigation.navigate("Login");
+          }
+        });
       } else {
         console.error("Signup error details:", data);
         setSignupError(
@@ -180,16 +202,14 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.logoContainer}>
+        <View ref={logoRef} style={styles.logoContainer}>
           <Logo width={120} height={120} />
           <Text style={styles.logoText}>MindCare AI</Text>
         </View>
 
-        <Animated.View
-          style={[
-            styles.signupContainer,
-            { transform: [{ translateX: shakeAnimation }] },
-          ]}
+        <View 
+          ref={formRef} 
+          style={styles.signupContainer}
         >
           <Text style={styles.title}>Create Your Account</Text>
 
@@ -295,7 +315,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
               Already have an account? Sign In
             </Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
