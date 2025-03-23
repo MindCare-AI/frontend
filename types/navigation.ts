@@ -3,6 +3,9 @@ export type RootStackParamList = {
   Splash: undefined;
   Auth: { screen?: keyof AuthStackParamList };
   App: { screen?: keyof AppTabParamList };
+  AppointmentManagement: undefined;
+  BookAppointment: undefined;
+  // Add other screen names as needed
 };
 
 export type AppTabParamList = {

@@ -1,10 +1,7 @@
-//screens/Home/HomeScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { NavigationProp, ParamListBase } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
-import NavigationArea from '../../components/NavigationArea'; 
 
 type HomeScreenProps = {
   navigation: NavigationProp<ParamListBase>;
@@ -12,26 +9,19 @@ type HomeScreenProps = {
 
 const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [currentScreen, setCurrentScreen] = useState('Feeds');
-  
+
   const handleLogout = async () => {
     try {
-      // Clear both tokens
       await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
-      
-      // Navigate to Auth stack
       navigation.reset({
         index: 0,
-        routes: [{ 
-          name: 'Auth' as never,
-          params: { screen: 'Login' } 
-        }],
+        routes: [{ name: 'Auth' as never, params: { screen: 'Login' } }],
       });
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
-  // Helper function to render different content based on selected navigation
   const renderContent = () => {
     switch (currentScreen) {
       case 'Feeds':
@@ -59,11 +49,21 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
         return (
           <View style={styles.contentContainer}>
             <Text style={styles.contentTitle}>Settings</Text>
-            <TouchableOpacity 
-              style={styles.logoutButton}
-              onPress={handleLogout}
-            >
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.buttonText}>Log Out</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      case 'Appointments':
+        return (
+          <View style={styles.contentContainer}>
+            <Text style={styles.contentTitle}>Appointments</Text>
+            <Text style={styles.contentText}>Manage your upcoming and past appointments here.</Text>
+            <TouchableOpacity
+              style={styles.appointmentButton}
+              onPress={() => navigation.navigate('AppointmentManagement')}
+            >
+              <Text style={styles.buttonText}>View Appointments</Text>
             </TouchableOpacity>
           </View>
         );
@@ -72,7 +72,6 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
     }
   };
 
-  // Handle navigation directly in the HomeScreen
   const handleScreenChange = (screenName: string) => {
     setCurrentScreen(screenName);
   };
@@ -83,14 +82,40 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
         <View style={styles.header}>
           <Text style={styles.title}>MindCare AI</Text>
         </View>
-        
+
         {renderContent()}
-        
+
         <View style={styles.navigationContainer}>
-          <NavigationArea 
-            currentScreen={currentScreen}
-            onScreenChange={handleScreenChange}
-          />
+          <TouchableOpacity
+            style={[styles.navButton, currentScreen === 'Feeds' && styles.activeNavButton]}
+            onPress={() => handleScreenChange('Feeds')}
+          >
+            <Text style={styles.navButtonText}>Feeds</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, currentScreen === 'Chatbot' && styles.activeNavButton]}
+            onPress={() => handleScreenChange('Chatbot')}
+          >
+            <Text style={styles.navButtonText}>Chatbot</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, currentScreen === 'Notifications' && styles.activeNavButton]}
+            onPress={() => handleScreenChange('Notifications')}
+          >
+            <Text style={styles.navButtonText}>Notifications</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, currentScreen === 'Settings' && styles.activeNavButton]}
+            onPress={() => handleScreenChange('Settings')}
+          >
+            <Text style={styles.navButtonText}>Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.navButton, currentScreen === 'Appointments' && styles.activeNavButton]}
+            onPress={() => handleScreenChange('Appointments')}
+          >
+            <Text style={styles.navButtonText}>Appointments</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -141,12 +166,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
+  appointmentButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 10,
+    width: '60%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },
   navigationContainer: {
-    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderTopColor: '#CCC',
+  },
+  navButton: {
+    padding: 10,
+  },
+  activeNavButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#002D62',
+  },
+  navButtonText: {
+    fontSize: 14,
+    color: '#002D62',
   },
 });
 
