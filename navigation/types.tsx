@@ -1,7 +1,8 @@
 export type RootStackParamList = {
   Splash: undefined;
-  Auth: undefined;
-  App: undefined;
+  Onboarding: undefined;
+  Auth: { screen?: string; params?: object };
+  App: { screen?: string; params?: object };
 };
 
 export type AppStackParamList = {

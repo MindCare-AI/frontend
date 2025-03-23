@@ -101,7 +101,38 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     });
   };
 
-  const handleLogin = async () => {
+  // Check if the user has seen the onboarding
+  const checkAndNavigate = async () => {
+    try {
+      const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+      
+      if (hasSeenOnboarding === 'true') {
+        // User has seen onboarding, navigate to home
+        navigation.reset({
+          index: 0,
+          routes: [{ 
+            name: 'App',
+            params: { screen: 'Home' }
+          }],
+        });
+      } else {
+        // User hasn't seen onboarding, navigate there first
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Onboarding' }],
+        });
+      }
+    } catch (error) {
+      console.error("Error checking onboarding status:", error);
+      // Default to onboarding in case of error
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Onboarding' }],
+      });
+    }
+  };
+
+  const handleLoginAsync = async () => {
     if (!formData.email || !formData.password) {
       setLoginError("Please fill in all fields.");
       shakeError();
@@ -152,13 +183,8 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
               refresh: data.refresh,
             });
             
-            navigation.reset({
-              index: 0,
-              routes: [{ 
-                name: 'App',
-                params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
-              }],
-            });
+            // Check onboarding status and navigate accordingly
+            await checkAndNavigate();
           }
         });
       } else {
@@ -170,6 +196,13 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       setLoginError("An error occurred during login. Please try again.");
       shakeError();
     }
+  };
+
+  // Synchronous wrapper function
+  const handleLogin = () => {
+    handleLoginAsync().catch(err => {
+      console.error("Unhandled login error:", err);
+    });
   };
 
   const handleGoogleLogin = async () => {
@@ -266,14 +299,8 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             ['refreshToken', data.refresh]
           ]);
 
-          // Navigate to app
-          navigation.reset({
-            index: 0,
-            routes: [{ 
-              name: 'App',
-              params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
-            }]
-          });
+          // Check onboarding status and navigate accordingly
+          await checkAndNavigate();
         } catch (error) {
           console.error('OAuth callback error:', error);
           Alert.alert(
@@ -390,6 +417,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 };
 
 const styles = StyleSheet.create({
+  // ... styles remain unchanged
   container: {
     flex: 1,
     backgroundColor: "#E4F0F6",
@@ -397,7 +425,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     padding: 20,
-    paddingBottom: 40, // Add more bottom padding for better scrolling experience
+    paddingBottom: 40,
   },
   logoContainer: {
     alignItems: "center",
@@ -409,30 +437,30 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#002D62",
     marginTop: 10,
-    letterSpacing: 0.5, // Add letter spacing for better readability
+    letterSpacing: 0.5,
   },
   loginContainer: {
     backgroundColor: "#fff",
-    padding: 24, // Increase padding for better spacing
-    borderRadius: 12, // Slightly increase border radius
+    padding: 24,
+    borderRadius: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 }, // Enhance shadow effect
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 5, // Increase elevation for better material design
-    marginHorizontal: 2, // Add slight horizontal margin
+    elevation: 5,
+    marginHorizontal: 2,
   },
   title: {
-    fontSize: 26, // Slightly larger font
+    fontSize: 26,
     fontWeight: "bold",
     color: "#002D62",
-    marginBottom: 24, // Increase spacing
+    marginBottom: 24,
     textAlign: "center",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18, // Increase spacing between inputs
+    marginBottom: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#CFCFCF",
@@ -440,83 +468,83 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 54, // Slightly taller inputs
+    height: 54,
     paddingHorizontal: 16,
     fontSize: 16,
     color: "#333",
   },
   inputIcon: {
-    padding: 12, // Increase touch target size
+    padding: 12,
   },
   inputError: {
     borderColor: "#E74C3C",
-    borderWidth: 1.5, // Make error border slightly thicker
+    borderWidth: 1.5,
   },
   errorText: {
     color: "#E74C3C",
     fontSize: 14,
     marginBottom: 15,
     textAlign: "center",
-    fontWeight: "500", // Make error text slightly bolder
+    fontWeight: "500",
   },
   forgotPassword: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 18, // Increase spacing
-    fontSize: 15, // Slightly larger
+    marginTop: 18,
+    fontSize: 15,
     textDecorationLine: "underline",
-    fontWeight: "500", // Make it slightly bolder
+    fontWeight: "500",
   },
   loginButton: {
     width: "100%",
     backgroundColor: "#002D62",
-    padding: 16, // Slightly taller button
+    padding: 16,
     borderRadius: 10,
     alignItems: "center",
-    elevation: 4, // Enhance elevation
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3,
-    marginTop: 6, // Add some spacing from the input
+    marginTop: 6,
   },
   loginButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-    letterSpacing: 0.5, // Add letter spacing for better readability
+    letterSpacing: 0.5,
   },
   createAccount: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 22, // Increase spacing
-    marginBottom: 8, // Add bottom margin
-    fontSize: 15, // Slightly larger
-    fontWeight: "500", // Make it slightly bolder
+    marginTop: 22,
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "500",
   },
   socialButtonsContainer: {
-    marginTop: 24, // Increase spacing
-    marginBottom: 4, // Add bottom margin
+    marginTop: 24,
+    marginBottom: 4,
     width: '100%',
   },
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14, // Increase padding
-    borderRadius: 10, // Match login button radius
+    padding: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CFCFCF',
     marginVertical: 8,
     backgroundColor: '#FFFFFF',
-    elevation: 1, // Add subtle elevation
+    elevation: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   socialButtonText: {
-    marginLeft: 12, // Increase spacing from icon
+    marginLeft: 12,
     color: '#002D62',
     fontWeight: '500',
     fontSize: 16,

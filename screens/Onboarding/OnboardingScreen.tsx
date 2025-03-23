@@ -1,4 +1,3 @@
-//screens/Onboarding/OnboardingScreen.tsx
 import React, { useState, useRef } from 'react';
 import { 
   View, 
@@ -11,7 +10,8 @@ import {
   SafeAreaView
 } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
-import { markOnboardingComplete } from "../../utils/onboarding"; // Fixed import
+import { markOnboardingComplete } from "../../utils/onboarding";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnboardingStep {
   title: string;
@@ -65,11 +65,39 @@ const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
     handleComplete();
   };
 
-  const handleComplete = () => {
-    // Mark onboarding as complete
-    markOnboardingComplete();
-    // Navigate to Welcome screen after onboarding
-    navigation.navigate('Welcome'); // Using navigate instead of replace
+  const handleComplete = async () => {
+    try {
+      // Mark onboarding as complete using both utility function and direct AsyncStorage
+      markOnboardingComplete();
+      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+      
+      // Check if user is logged in to determine where to navigate
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      
+      if (accessToken) {
+        // User is logged in, navigate to main app
+        navigation.reset({
+          index: 0,
+          routes: [{ 
+            name: 'App', 
+            params: { screen: 'Home' }
+          }]
+        });
+      } else {
+        // User is not logged in, navigate to welcome/auth flow
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Auth', params: { screen: 'Welcome' } }]
+        });
+      }
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Fallback navigation in case of error
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Auth', params: { screen: 'Welcome' } }]
+      });
+    }
   };
 
   const renderDot = (index: number) => {
