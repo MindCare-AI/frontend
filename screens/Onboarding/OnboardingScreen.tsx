@@ -1,263 +1,148 @@
-import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet, 
-  TouchableOpacity,
-  FlatList,
-  Dimensions,
-  SafeAreaView
-} from 'react-native';
-import { NavigationProp } from '@react-navigation/native';
-import { markOnboardingComplete } from "../../utils/onboarding";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Brain, HandHeart, MessageSquare } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../components/ui/ToastContext';
+import UserTypeSelection from '../../components/UserTypeSelection';
+import OnboardingSlide from '../../components/OnboardingSlide';
+import OnboardingLayout from '../../components/OnboardingLayout';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigation';
 
-interface OnboardingStep {
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+export interface OnboardingSlideProps {
   title: string;
   description: string;
-  image: any; // Changed to any for require() image source
+  icon: React.ReactNode;
+  isActive: boolean;
+  onNext?: () => void; // Added onNext property
 }
 
-type OnboardingScreenProps = {
-  navigation: NavigationProp<any>;
-};
+const OnboardingScreen = () => {
+  const [step, setStep] = useState(0);
+  const [userType, setUserType] = useState<'patient' | 'therapist' | null>(null);
+  const navigation = useNavigation<NavigationProp>();
+  const { toast } = useToast();
+  const { user, updateUserRole } = useAuth();
+  const totalSteps = 4;
 
-const { width } = Dimensions.get('window');
+  useEffect(() => {
+    checkUserRole();
+  }, [user]);
 
-const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  
-  const steps: OnboardingStep[] = [
-    {
-      title: "Welcome to MindCare AI",
-      description: "Your AI companion for mental wellbeing and mindfulness",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "Track Your Mood",
-      description: "Log how you're feeling daily to recognize patterns and improve self-awareness",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "Guided Meditation",
-      description: "Access personalized meditation sessions to reduce stress and improve focus",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "AI-Powered Support",
-      description: "Chat with our AI assistant anytime you need someone to talk to",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-  ];
+  const checkUserRole = async () => {
+    try {
+      if (user?.role) {
+        // User already has a role, skip onboarding
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        });
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to check user role',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!userType) return;
+
+    try {
+      await updateUserRole(userType);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'App' }],
+      });
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete onboarding. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleUserTypeSelect = (type: 'patient' | 'therapist') => {
+    setUserType(type);
+    handleNext();
+  };
 
   const handleNext = () => {
-    if (currentIndex < steps.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      flatListRef.current?.scrollToIndex({ animated: true, index: currentIndex + 1 });
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
     } else {
       handleComplete();
     }
   };
 
-  const handleSkip = () => {
-    handleComplete();
-  };
-
-  const handleComplete = async () => {
-    try {
-      // Mark onboarding as complete using both utility function and direct AsyncStorage
-      markOnboardingComplete();
-      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-      
-      // Check if user is logged in to determine where to navigate
-      const accessToken = await AsyncStorage.getItem('accessToken');
-      
-      if (accessToken) {
-        // User is logged in, navigate to main app
-        navigation.reset({
-          index: 0,
-          routes: [{ 
-            name: 'App', 
-            params: { screen: 'Home' }
-          }]
-        });
-      } else {
-        // User is not logged in, navigate to welcome/auth flow
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Auth', params: { screen: 'Welcome' } }]
-        });
-      }
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-      // Fallback navigation in case of error
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Auth', params: { screen: 'Welcome' } }]
-      });
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
     }
   };
 
-  const renderDot = (index: number) => {
-    return (
-      <View
-        key={index}
-        style={[
-          styles.dot,
-          {
-            width: index === currentIndex ? 20 : 10,
-            backgroundColor: index === currentIndex 
-              ? '#002D62' 
-              : index < currentIndex 
-                ? '#002D6280' 
-                : '#CFCFCF',
-          }
-        ]}
-      />
-    );
-  };
-
-  const renderItem = ({ item }: { item: OnboardingStep }) => {
-    return (
-      <View style={styles.slide}>
-        <View style={styles.imageContainer}>
-          <Image 
-            source={item.image} 
-            style={styles.image}
-            resizeMode="cover"
-          />
-        </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
-      </View>
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.dotsContainer}>
-        {steps.map((_, index) => renderDot(index))}
-      </View>
+    <OnboardingLayout
+      totalSteps={totalSteps}
+      currentStep={step}
+      onBack={step > 0 ? handleBack : undefined}
+      showProgress={true}
+    >
+      {step === 0 && (
+        <OnboardingSlide
+          title="Welcome to MindCare AI"
+          description="Your digital companion for mental wellness and therapy management"
+          icon={<Brain size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
 
-      <FlatList
-        ref={flatListRef}
-        data={steps}
-        renderItem={renderItem}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(index);
-        }}
-        keyExtractor={(_, index) => index.toString()}
-      />
+      {step === 1 && (
+        <OnboardingSlide
+          title="Personalized Support"
+          description="Access tools tailored to your unique needs and goals"
+          icon={<HandHeart size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
 
-      <View style={styles.buttonContainer}>
-        {currentIndex < steps.length - 1 ? (
-          <>
-            <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-              <Text style={styles.skipButtonText}>Skip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleNext} style={styles.nextButton}>
-              <Text style={styles.nextButtonText}>Next</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity onPress={handleComplete} style={styles.getStartedButton}>
-              <Text style={styles.nextButtonText}>Get Started</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </SafeAreaView>
+      {step === 2 && (
+        <OnboardingSlide
+          title="Stay Connected"
+          description="Communication tools that bridge the gap between sessions"
+          icon={<MessageSquare size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
+
+      {step === 3 && (
+        <OnboardingSlide
+          title="Who Are You?"
+          description="Select your role to personalize your experience"
+          isActive={true}
+        >
+          <UserTypeSelection onSelect={handleUserTypeSelect} />
+        </OnboardingSlide>
+      )}
+    </OnboardingLayout>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E4F0F6',
-  },
-  slide: {
-    width,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#4A90E280',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#002D62',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    lineHeight: 22,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    marginBottom: 20,
-  },
-  skipButton: {
-    padding: 10,
-  },
-  skipButtonText: {
-    color: '#666',
-    fontSize: 16,
-  },
-  nextButton: {
-    backgroundColor: '#002D62',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 3,
-  },
-  getStartedButton: {
-    backgroundColor: '#002D62',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 3,
-  },
-  nextButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: 'white',
   },
 });
 
