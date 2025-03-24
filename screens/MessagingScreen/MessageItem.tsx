@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarSvg from '../../assets/avatar/avatar.svg';
-require('../../assets/default-avatar.png');
 
 interface MessageItemProps {
   id: string;
