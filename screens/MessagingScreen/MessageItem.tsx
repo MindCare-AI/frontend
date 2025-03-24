@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarSvg from '../../assets/avatar/avatar.svg';
 
@@ -38,7 +38,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: false, // disable native animation driver for environments where it's not supported
     }).start();
   }, []);
   
@@ -47,12 +47,16 @@ const MessageItem: React.FC<MessageItemProps> = ({
     minute: '2-digit' 
   });
   
-  let reactionsList: {emoji: string, count: number}[] = [];
+  let reactionsList: { emoji: string, count: number }[] = [];
   if (reactions) {
-    try {
-      reactionsList = JSON.parse(reactions);
-    } catch (e) {
-      console.error('Failed to parse reactions:', e);
+    if (typeof reactions === 'string') {
+      try {
+        reactionsList = JSON.parse(reactions);
+      } catch (e) {
+        console.error('Failed to parse reactions:', e);
+      }
+    } else if (typeof reactions === 'object') {
+      reactionsList = reactions as { emoji: string, count: number }[];
     }
   }
   
@@ -233,5 +237,14 @@ const styles = StyleSheet.create({
     color: '#666',
   }
 });
+
+const MessageList: React.FC<{ messages: MessageItemProps[] }> = ({ messages }) => (
+  <FlatList
+    inverted
+    data={messages}
+    renderItem={({ item }) => <MessageItem {...item} />}
+    // ...other props
+  />
+);
 
 export default MessageItem;
