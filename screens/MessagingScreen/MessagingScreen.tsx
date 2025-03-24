@@ -17,18 +17,10 @@ import { MessagingStackParamList } from '../../navigation/MessagingNavigator';
 import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
 import NewConversationModal from './NewConversationModal';
+import MessageItem from '../MessagingScreen/MessageItem';
 
-// Define your navigation parameters
-type RootStackParamList = {
-  Chat: {
-    conversationId: number | string;
-    conversationType: 'one_to_one' | 'group';
-    title?: string;
-  };
-  // Add other screens here
-};
-
-type ConversationType = 'one_to_one' | 'group';
+// Define type aliases for conversation items
+export type Conversation = OneToOneConversation | GroupConversation;
 
 interface OneToOneConversation {
   id: number | string;
@@ -61,14 +53,16 @@ interface GroupConversation {
   participant_count?: number;
 }
 
-// Use this navigation type
+type ConversationType = 'one_to_one' | 'group';
+
 type MessagingScreenNavigationProp = StackNavigationProp<MessagingStackParamList, 'Messaging'>;
 
 const MessagingScreen: React.FC = () => {
   const navigation = useNavigation<MessagingScreenNavigationProp>();
   const { accessToken, user } = useAuth();
+  const flatListRef = React.useRef<FlatList>(null);
   const [conversationType, setConversationType] = useState<ConversationType>('one_to_one');
-  const [conversations, setConversations] = useState<(OneToOneConversation | GroupConversation)[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +70,6 @@ const MessagingScreen: React.FC = () => {
   const [hasMoreConversations, setHasMoreConversations] = useState(true);
   const [newConversationModalVisible, setNewConversationModalVisible] = useState(false);
 
-  // Add debug logging
   useEffect(() => {
     console.log('Auth State:', { 
       hasToken: !!accessToken, 
@@ -85,37 +78,21 @@ const MessagingScreen: React.FC = () => {
     });
   }, [accessToken, user]);
 
-  // Refresh conversations when the screen is focused
   useFocusEffect(
     useCallback(() => {
-      if (accessToken) {
-        handleRefresh();
-      }
+      if (accessToken) handleRefresh();
       return () => {};
     }, [accessToken, conversationType])
   );
   
-  // Update fetch conversations to use pagination and handle errors
   const fetchConversations = useCallback(async (pageNum = 1, refreshing = false) => {
-    console.log('Attempting to fetch conversations:', {
-      page: pageNum,
-      refreshing,
-      hasToken: !!accessToken,
-      hasUser: !!user,
-      userDetails: user
-    });
-
     if (!accessToken) {
-      console.error('Missing access token');
       setIsLoading(false);
       return;
     }
 
-    // Set appropriate loading state
     if (pageNum === 1 && !refreshing) setIsLoading(true);
     if (refreshing) setIsRefreshing(true);
-    
-    // Reset error state
     setError(null);
 
     let endpoint = '';
@@ -126,7 +103,6 @@ const MessagingScreen: React.FC = () => {
     }
     
     try {
-      console.log('Fetching from endpoint:', endpoint);
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -139,50 +115,36 @@ const MessagingScreen: React.FC = () => {
       }
       
       const data = await response.json();
-      console.log('Received API response:', data);
-      
-      // Determine if there are more pages
       const hasMore = data.next !== null;
       setHasMoreConversations(hasMore);
       
-      // Extract results, ensuring it's always an array
-      let results = [];
+      let results: Conversation[] = [];
       if (data.results && Array.isArray(data.results)) {
-        // Handle paginated response
-        console.log('Setting paginated conversations:', data.results.length);
         results = data.results;
       } else if (Array.isArray(data)) {
-        // Handle array response
-        console.log('Setting array conversations:', data.length);
         results = data;
-      } else {
-        // Handle unexpected response format
-        console.error('Unexpected API response format:', data);
-        results = []; // Set empty array to avoid mapping errors
       }
       
-      // Update state based on pagination
       if (pageNum === 1) {
         setConversations(results);
       } else {
         setConversations(prev => [...prev, ...results]);
       }
     } catch (error) {
-      console.error('Error fetching conversations:', error);
       setError(error instanceof Error ? error.message : 'An error occurred');
       if (pageNum === 1) {
-        setConversations([]); // Set empty array on error for first page
+        setConversations([]);
       }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [accessToken, conversationType, user]);
+  }, [accessToken, conversationType]);
 
   useEffect(() => {
-    setPage(1); // Reset page when conversation type changes
+    setPage(1);
     if (accessToken) {
-      fetchConversations(1); // Always fetch first page
+      fetchConversations(1);
     } else {
       setIsLoading(false);
     }
@@ -192,7 +154,7 @@ const MessagingScreen: React.FC = () => {
     setPage(1);
     fetchConversations(1, true);
   };
-  
+
   const handleLoadMore = () => {
     if (hasMoreConversations && !isLoading && !isRefreshing) {
       const nextPage = page + 1;
@@ -201,73 +163,59 @@ const MessagingScreen: React.FC = () => {
     }
   };
 
-  const renderConversationItem = useCallback(({ item }: { item: OneToOneConversation | GroupConversation }) => {
-    if (!item) return null;
-    
+  const renderConversationItem = useCallback(({ item }: { item: Conversation }) => {
     let displayName = '';
     let lastMessageText = '';
     let lastMessageTime = '';
-    let avatarUrl = null;
+    let avatarUrl = '';
     
     try {
       if (conversationType === 'one_to_one') {
-        const oneToOneConv = item as OneToOneConversation;
-        
-        // Handle case where participants might be null
-        const participants = oneToOneConv.participants || [];
-        
-        // Get the display name - either from other_participant or by finding non-current user
-        if (oneToOneConv.other_participant) {
-          displayName = oneToOneConv.other_participant;
+        const conv = item as OneToOneConversation;
+        if (conv.other_participant) {
+          displayName = conv.other_participant;
         } else {
           const userId = user?.id;
-          if (!userId) {
-            displayName = participants.map(p => p.username).join(', ');
-          } else {
-            const other = participants.find((p) => p.id !== Number(userId));
-            displayName = other ? other.username : 'Conversation';
-          }
+          const other = conv.participants.find((p) => p.id !== Number(userId));
+          displayName = other ? other.username : 'Conversation';
         }
         
-        if (oneToOneConv.last_message) {
-          lastMessageText = oneToOneConv.last_message.content;
-          lastMessageTime = new Date(oneToOneConv.last_message.timestamp).toLocaleTimeString([], {
+        if (conv.last_message) {
+          lastMessageText = conv.last_message.content;
+          lastMessageTime = new Date(conv.last_message.timestamp).toLocaleTimeString([], {
             hour: '2-digit', 
             minute: '2-digit'
           });
         } else {
-          lastMessageTime = new Date(oneToOneConv.created_at).toLocaleTimeString([], {
+          lastMessageTime = new Date(conv.created_at).toLocaleTimeString([], {
             hour: '2-digit', 
             minute: '2-digit'
           });
         }
         
-        // Generate avatar url for the other user
         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
         
       } else {
-        const groupConv = item as GroupConversation;
-        displayName = groupConv.name || 'Group Chat';
+        const conv = item as GroupConversation;
+        displayName = conv.name || 'Group Chat';
         
-        if (groupConv.last_message) {
-          const sender = groupConv.last_message.sender;
-          lastMessageText = sender ? `${sender}: ${groupConv.last_message.content}` : groupConv.last_message.content;
-          lastMessageTime = new Date(groupConv.last_message.timestamp).toLocaleTimeString([], {
+        if (conv.last_message) {
+          const sender = conv.last_message.sender;
+          lastMessageText = sender ? `${sender}: ${conv.last_message.content}` : conv.last_message.content;
+          lastMessageTime = new Date(conv.last_message.timestamp).toLocaleTimeString([], {
             hour: '2-digit', 
             minute: '2-digit'
           });
         } else {
-          lastMessageTime = new Date(groupConv.created_at).toLocaleTimeString([], {
+          lastMessageTime = new Date(conv.created_at).toLocaleTimeString([], {
             hour: '2-digit', 
             minute: '2-digit'
           });
         }
         
-        // Generate avatar url for group
         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
       }
     } catch (err) {
-      console.error('Error rendering conversation item:', err, item);
       displayName = 'Error displaying conversation';
     }
   
@@ -278,7 +226,6 @@ const MessagingScreen: React.FC = () => {
           item.unread_count && item.unread_count > 0 ? styles.unreadConversation : null
         ]}
         onPress={() => {
-          console.log('Navigating to chat with ID:', item.id);
           navigation.navigate('Chat', {
             conversationId: item.id,
             conversationType: conversationType,
@@ -317,9 +264,8 @@ const MessagingScreen: React.FC = () => {
     );
   }, [conversationType, navigation, user]);
   
-  // Modify the authentication guard to only check for accessToken
+  // Use renderConversationItem for the conversations list.
   if (!accessToken) {
-    console.log('Authentication required:', { hasToken: !!accessToken });
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>Authentication required.</Text>
@@ -375,9 +321,13 @@ const MessagingScreen: React.FC = () => {
       )}
       
       <FlatList
-        data={conversations && Array.isArray(conversations) ? conversations : []}
+        ref={flatListRef}
+        data={conversations}
+        keyExtractor={(item) => String(item.id)}
         renderItem={renderConversationItem}
-        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.messageList}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -385,8 +335,6 @@ const MessagingScreen: React.FC = () => {
             colors={["#007BFF"]}
           />
         }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
         ListFooterComponent={
           hasMoreConversations && isLoading && page > 1 ? (
             <View style={styles.loadingMore}>
@@ -417,6 +365,7 @@ const MessagingScreen: React.FC = () => {
             </View>
           ) : null
         }
+        inverted
       />
       
       <TouchableOpacity
@@ -444,6 +393,9 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#F8F9FA' 
   },
+  unreadConversation: {
+    backgroundColor: '#F0F7FF',
+  },
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: '#F0F2F5',
@@ -469,10 +421,6 @@ const styles = StyleSheet.create({
   inactiveToggleText: {
     color: '#555',
   },
-  conversationsContainer: { 
-    flex: 1,
-    padding: 10 
-  },
   conversationItem: {
     flexDirection: 'row',
     padding: 15,
@@ -489,9 +437,6 @@ const styles = StyleSheet.create({
   },
   conversationContent: {
     flex: 1,
-  },
-  unreadConversation: {
-    backgroundColor: '#F0F7FF',
   },
   conversationHeader: {
     flexDirection: 'row',
@@ -511,7 +456,7 @@ const styles = StyleSheet.create({
   lastMessage: {
     fontSize: 14,
     color: '#5F6368',
-    marginRight: 30, // Space for unread badge
+    marginRight: 30,
   },
   noMessages: {
     fontSize: 14,
@@ -609,6 +554,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  // Add this style for the FlatList container if needed
+  messageList: {
+    paddingVertical: 10,
   },
 });
 

@@ -345,22 +345,20 @@ const ChatScreen: React.FC = () => {
     const isCurrentUser = item.sender === (user?.id ? Number(user.id) : undefined);
     
     return (
-      <View style={{ transform: [{ scaleY: -1 }] }}>
-        <MessageItem
-          id={String(item.id)}
-          content={item.content}
-          sender={{
-            id: item.sender,
-            name: item.sender_name,
-          }}
-          timestamp={item.timestamp}
-          isCurrentUser={isCurrentUser}
-          status={isCurrentUser ? (item.read_by ? 'read' : 'sent') : undefined}
-          isEdited={item.is_edited}
-          reactions={item.reactions}
-          onRetry={item.sendingFailed ? () => handleRetry(String(item.id)) : undefined}
-        />
-      </View>
+      <MessageItem
+        id={String(item.id)}
+        content={item.content}
+        sender={{
+          id: item.sender,
+          name: item.sender_name,
+        }}
+        timestamp={item.timestamp}
+        isCurrentUser={isCurrentUser}
+        status={isCurrentUser ? (item.read_by ? 'read' : 'sent') : undefined}
+        isEdited={item.is_edited}
+        reactions={item.reactions}
+        onRetry={item.sendingFailed ? () => handleRetry(String(item.id)) : undefined}
+      />
     );
   };
   
@@ -396,8 +394,6 @@ const ChatScreen: React.FC = () => {
           data={messages}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderMessage}
-          inverted
-          // ...other props
           contentContainerStyle={styles.messageList}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
@@ -416,9 +412,7 @@ const ChatScreen: React.FC = () => {
               </View>
             ) : null
           }
-          ListHeaderComponent={
-            isTyping ? <TypingIndicator visible={true} /> : null
-          }
+          ListHeaderComponent={isTyping ? <TypingIndicator visible={true} /> : null}
         />
       )}
       
