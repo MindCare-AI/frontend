@@ -7,6 +7,8 @@ import { useToast } from '../../components/ui/ToastContext';
 import UserTypeSelection from '../../components/UserTypeSelection';
 import OnboardingSlide from '../../components/OnboardingSlide';
 import OnboardingLayout from '../../components/OnboardingLayout';
+import axios from 'axios';
+import { API_URL } from '../../config';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
 
@@ -25,7 +27,7 @@ const OnboardingScreen = () => {
   const [userType, setUserType] = useState<'patient' | 'therapist' | null>(null);
   const navigation = useNavigation<NavigationProp>();
   const { toast } = useToast();
-  const { user, isLoading, updateUserRole } = useAuth(); // include isLoading
+  const { user, accessToken, isLoading, fetchUserData } = useAuth();
   const totalSteps = 4;
 
   useEffect(() => {
@@ -33,18 +35,15 @@ const OnboardingScreen = () => {
       console.log('Initial check - Auth loading complete');
       checkUserRole();
     }
-  }, [isLoading]); // Only depends on loading state, not user
+  }, [isLoading]);
 
-  // Update the effect that handles user_type changes
+  // Monitor user_type changes to handle navigation
   useEffect(() => {
-    // Only run this effect if we have a user and we're not loading
     if (!isLoading && user) {
       console.log('User_type changed effect - current user_type:', user?.user_type);
       
-      // Check if user_type has a non-empty value using safe type checking
-      const hasValidUserType = Boolean(user.user_type) && user.user_type !== '';
-      
-      if (hasValidUserType) {
+      // Using typeof to avoid TypeScript errors
+      if (typeof user.user_type === 'string' && user.user_type !== '') {
         console.log('User already has a type, navigating to App:', user.user_type);
         navigation.reset({
           index: 0,
@@ -52,17 +51,14 @@ const OnboardingScreen = () => {
         });
       }
     }
-  }, [user?.user_type, isLoading, navigation]); // Added navigation to dependencies
+  }, [user?.user_type, isLoading, navigation]);
 
-  // Update the checkUserRole function with safer type handling
   const checkUserRole = async () => {
     try {
       console.log('Checking user role - current user:', user);
       
-      // Use Boolean to convert to a boolean value first, then check if it's not empty
-      const hasValidUserType = Boolean(user?.user_type) && user?.user_type !== '';
-      
-      if (hasValidUserType && user) {
+      // Using typeof for better type safety
+      if (user && typeof user.user_type === 'string' && user.user_type !== '') {
         console.log('User has a role, skipping onboarding:', user.user_type);
         navigation.reset({
           index: 0,
@@ -81,6 +77,45 @@ const OnboardingScreen = () => {
     }
   };
 
+  // Direct API call to set user type without modifying auth context
+  const setUserTypeInBackend = async (selectedType: 'patient' | 'therapist') => {
+    if (!accessToken) {
+      console.error('No access token available');
+      return;
+    }
+
+    try {
+      // Make sure this matches your API's expected payload structure
+      const payload = { user_type: selectedType };
+      
+      console.log('Setting user type in backend:', selectedType);
+      const response = await axios.post(
+        `${API_URL}/users/set-user-type/`, 
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      
+      console.log('User type set successfully, response:', response.status);
+      
+      // Refresh user data to get updated user_type
+      await fetchUserData();
+      
+      return true;
+    } catch (error) {
+      console.error('Error setting user type:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status: number, data: any } };
+        console.error('API error details:', axiosError.response?.data);
+      }
+      throw error;
+    }
+  };
+
   const handleComplete = async () => {
     if (!userType) {
       console.error('No user type selected');
@@ -95,17 +130,11 @@ const OnboardingScreen = () => {
     try {
       console.log('Completing onboarding, setting user type to:', userType);
       
-      // Update role in backend
-      await updateUserRole(userType);
+      // Set user type directly via API
+      await setUserTypeInBackend(userType);
       
-      // Force a small delay to ensure backend sync completes
-      setTimeout(() => {
-        console.log('Navigating to App after role update');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'App' }],
-        });
-      }, 300);
+      // The navigation will be handled by the useEffect that watches user.user_type
+      // after fetchUserData() updates the user state
       
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -117,16 +146,64 @@ const OnboardingScreen = () => {
     }
   };
 
+  // Fix the handleUserTypeSelect function
   const handleUserTypeSelect = (type: 'patient' | 'therapist') => {
+    // Set the user type first
     setUserType(type);
-    handleNext();
+    console.log('User type selected:', type);
+    
+    // Then move to the next step (or complete if it's the last step)
+    setTimeout(() => {
+      if (step < totalSteps - 1) {
+        setStep(step + 1);
+      } else {
+        // Directly use the selected type instead of relying on state
+        handleCompleteWithType(type);
+      }
+    }, 100); // Small timeout to ensure state updates
   };
 
+  // Add this helper function to use the type directly
+  const handleCompleteWithType = async (selectedType: 'patient' | 'therapist') => {
+    try {
+      console.log('Completing onboarding with type:', selectedType);
+      
+      // Set user type directly via API using the passed-in type
+      await setUserTypeInBackend(selectedType);
+      
+      // Optional: Force navigation if the useEffect doesn't trigger fast enough
+      setTimeout(() => {
+        console.log('Forcing navigation to App screen after role update');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete onboarding. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Update the handleNext function to handle the final step differently
   const handleNext = () => {
     if (step < totalSteps - 1) {
       setStep(step + 1);
-    } else {
+    } else if (userType) {
+      // Only call handleComplete if userType is set
       handleComplete();
+    } else {
+      // Show an error if we're on the last step but no user type is selected
+      toast({
+        title: 'Error',
+        description: 'Please select your role to continue',
+        variant: 'destructive',
+      });
     }
   };
 
