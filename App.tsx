@@ -5,16 +5,18 @@ import RootNavigator from './navigation/RootNavigator';
 import { LogBox } from 'react-native';
 import { AuthProvider } from './contexts/AuthContext';
 import { NavigationContainer } from '@react-navigation/native';
+import { ToastProvider } from './components/ui/ToastContext';
 
-// Ignore any warnings that might disrupt your debugging
-LogBox.ignoreLogs(['Warning: ...']); // Add specific warnings to ignore
+LogBox.ignoreLogs(['Warning: ...']);
 
 const App = () => {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <ToastProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </ToastProvider>
     </AuthProvider>
   );
 };

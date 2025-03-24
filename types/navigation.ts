@@ -1,11 +1,10 @@
 //types/navigation.ts
 export type RootStackParamList = {
-  Splash: undefined;
-  Auth: { screen?: keyof AuthStackParamList };
-  App: { screen?: keyof AppTabParamList };
-  AppointmentManagement: undefined;
-  BookAppointment: undefined;
-  // Add other screen names as needed
+  Auth: undefined;
+  Onboarding: undefined;
+  App: undefined;
+  Home: undefined;
+  // ... other routes
 };
 
 export type AppTabParamList = {
