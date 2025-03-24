@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 
-interface OnboardingSlideProps {
+export interface OnboardingSlideProps {
   title: string;
   description: string;
   icon?: React.ReactNode;
   children?: React.ReactNode;
   isActive?: boolean;
   index?: number;
+  onNext?: () => void; // Added onNext property
 }
 
 const OnboardingSlide: React.FC<OnboardingSlideProps> = ({
@@ -17,6 +18,7 @@ const OnboardingSlide: React.FC<OnboardingSlideProps> = ({
   children,
   isActive = false,
   index = 0,
+  onNext,
 }) => {
   if (!isActive) return null;
 
@@ -43,6 +45,12 @@ const OnboardingSlide: React.FC<OnboardingSlideProps> = ({
         <View style={styles.childrenContainer}>
           {children}
         </View>
+        
+        {onNext && (
+          <TouchableOpacity onPress={onNext}>
+            <Text style={styles.next}>Next</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
@@ -77,6 +85,12 @@ const styles = StyleSheet.create({
   childrenContainer: {
     width: '100%',
     paddingTop: 24,
+  },
+  next: {
+    fontSize: 16,
+    color: '#007BFF',
+    textAlign: 'center',
+    marginTop: 24,
   },
 });
 

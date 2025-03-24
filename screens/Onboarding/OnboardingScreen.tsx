@@ -17,7 +17,7 @@ export interface OnboardingSlideProps {
   description: string;
   icon: React.ReactNode;
   isActive: boolean;
-  onNext?: () => void; // Added onNext property
+  onNext?: () => void;
 }
 
 const OnboardingScreen = () => {
@@ -25,21 +25,51 @@ const OnboardingScreen = () => {
   const [userType, setUserType] = useState<'patient' | 'therapist' | null>(null);
   const navigation = useNavigation<NavigationProp>();
   const { toast } = useToast();
-  const { user, updateUserRole } = useAuth();
+  const { user, isLoading, updateUserRole } = useAuth(); // include isLoading
   const totalSteps = 4;
 
   useEffect(() => {
-    checkUserRole();
-  }, [user]);
+    if (!isLoading) {
+      console.log('Initial check - Auth loading complete');
+      checkUserRole();
+    }
+  }, [isLoading]); // Only depends on loading state, not user
 
-  const checkUserRole = async () => {
-    try {
-      if (user?.role) {
-        // User already has a role, skip onboarding
+  // Update the effect that handles user_type changes
+  useEffect(() => {
+    // Only run this effect if we have a user and we're not loading
+    if (!isLoading && user) {
+      console.log('User_type changed effect - current user_type:', user?.user_type);
+      
+      // Check if user_type has a non-empty value using safe type checking
+      const hasValidUserType = Boolean(user.user_type) && user.user_type !== '';
+      
+      if (hasValidUserType) {
+        console.log('User already has a type, navigating to App:', user.user_type);
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Home' }],
+          routes: [{ name: 'App' }],
         });
+      }
+    }
+  }, [user?.user_type, isLoading, navigation]); // Added navigation to dependencies
+
+  // Update the checkUserRole function with safer type handling
+  const checkUserRole = async () => {
+    try {
+      console.log('Checking user role - current user:', user);
+      
+      // Use Boolean to convert to a boolean value first, then check if it's not empty
+      const hasValidUserType = Boolean(user?.user_type) && user?.user_type !== '';
+      
+      if (hasValidUserType && user) {
+        console.log('User has a role, skipping onboarding:', user.user_type);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      } else {
+        console.log('User needs onboarding, current user_type:', user?.user_type || 'undefined');
       }
     } catch (error) {
       console.error('Error checking user role:', error);
@@ -52,14 +82,31 @@ const OnboardingScreen = () => {
   };
 
   const handleComplete = async () => {
-    if (!userType) return;
+    if (!userType) {
+      console.error('No user type selected');
+      toast({
+        title: 'Error',
+        description: 'Please select your role to continue',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
+      console.log('Completing onboarding, setting user type to:', userType);
+      
+      // Update role in backend
       await updateUserRole(userType);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'App' }],
-      });
+      
+      // Force a small delay to ensure backend sync completes
+      setTimeout(() => {
+        console.log('Navigating to App after role update');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      }, 300);
+      
     } catch (error) {
       console.error('Error completing onboarding:', error);
       toast({

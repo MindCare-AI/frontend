@@ -12,7 +12,7 @@ import {
   Alert,
   Linking,
 } from "react-native";
-import { NavigationProp } from "@react-navigation/native";
+import { NavigationProp, CommonActions } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation"; 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -22,6 +22,7 @@ import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
+import { resetOnboardingStatus } from '../../utils/onboarding';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -39,9 +40,22 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const { signIn } = useAuth();
 
-  const logoRef = useRef(null);
-  const formRef = useRef(null);
-  const socialButtonsRef = useRef(null);
+  const logoRef = useRef<View | null>(null);
+  const formRef = useRef<View | null>(null);
+  const socialButtonsRef = useRef<View | null>(null);
+
+  useEffect(() => {
+    // Log all available route names for debugging
+    try {
+      const state = navigation.getState();
+      console.log("Available routes in this navigator:", state.routeNames);
+      
+      // Also log the current navigation state
+      console.log("Current navigation state:", JSON.stringify(state, null, 2));
+    } catch (error) {
+      console.error("Error inspecting navigation:", error);
+    }
+  }, [navigation]);
 
   useEffect(() => {
     // Initial animation timeline
@@ -58,14 +72,15 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       opacity: 0,
       duration: 0.8,
       ease: "power2.out"
-    }, "-=0.5")
-    .from(socialButtonsRef.current?.children || [], {
-      y: 20,
-      opacity: 0,
-      duration: 0.4,
-      stagger: 0.1,
-      ease: "power2.out"
-    }, "-=0.3");
+    }, "-=0.5");
+    // Remove or comment out the following tween since React Native does not use traditional CSS selectors
+    // .from('.socialButton', {
+    //   y: 20,
+    //   opacity: 0,
+    //   duration: 0.4,
+    //   stagger: 0.1,
+    //   ease: "power2.out"
+    // }, "-=0.3");
   }, []);
 
   const validateEmail = (email: string) => {
@@ -102,33 +117,46 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   };
 
   // Check if the user has seen the onboarding
-  const checkAndNavigate = async () => {
+  const checkAndNavigate = async (userProfile?: any) => {
     try {
-      const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+      console.log("Navigating with profile:", userProfile);
       
-      if (hasSeenOnboarding === 'true') {
-        // User has seen onboarding, navigate to home
-        navigation.reset({
+      // If user_type is empty or undefined, always show onboarding
+      if (!userProfile?.user_type || userProfile.user_type.trim() === "") {
+        console.log("User has no user_type, navigating to onboarding");
+        
+        // Reset the onboarding flag first
+        await resetOnboardingStatus();
+        
+        // Based on your navigation output logs and the error message,
+        // it seems Onboarding is likely in the root stack, not the Auth stack
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Onboarding' }],
+          })
+        );
+        
+        return;
+      }
+      
+      // For users with a user_type
+      console.log("User has user_type:", userProfile.user_type, "going to Home");
+      navigation.dispatch(
+        CommonActions.reset({
           index: 0,
-          routes: [{ 
+          routes: [{
             name: 'App',
             params: { screen: 'Home' }
           }],
-        });
-      } else {
-        // User hasn't seen onboarding, navigate there first
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Onboarding' }],
-        });
-      }
+        })
+      );
     } catch (error) {
-      console.error("Error checking onboarding status:", error);
-      // Default to onboarding in case of error
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Onboarding' }],
-      });
+      console.error("Error in navigation:", error);
+      Alert.alert(
+        'Navigation Error',
+        'An error occurred during login navigation. Please check logs.'
+      );
     }
   };
 
@@ -177,14 +205,32 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
           opacity: 0,
           duration: 0.5,
           ease: "power2.in",
-          onComplete: async () => {
-            await signIn({
-              access: data.access,
-              refresh: data.refresh,
-            });
-            
-            // Check onboarding status and navigate accordingly
-            await checkAndNavigate();
+          onComplete: () => {
+            // Execute async operations after animation completes
+            (async () => {
+              await signIn({
+                access: data.access,
+                refresh: data.refresh,
+              });
+              
+              try {
+                 const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+                  method: "GET",
+                  headers: {
+                    "Authorization": `Bearer ${data.access}`,
+                    "Content-Type": "application/json"
+                  }
+                });
+                const profileData = await profileResponse.json();
+                console.log("User profile:", profileData);
+                // Pass profileData so that checkAndNavigate can test user_type
+                checkAndNavigate(profileData);
+              } catch (profileError) {
+                console.error("Error fetching user profile:", profileError);
+                // In case of error, you can decide what to do (default to onboarding, for example)
+                checkAndNavigate();
+              }
+            })();
           }
         });
       } else {
@@ -299,8 +345,51 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             ['refreshToken', data.refresh]
           ]);
 
-          // Check onboarding status and navigate accordingly
-          await checkAndNavigate();
+          // Fetch user profile before navigating
+          try {
+            const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${data.access}`,
+                "Content-Type": "application/json"
+              }
+            });
+            const profileData = await profileResponse.json();
+            console.log("OAuth user profile:", profileData);
+
+            // Use signIn from AuthContext to properly set the tokens
+            await signIn({
+              access: data.access,
+              refresh: data.refresh,
+            });
+
+            // Check profile and navigate accordingly
+            if (!profileData?.user_type || profileData.user_type.trim() === "") {
+              console.log("OAuth user has no user_type, navigating to onboarding");
+              await resetOnboardingStatus();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Onboarding' }],
+                })
+              );
+            } else {
+              console.log("OAuth user has user_type, going to Home");
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{
+                    name: 'App',
+                    params: { screen: 'Home' }
+                  }],
+                })
+              );
+            }
+          } catch (profileError) {
+            console.error("Error fetching OAuth user profile:", profileError);
+            // Default to standard checkAndNavigate
+            await checkAndNavigate();
+          }
         } catch (error) {
           console.error('OAuth callback error:', error);
           Alert.alert(

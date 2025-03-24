@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { API_URL } from '../config'; // Ensure this is set correctly
 
 interface User {
   id: string;
   email: string;
-  role?: 'patient' | 'therapist' | null;
+  username?: string;
+  user_type: 'patient' | 'therapist' | ''; // This is already correct
   // ... other user properties
 }
 
@@ -21,6 +23,7 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<void>;
   updateTokens: (tokens: { access: string; refresh?: string }) => Promise<void>;
   updateUserRole: (role: 'patient' | 'therapist') => Promise<void>;
+  fetchUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,11 +41,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadStoredTokens();
   }, []);
 
+  const fetchUserData = async () => {
+    if (!authState.accessToken) return;
+    
+    try {
+      // Ensure the endpoint exactly matches your backend (trailing slash if required)
+      const response = await axios.get(`${API_URL}/users/me/`, {
+        headers: {
+          Authorization: `Bearer ${authState.accessToken}`
+        }
+      });
+      
+      setUser(response.data as User);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      // Optionally handle error (for example, force logout if token is invalid)
+    }
+  };
+
   const loadStoredTokens = async () => {
     try {
-      const [accessToken, refreshToken] = await Promise.all([
+      const [accessToken, refreshToken, userData] = await Promise.all([
         AsyncStorage.getItem('accessToken'),
         AsyncStorage.getItem('refreshToken'),
+        AsyncStorage.getItem('userData'),
       ]);
 
       if (accessToken) {
@@ -51,11 +74,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           refreshToken,
           isLoading: false,
         });
+        
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+        
         setupAxiosInterceptor(accessToken);
+        // Fetch fresh user data in the background
+        fetchUserData();
+      } else {
+        setAuthState(prev => ({ ...prev, isLoading: false }));
       }
     } catch (error) {
       console.error('Error loading auth tokens:', error);
-    } finally {
       setAuthState(prev => ({ ...prev, isLoading: false }));
     }
   };
@@ -75,32 +106,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (tokens: { access: string; refresh: string }) => {
     try {
+      // Store tokens locally
       await AsyncStorage.multiSet([
         ['accessToken', tokens.access],
         ['refreshToken', tokens.refresh],
       ]);
 
+      // Fetch user data
+      const response = await axios.get(`${API_URL}/users/me/`, {
+        headers: {
+          Authorization: `Bearer ${tokens.access}`,
+        },
+      });
+
+      // Ensure the user_type is one of the valid types
+      const userData = response.data as User;
+      const validUserType = 
+        userData.user_type === 'patient' || 
+        userData.user_type === 'therapist' || 
+        userData.user_type === '';
+
+      if (!validUserType) {
+        console.warn(`Received invalid user_type: ${userData.user_type}. Setting to empty string.`);
+        userData.user_type = '';
+      }
+
+      // Update state with user details
       setAuthState({
         accessToken: tokens.access,
         refreshToken: tokens.refresh,
         isLoading: false,
       });
+      setUser(userData as User);
 
+      // Setup axios interceptor
       setupAxiosInterceptor(tokens.access);
-    } catch (error) {
-      console.error('Error storing auth tokens:', error);
+    } catch (error: any) {
+      console.error('Error during sign in:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
-      await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+      await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'userData']);
       setAuthState({
         accessToken: null,
         refreshToken: null,
         isLoading: false,
       });
+      setUser(null);
     } catch (error) {
       console.error('Error removing auth tokens:', error);
       throw error;
@@ -130,38 +185,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserRole = async (role: 'patient' | 'therapist') => {
     try {
-      // Update the user state immediately for better UX
-      setUser(prev => prev ? { ...prev, role } : null);
+      // Update the user state immediately for a better UX
+      // Use type assertion to ensure TypeScript understands this is a valid assignment
+      setUser(prev => {
+        if (!prev) return null;
+        
+        // Create a new user object with the updated role
+        return {
+          ...prev,
+          user_type: role as 'patient' | 'therapist' // Explicitly cast to allowed type
+        };
+      });
 
       // Then update the backend
-      const response = await axios.put('/api/user/role', { role });
+      const response = await axios.post(
+        `${API_URL}/users/set-user-type/`,
+        { user_type: role },
+        {
+          headers: {
+            Authorization: `Bearer ${authState.accessToken}`
+          }
+        }
+      );
       
-      if (!response.data) {
-        throw new Error('Failed to update role');
-      }
-
-      // Save updated user data
-      await AsyncStorage.setItem('userData', JSON.stringify(response.data));
-      
-      return response.data;
+      // After successful update, refresh user data to ensure it's in sync
+      await fetchUserData();
     } catch (error) {
-      // Revert the optimistic update on error
-      setUser(prev => prev ? { ...prev, role: null } : null);
+      console.error('Error updating user role:', error);
       throw error;
     }
   };
 
-  const value = {
-    ...authState,
-    user,
-    signIn,
-    signOut,
-    updateTokens,
-    updateUserRole,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        accessToken: authState.accessToken,
+        refreshToken: authState.refreshToken,
+        isLoading: authState.isLoading,
+        user,
+        signIn,
+        signOut,
+        updateTokens,
+        updateUserRole,
+        fetchUserData,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
