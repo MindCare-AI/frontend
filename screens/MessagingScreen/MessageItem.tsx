@@ -242,7 +242,11 @@ const MessageList: React.FC<{ messages: MessageItemProps[] }> = ({ messages }) =
   <FlatList
     inverted
     data={messages}
-    renderItem={({ item }) => <MessageItem {...item} />}
+    renderItem={({ item }) => (
+      <View style={{ transform: [{ scaleY: -1 }] }}>
+        <MessageItem {...item} />
+      </View>
+    )}
     // ...other props
   />
 );
