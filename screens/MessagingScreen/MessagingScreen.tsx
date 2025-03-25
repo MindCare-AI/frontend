@@ -365,7 +365,6 @@ const MessagingScreen: React.FC = () => {
             </View>
           ) : null
         }
-        inverted
       />
       
       <TouchableOpacity
