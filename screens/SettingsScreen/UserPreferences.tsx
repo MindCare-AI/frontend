@@ -12,7 +12,7 @@ import { Picker } from '@react-native-picker/picker';
 import { Button } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import { useNavigation } from '@react-navigation/native';
-import { API_BASE_URL } from '../../config';
+import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
 
 type PreferencesType = {
@@ -63,7 +63,7 @@ const UserPreferences: React.FC = () => {
           setLoading(false);
           return;
         }
-        const response = await fetch(`${API_BASE_URL}/api/v1/users/preferences/`, {
+        const response = await fetch(`${API_URL}/users/preferences/`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ const UserPreferences: React.FC = () => {
         in_app_notifications: preferences.in_app_notifications,
         disabled_notification_types: preferences.disabled_notification_types
       };
-      const endpoint = `${API_BASE_URL}/api/v1/users/preferences/${preferences.id}/`;
+      const endpoint = `${API_URL}/users/preferences/${preferences.id}/`;
       const response = await fetch(endpoint, {
         method: 'PATCH',
         headers: {

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { MaterialIcons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../config';
+import { API_URL } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext'; // Add this import
 
@@ -72,7 +73,7 @@ const UserSettings = () => {
         }
 
         // First fetch user profile to get the ID
-        const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/profile/`, {
+        const profileResponse = await fetch(`${API_URL}/users/profile/`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
@@ -89,7 +90,7 @@ const UserSettings = () => {
         setUserId(profileData.id);
 
         // Then fetch settings using the user ID
-        const settingsResponse = await fetch(`${API_BASE_URL}/api/v1/users/settings/${profileData.id}/`, {
+        const settingsResponse = await fetch(`${API_URL}/users/settings/${profileData.id}/`, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${accessToken}`,
@@ -177,7 +178,7 @@ const UserSettings = () => {
       };
 
       // Use the user ID in the endpoint
-      const endpoint = `${API_BASE_URL}/api/v1/users/settings/${userId}/`;
+      const endpoint = `${API_URL}/users/settings/${userId}/`;
 
       const response = await fetch(endpoint, {
         method: "PATCH",

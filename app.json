@@ -29,9 +29,11 @@
       "newArchEnabled": true
     },
     "android": {
+      
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo_mindcare.png",
         "backgroundColor": "#ffffff"
+        
       },
       "package": "com.mindcareai.app",
       "versionCode": 1,
