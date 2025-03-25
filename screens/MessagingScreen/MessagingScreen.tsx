@@ -172,14 +172,17 @@ const MessagingScreen: React.FC = () => {
     try {
       if (conversationType === 'one_to_one') {
         const conv = item as OneToOneConversation;
+        // First try to get the name from other_participant
         if (conv.other_participant) {
           displayName = conv.other_participant;
         } else {
+          // If other_participant is not available, find the other user from participants array
           const userId = user?.id;
-          const other = conv.participants.find((p) => p.id !== Number(userId));
-          displayName = other ? other.username : 'Conversation';
+          const otherParticipant = conv.participants.find(p => p.id !== Number(userId));
+          displayName = otherParticipant ? otherParticipant.username : 'Unknown User';
         }
         
+        // Format last message and time
         if (conv.last_message) {
           lastMessageText = conv.last_message.content;
           lastMessageTime = new Date(conv.last_message.timestamp).toLocaleTimeString([], {
@@ -193,9 +196,11 @@ const MessagingScreen: React.FC = () => {
           });
         }
         
+        // Generate avatar URL using the display name
         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
         
       } else {
+        // Group conversation handling remains the same
         const conv = item as GroupConversation;
         displayName = conv.name || 'Group Chat';
         
@@ -216,7 +221,8 @@ const MessagingScreen: React.FC = () => {
         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
       }
     } catch (err) {
-      displayName = 'Error displaying conversation';
+      console.error('Error parsing conversation:', err);
+      displayName = 'Error displaying user';
     }
   
     return (
