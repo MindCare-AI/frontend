@@ -12,7 +12,7 @@ import {
 import { Button } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import Toast from 'react-native-toast-message';
-import { API_BASE_URL } from '../../config';
+import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
 
 const UserProfile: React.FC = () => {
@@ -53,7 +53,7 @@ const UserProfile: React.FC = () => {
         }
 
         // Fetch user profile
-        const response = await fetch(`${API_BASE_URL}/api/v1/users/profiles/`, {
+        const response = await fetch(`${API_URL}/users/profiles/`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -103,7 +103,7 @@ const UserProfile: React.FC = () => {
         gender: profile.gender,
       };
 
-      const endpoint = `${API_BASE_URL}/api/v1/users/profiles/${userId}/`;
+      const endpoint = `${API_URL}/users/profiles/${userId}/`;
 
       const response = await fetch(endpoint, {
         method: 'PATCH',
