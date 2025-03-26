@@ -1,106 +1,77 @@
+// services/ConversationService.ts
 import { API_URL } from '../config';
-
-interface FetchOptions {
-  page?: number;
-  pageSize?: number;
-  searchQuery?: string;
-}
+import { retryFetch } from '../utils/retryFetch';
+import { Message, Conversation, OneToOneConversation, GroupConversation } from '../types/messaging';
 
 export default class ConversationService {
-  static async fetchOneToOneConversations(token: string, options: FetchOptions = {}) {
-    const { page = 1, pageSize = 20 } = options;
-    
+  static async fetchConversations(
+    token: string,
+    type: 'one_to_one' | 'group',
+    page: number = 1,
+    pageSize: number = 20
+  ): Promise<Conversation[]> {
+    const endpoint = `${API_URL}/messaging/${type === 'one_to_one' ? 'one_to_one' : 'groups'}/?page=${page}&page_size=${pageSize}`;
+
     try {
-      const response = await fetch(
-        `${API_URL}/messaging/one_to_one/?page=${page}&page_size=${pageSize}`, 
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching one-to-one conversations:', error);
-      throw error;
-    }
-  }
-  
-  static async fetchGroupConversations(token: string, options: FetchOptions = {}) {
-    const { page = 1, pageSize = 20 } = options;
-    
-    try {
-      const response = await fetch(
-        `${API_URL}/messaging/groups/?page=${page}&page_size=${pageSize}`, 
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching group conversations:', error);
-      throw error;
-    }
-  }
-  
-  static async fetchMessages(
-    token: string, 
-    conversationType: 'one_to_one' | 'group',
-    conversationId: number | string,
-    options: FetchOptions = {}
-  ) {
-    const { page = 1, pageSize = 20 } = options;
-    
-    const endpoint = conversationType === 'one_to_one'
-      ? `${API_URL}/messaging/one_to_one/messages/?conversation=${conversationId}&page=${page}&page_size=${pageSize}`
-      : `${API_URL}/messaging/groups/messages/?conversation=${conversationId}&page=${page}&page_size=${pageSize}`;
-      
-    try {
-      const response = await fetch(endpoint, {
+      const response = await retryFetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      return await response.json();
+
+      const data = await response.json();
+      return data.results || data;
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error(`Failed to fetch ${type} conversations:`, error);
       throw error;
     }
   }
-  
+
+  static async fetchMessages(
+    token: string,
+    conversationId: string | number,
+    type: 'one_to_one' | 'group',
+    page: number = 1,
+    pageSize: number = 20
+  ): Promise<Message[]> {
+    const endpoint = `${API_URL}/messaging/${type === 'one_to_one' ? 'one_to_one' : 'groups'}/${conversationId}/messages/?page=${page}&page_size=${pageSize}`;
+
+    try {
+      const response = await retryFetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.results || data;
+    } catch (error) {
+      console.error(`Failed to fetch messages for ${type} conversation ${conversationId}:`, error);
+      throw error;
+    }
+  }
+
   static async sendMessage(
     token: string,
-    conversationType: 'one_to_one' | 'group',
-    conversationId: number | string,
     content: string,
+    conversationId: string | number,
+    type: 'one_to_one' | 'group',
     messageType: string = 'text'
-  ) {
-    const endpoint = conversationType === 'one_to_one'
-      ? `${API_URL}/messaging/one_to_one/messages/`
-      : `${API_URL}/messaging/groups/messages/`;
-      
+  ): Promise<Message> {
+    const endpoint = `${API_URL}/messaging/${type === 'one_to_one' ? 'one_to_one' : 'groups'}/messages/`;
+
     try {
-      const response = await fetch(endpoint, {
+      const response = await retryFetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -112,51 +83,53 @@ export default class ConversationService {
           message_type: messageType
         }),
       });
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to send message: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Failed to send message:', error);
       throw error;
     }
   }
-  
-  static async createOneToOneConversation(token: string, otherUserId: number) {
-    try {
-      const response = await fetch(`${API_URL}/messaging/one_to_one/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          participants: [otherUserId]
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error creating one-to-one conversation:', error);
-      throw error;
+
+  static async createOneToOneConversation(
+    token: string,
+    participantId: number
+  ): Promise<OneToOneConversation> {
+    const response = await retryFetch(`${API_URL}/api/v1/messaging/one_to_one/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        participant_id: participantId, // Match the backend expectation
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create conversation');
     }
+
+    return await response.json();
   }
-  
+
   static async createGroupConversation(
-    token: string, 
-    name: string, 
-    participants: number[],
+    token: string,
+    name: string,
+    participantIds: number[],
     description: string = '',
-    isPrivate: boolean = false
-  ) {
+    isPrivate: boolean = true
+  ): Promise<GroupConversation> {
+    const endpoint = `${API_URL}/messaging/groups/`;
+
     try {
-      const response = await fetch(`${API_URL}/messaging/groups/`, {
+      const response = await retryFetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -165,66 +138,71 @@ export default class ConversationService {
         body: JSON.stringify({
           name,
           description,
-          participants,
+          participants: participantIds,
           is_private: isPrivate
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Error creating group conversation:', error);
+      console.error('Failed to create group conversation:', error);
       throw error;
     }
   }
-  
-  static async sendTypingStatus(token: string, conversationId: number | string) {
+
+  static async markAsRead(
+    token: string,
+    conversationId: string | number,
+    type: 'one_to_one' | 'group'
+  ): Promise<void> {
+    const endpoint = `${API_URL}/messaging/${type === 'one_to_one' ? 'one_to_one' : 'groups'}/${conversationId}/`;
+
     try {
-      const response = await fetch(`${API_URL}/messaging/one_to_one/${conversationId}/typing/`, {
-        method: 'POST',
+      const response = await retryFetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ read: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Failed to mark conversation as read:', error);
+      throw error;
+    }
+  }
+
+  static async searchMessages(
+    token: string,
+    conversationId: string | number,
+    type: 'one_to_one' | 'group',
+    query: string
+  ): Promise<Message[]> {
+    const endpoint = `${API_URL}/messaging/${type === 'one_to_one' ? 'one_to_one' : 'groups'}/${conversationId}/search/?q=${encodeURIComponent(query)}`;
+
+    try {
+      const response = await retryFetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Error sending typing status:', error);
-      throw error;
-    }
-  }
-  
-  static async searchMessages(
-    token: string, 
-    conversationId: number | string, 
-    query: string
-  ) {
-    try {
-      const response = await fetch(
-        `${API_URL}/messaging/one_to_one/${conversationId}/search/?q=${encodeURIComponent(query)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error searching messages:', error);
+      console.error('Failed to search messages:', error);
       throw error;
     }
   }

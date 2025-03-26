@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, 
   TextInput, 
@@ -10,17 +10,23 @@ import {
   Text,
   FlatList,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../config';
 
 interface MessageInputProps {
   onSend: (message: string, type?: string) => void;
   conversationType: 'one_to_one' | 'group';
   onTyping?: () => void;
+  initialValue?: string;
+  isEditing?: boolean;
+  onCancelEdit?: () => void;
 }
 
 // Define a type that includes all the icon names we need
@@ -29,13 +35,28 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const MessageInput: React.FC<MessageInputProps> = ({ 
   onSend, 
   conversationType,
-  onTyping
+  onTyping,
+  initialValue = '',
+  isEditing = false,
+  onCancelEdit
 }) => {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(initialValue);
   const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
+  
+  // Move the useAuth inside the component
+  const { accessToken } = useAuth();
+
+  useEffect(() => {
+    if (initialValue) {
+      setMessage(initialValue);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }, [initialValue]);
 
   const handleSend = () => {
     if (message.trim()) {
@@ -146,6 +167,30 @@ const MessageInput: React.FC<MessageInputProps> = ({
       setIsAttaching(false);
     }
   };
+
+  const handleFileUpload = async (uri: string, type: 'image' | 'file', filename: string) => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+      formData.append('message_type', type);
+  
+      const uploadResponse = await fetch(`${API_URL}/messaging/${conversationType}/messages/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          // Do not set 'Content-Type' when using FormData
+        },
+        body: formData,
+      });
+      // Handle the upload response as needed
+    } catch (error) {
+      Alert.alert('Error', 'Failed to upload file');
+      console.error('File upload error:', error);
+    }
+  };
   
   // Fix the icon names to be compatible with TypeScript
   const attachmentOptions = [
@@ -170,91 +215,109 @@ const MessageInput: React.FC<MessageInputProps> = ({
   ];
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.attachmentButton}
-        onPress={handleAttachment}
-      >
-        <Ionicons name="add-circle-outline" size={24} color="#007BFF" />
-      </TouchableOpacity>
-      
-      <TextInput
-        ref={inputRef}
-        style={styles.input}
-        value={message}
-        onChangeText={handleTextChange}
-        placeholder={conversationType === 'group' ? "Message group..." : "Type a message..."}
-        multiline
-        maxLength={1000}
-      />
-      
-      <TouchableOpacity 
-        style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]} 
-        onPress={handleSend}
-        disabled={!message.trim()}
-      >
-        <Ionicons 
-          name="send" 
-          size={20} 
-          color={message.trim() ? "#FFF" : "#CCC"} 
-        />
-      </TouchableOpacity>
-      
-      {isAttaching && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#007BFF" />
-        </View>
-      )}
-      
-      <Modal
-        visible={attachmentMenuVisible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={closeAttachmentMenu}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={closeAttachmentMenu}
-        >
-          <Animated.View 
-            style={[
-              styles.attachmentMenu,
-              {
-                transform: [
-                  {
-                    translateY: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <View style={styles.container}>
+        {isEditing && (
+          <View style={styles.editingBanner}>
+            <Text style={styles.editingText}>Editing message</Text>
+            <TouchableOpacity onPress={onCancelEdit}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {!isEditing && (
+          <TouchableOpacity 
+            style={styles.attachmentButton}
+            onPress={handleAttachment}
           >
-            <View style={styles.handle} />
-            <Text style={styles.attachmentMenuTitle}>Attach</Text>
-            
-            <FlatList
-              data={attachmentOptions}
-              keyExtractor={(item, index) => index.toString()}
-              horizontal={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.attachmentOption}
-                  onPress={item.onPress}
-                >
-                  <View style={[styles.attachmentIconContainer, { backgroundColor: item.color }]}>
-                    <Ionicons name={item.icon} size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.attachmentOptionText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </Animated.View>
+            <Ionicons name="add-circle-outline" size={24} color="#007BFF" />
+          </TouchableOpacity>
+        )}
+        
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          value={message}
+          onChangeText={handleTextChange}
+          placeholder={isEditing 
+            ? "Edit your message..." 
+            : (conversationType === 'group' ? "Message group..." : "Type a message...")}
+          multiline
+          maxLength={1000}
+        />
+        
+        <TouchableOpacity 
+          style={[styles.sendButton, !message.trim() && styles.sendButtonDisabled]} 
+          onPress={handleSend}
+          disabled={!message.trim()}
+        >
+          <Ionicons 
+            name={isEditing ? "checkmark" : "send"} 
+            size={20} 
+            color={message.trim() ? "#FFF" : "#CCC"} 
+          />
         </TouchableOpacity>
-      </Modal>
-    </View>
+        
+        {isAttaching && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#007BFF" />
+          </View>
+        )}
+        
+        <Modal
+          visible={attachmentMenuVisible}
+          transparent={true}
+          animationType="none"
+          onRequestClose={closeAttachmentMenu}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={closeAttachmentMenu}
+          >
+            <Animated.View 
+              style={[
+                styles.attachmentMenu,
+                {
+                  transform: [
+                    {
+                      translateY: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [300, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View style={styles.handle} />
+              <Text style={styles.attachmentMenuTitle}>Attach</Text>
+              
+              <FlatList
+                data={attachmentOptions}
+                keyExtractor={(item, index) => index.toString()}
+                horizontal={false}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.attachmentOption}
+                    onPress={item.onPress}
+                  >
+                    <View style={[styles.attachmentIconContainer, { backgroundColor: item.color }]}>
+                      <Ionicons name={item.icon} size={24} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.attachmentOptionText}>{item.title}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -338,7 +401,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
-  }
+  },
+  editingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F7FF',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 8,
+    width: '100%',
+  },
+  editingText: {
+    color: '#007BFF',
+    fontSize: 14,
+  },
 });
 
 export default MessageInput;

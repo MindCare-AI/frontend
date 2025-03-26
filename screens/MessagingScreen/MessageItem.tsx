@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, FlatList } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Animated, Clipboard, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AvatarSvg from '../../assets/avatar/avatar.svg';
+import MessageContextMenu from '../../components/chat/MessageContextMenu';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MessageItemProps {
   id: string;
@@ -16,8 +19,11 @@ interface MessageItemProps {
   status?: 'sent' | 'delivered' | 'read';
   isEdited?: boolean;
   reactions?: string;
+  conversationType: 'one_to_one' | 'group';
   onRetry?: () => void;
   onLongPress?: () => void;
+  onEdit: (id: string, content: string) => void;
+  onDelete: (id: string) => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ 
@@ -29,10 +35,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
   status = 'sent',
   isEdited = false,
   reactions,
+  conversationType,
   onRetry,
-  onLongPress
+  onLongPress,
+  onEdit,
+  onDelete
 }) => {
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
+  const { accessToken } = useAuth();
   
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -62,80 +73,132 @@ const MessageItem: React.FC<MessageItemProps> = ({
   
   const hasFailed = !!onRetry;
 
+  const handleLongPress = () => {
+    setContextMenuVisible(true);
+    if (onLongPress) onLongPress();
+  };
+
+  const handleCopyText = () => {
+    Clipboard.setString(content);
+    setContextMenuVisible(false);
+  };
+
+  const handleReact = async (emoji: string) => {
+    try {
+      const endpoint = `${API_URL}/messaging/${conversationType}/messages/${id}/add_reaction/`;
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reaction: emoji }),
+      });
+      // Refresh message data or update the UI accordingly
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add reaction');
+    }
+  };
+
   return (
-    <Animated.View style={{ opacity: fadeAnim }}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onLongPress={onLongPress}
-        delayLongPress={500}
-        style={[
-          styles.container, 
-          isCurrentUser ? styles.currentUserContainer : styles.otherUserContainer
-        ]}
-      >
-        {!isCurrentUser && (
-          sender.avatar ? (
-            <Image 
-              source={{ uri: sender.avatar }} 
-              style={styles.avatar} 
-            />
-          ) : (
-            <AvatarSvg width={36} height={36} />
-          )
-        )}
-        
-        <View style={[
-          styles.messageContent,
-          isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage,
-          hasFailed && styles.failedMessage
-        ]}>
+    <>
+      <Animated.View style={{ opacity: fadeAnim }}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+          style={[
+            styles.container, 
+            isCurrentUser ? styles.currentUserContainer : styles.otherUserContainer
+          ]}
+        >
           {!isCurrentUser && (
-            <Text style={styles.senderName}>{sender.name}</Text>
+            sender.avatar ? (
+              <Image 
+                source={{ uri: sender.avatar }} 
+                style={styles.avatar} 
+              />
+            ) : (
+              <AvatarSvg width={36} height={36} />
+            )
           )}
           
-          <Text style={styles.messageText}>{content}</Text>
-          
-          <View style={styles.messageMeta}>
-            {isEdited && (
-              <Text style={styles.editedText}>(edited)</Text>
+          <View style={[
+            styles.messageContent,
+            isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage,
+            hasFailed && styles.failedMessage
+          ]}>
+            {!isCurrentUser && (
+              <Text style={styles.senderName}>{sender.name}</Text>
             )}
             
-            <Text style={styles.timeText}>{formattedTime}</Text>
+            <Text style={styles.messageText}>{content}</Text>
             
-            {isCurrentUser && !hasFailed && (
-              <Ionicons 
-                name={
-                  status === 'read' ? 'checkmark-done-outline' : 
-                  status === 'delivered' ? 'checkmark-done-outline' : 'checkmark-outline'
-                } 
-                size={16} 
-                color={status === 'read' ? '#4CAF50' : '#999'} 
-                style={styles.statusIcon}
-              />
-            )}
+            <View style={styles.messageMeta}>
+              {isEdited && (
+                <Text style={styles.editedText}>(edited)</Text>
+              )}
+              
+              <Text style={styles.timeText}>{formattedTime}</Text>
+              
+              {isCurrentUser && !hasFailed && (
+                <Ionicons 
+                  name={
+                    status === 'read' ? 'checkmark-done-outline' : 
+                    status === 'delivered' ? 'checkmark-done-outline' : 'checkmark-outline'
+                  } 
+                  size={16} 
+                  color={status === 'read' ? '#4CAF50' : '#999'} 
+                  style={styles.statusIcon}
+                />
+              )}
+              
+              {hasFailed && (
+                <TouchableOpacity onPress={onRetry} style={styles.retryButton}>
+                  <Ionicons name="refresh-outline" size={18} color="#FF3B30" />
+                </TouchableOpacity>
+              )}
+            </View>
             
-            {hasFailed && (
-              <TouchableOpacity onPress={onRetry} style={styles.retryButton}>
-                <Ionicons name="refresh-outline" size={18} color="#FF3B30" />
-              </TouchableOpacity>
+            {reactionsList.length > 0 && (
+              <View style={styles.reactionsContainer}>
+                {reactionsList.map((reaction, index) => (
+                  <View key={index} style={styles.reactionBubble}>
+                    <Text>{reaction.emoji}</Text>
+                    {reaction.count > 1 && (
+                      <Text style={styles.reactionCount}>{reaction.count}</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
             )}
           </View>
-          
-          {reactionsList.length > 0 && (
-            <View style={styles.reactionsContainer}>
-              {reactionsList.map((reaction, index) => (
-                <View key={index} style={styles.reactionBubble}>
-                  <Text>{reaction.emoji}</Text>
-                  {reaction.count > 1 && (
-                    <Text style={styles.reactionCount}>{reaction.count}</Text>
-                  )}
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <MessageContextMenu
+        visible={contextMenuVisible}
+        onClose={() => setContextMenuVisible(false)}
+        isCurrentUserMessage={isCurrentUser}
+        onEdit={() => {
+          setContextMenuVisible(false);
+          if (onEdit) onEdit(id, content);
+        }}
+        onDelete={() => {
+          setContextMenuVisible(false);
+          if (onDelete) onDelete(id);
+        }}
+        onReact={() => {
+          setContextMenuVisible(false);
+          // Implement reaction picker
+        }}
+        onCopy={handleCopyText}
+        onForward={() => {
+          setContextMenuVisible(false);
+          // Implement forward functionality
+        }}
+      />
+    </>
   );
 };
 
@@ -237,18 +300,5 @@ const styles = StyleSheet.create({
     color: '#666',
   }
 });
-
-const MessageList: React.FC<{ messages: MessageItemProps[] }> = ({ messages }) => (
-  <FlatList
-    inverted
-    data={messages}
-    renderItem={({ item }) => (
-      <View style={{ transform: [{ scaleY: -1 }] }}>
-        <MessageItem {...item} />
-      </View>
-    )}
-    // ...other props
-  />
-);
 
 export default MessageItem;
