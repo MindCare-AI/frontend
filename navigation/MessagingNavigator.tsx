@@ -12,7 +12,7 @@ export type MessagingStackParamList = {
   Chat: {
     conversationId: number | string;
     conversationType: 'one_to_one' | 'group';
-    title?: string; // Title for header
+    title: string;
     otherParticipantId?: number; // Optional user ID of the other participant (for 1-to-1)
   };
 };
@@ -88,9 +88,17 @@ const MessagingNavigator = () => {
         name="Chat"
         component={ChatScreen}
         options={({ route, navigation }) => ({ 
-          title: route.params.title || (
-            route.params.conversationType === 'group' ? 'Group Chat' : 'Conversation'
-          ),
+          title: route.params.title,
+          headerBackTitleVisible: false,
+          headerTitleAlign: 'center',
+          headerStyle: {
+            backgroundColor: '#007BFF',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: '600',
+            fontSize: 17,
+          },
           headerRight: () => (
             <TouchableOpacity 
               style={{ padding: 8 }}

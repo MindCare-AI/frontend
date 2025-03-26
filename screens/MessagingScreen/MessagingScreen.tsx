@@ -33,7 +33,10 @@ interface OneToOneConversation {
     sender: string;
   };
   unread_count?: number;
-  other_participant?: string;
+  other_participant?: {
+    id: number;
+    username: string;
+  };
 }
 
 interface GroupConversation {
@@ -90,17 +93,22 @@ const MessagingScreen: React.FC = () => {
       setIsLoading(false);
       return;
     }
-
+  
     if (pageNum === 1 && !refreshing) setIsLoading(true);
     if (refreshing) setIsRefreshing(true);
     setError(null);
-
+  
     let endpoint = '';
     if (conversationType === 'one_to_one') {
+      // Note: No extra "/messages/" segment
       endpoint = `${API_URL}/messaging/one_to_one/?page=${pageNum}&page_size=20`;
-    } else {
+    } else if (conversationType === 'group') {
       endpoint = `${API_URL}/messaging/groups/?page=${pageNum}&page_size=20`;
+    } else {
+      endpoint = `${API_URL}/messaging/one_to_one/?page=${pageNum}&page_size=20`;
     }
+    
+    console.log('Fetching conversations from:', endpoint);
     
     try {
       const response = await fetch(endpoint, {
@@ -110,20 +118,16 @@ const MessagingScreen: React.FC = () => {
         },
       });
       
+      // Better error handling from backend
       if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `Failed to fetch conversations: ${response.status}`);
       }
-      
+  
       const data = await response.json();
-      const hasMore = data.next !== null;
+      const results: Conversation[] = data.results && Array.isArray(data.results) ? data.results : data;
+      const hasMore = data.next !== undefined ? data.next !== null : false;
       setHasMoreConversations(hasMore);
-      
-      let results: Conversation[] = [];
-      if (data.results && Array.isArray(data.results)) {
-        results = data.results;
-      } else if (Array.isArray(data)) {
-        results = data;
-      }
       
       if (pageNum === 1) {
         setConversations(results);
@@ -164,57 +168,50 @@ const MessagingScreen: React.FC = () => {
   };
 
   const renderConversationItem = useCallback(({ item }: { item: Conversation }) => {
+    // Guard against user being null
+    if (!user) return null;
+  
     let displayName = '';
     let lastMessageText = '';
     let lastMessageTime = '';
     let avatarUrl = '';
-    
+  
     try {
       if (conversationType === 'one_to_one') {
         const conv = item as OneToOneConversation;
-        // First try to get the name from other_participant
-        if (conv.other_participant) {
-          displayName = conv.other_participant;
-        } else {
-          // If other_participant is not available, find the other user from participants array
-          const userId = user?.id;
-          const otherParticipant = conv.participants.find(p => p.id !== Number(userId));
-          displayName = otherParticipant ? otherParticipant.username : 'Unknown User';
-        }
-        
-        // Format last message and time
+        // Convert both p.id and user.id to strings to ensure type consistency.
+        const otherUser = conv.participants.find(p => String(p.id) !== String(user.id));
+        displayName = otherUser ? otherUser.username : (conv.other_participant?.username || 'Unknown User');
+  
         if (conv.last_message) {
           lastMessageText = conv.last_message.content;
           lastMessageTime = new Date(conv.last_message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit', 
-            minute: '2-digit'
+            hour: '2-digit', minute: '2-digit'
           });
         } else {
           lastMessageTime = new Date(conv.created_at).toLocaleTimeString([], {
-            hour: '2-digit', 
-            minute: '2-digit'
+            hour: '2-digit', minute: '2-digit'
           });
         }
         
-        // Generate avatar URL using the display name
         avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`;
         
       } else {
-        // Group conversation handling remains the same
+        // For group conversation
         const conv = item as GroupConversation;
         displayName = conv.name || 'Group Chat';
         
         if (conv.last_message) {
           const sender = conv.last_message.sender;
-          lastMessageText = sender ? `${sender}: ${conv.last_message.content}` : conv.last_message.content;
+          lastMessageText = sender 
+            ? `${sender}: ${conv.last_message.content}` 
+            : conv.last_message.content;
           lastMessageTime = new Date(conv.last_message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit', 
-            minute: '2-digit'
+            hour: '2-digit', minute: '2-digit'
           });
         } else {
           lastMessageTime = new Date(conv.created_at).toLocaleTimeString([], {
-            hour: '2-digit', 
-            minute: '2-digit'
+            hour: '2-digit', minute: '2-digit'
           });
         }
         
@@ -235,7 +232,10 @@ const MessagingScreen: React.FC = () => {
           navigation.navigate('Chat', {
             conversationId: item.id,
             conversationType: conversationType,
-            title: displayName
+            title: displayName,
+            otherParticipantId: conversationType === 'one_to_one' 
+              ? (item as OneToOneConversation).other_participant?.id 
+              : undefined,
           });
         }}
       >
@@ -243,13 +243,11 @@ const MessagingScreen: React.FC = () => {
           source={{ uri: avatarUrl || 'https://ui-avatars.com/api/?name=User&background=random' }} 
           style={styles.avatar} 
         />
-        
         <View style={styles.conversationContent}>
           <View style={styles.conversationHeader}>
             <Text style={styles.conversationTitle}>{displayName}</Text>
             <Text style={styles.conversationTime}>{lastMessageTime}</Text>
           </View>
-          
           {lastMessageText ? (
             <Text style={styles.lastMessage} numberOfLines={1} ellipsizeMode="tail">
               {lastMessageText}
@@ -258,7 +256,6 @@ const MessagingScreen: React.FC = () => {
             <Text style={styles.noMessages}>No messages yet</Text>
           )}
         </View>
-        
         {item.unread_count && item.unread_count > 0 && (
           <View style={styles.unreadBadge}>
             <Text style={styles.unreadBadgeText}>
@@ -392,6 +389,8 @@ const MessagingScreen: React.FC = () => {
     </View>
   );
 };
+
+// Message sending functionality should be implemented in the Chat component
 
 const styles = StyleSheet.create({
   container: { 
