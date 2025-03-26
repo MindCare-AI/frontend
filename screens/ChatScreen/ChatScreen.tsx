@@ -118,14 +118,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
     if (!accessToken) return;
     
     try {
+      // Update endpoints to match Django URL patterns
       const endpoint = conversationType === 'one_to_one'
-        ? `${API_URL}/api/v1/messaging/one_to_one/${conversationId}/messages/?page=${pageNum}`
-        : `${API_URL}/api/v1/messaging/groups/${conversationId}/messages/?page=${pageNum}`;
-        
+        ? `${API_URL}/messaging/one_to_one/messages/?conversation=${conversationId}&page=${pageNum}`
+        : `${API_URL}/messaging/groups/messages/?conversation=${conversationId}&page=${pageNum}`;
+      
       setError(null);
       if (pageNum === 1 && !refresh) setIsLoading(true);
       if (refresh) setIsRefreshing(true);
       if (pageNum > 1) setLoadingMore(true);
+      
+      console.log('Fetching messages from:', endpoint);
       
       const response = await retryFetch(endpoint, {
         headers: {
@@ -133,30 +136,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           'Content-Type': 'application/json',
         },
       });
-      
-      // Handle 404 for "Invalid page" specifically as end of pagination
-      if (response.status === 404) {
-        const errorData = await response.json();
-        if (errorData.detail === "Invalid page.") {
-          setHasMoreMessages(false);
-          setLoadingMore(false);
-          return;
-        } else {
-          throw new Error(`Error ${response.status}: ${JSON.stringify(errorData)}`);
-        }
-      }
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `Error ${response.status}`);
+        const text = await response.text();
+        console.error('Error response:', text);
+        throw new Error(`Server error: ${response.status}`);
       }
-      
+
       const data = await response.json();
       const messageList = data.results || data;
-      
-      if (!Array.isArray(messageList)) {
-        throw new Error('Unexpected response format');
-      }
       
       setHasMoreMessages(data.next ? true : false);
       
@@ -224,8 +212,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
     
     try {
       const endpoint = conversationType === 'one_to_one' 
-        ? `${API_URL}/api/v1/messaging/one_to_one/messages/` 
-        : `${API_URL}/api/v1/messaging/groups/messages/`;
+        ? `${API_URL}/messaging/one_to_one/messages/` 
+        : `${API_URL}/messaging/groups/messages/`;
         
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -300,8 +288,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
     try {
       setIsLoading(true);
       const endpoint = conversationType === 'one_to_one'
-        ? `${API_URL}/api/v1/messaging/one_to_one/${conversationId}/search/?q=${encodeURIComponent(query)}`
-        : `${API_URL}/api/v1/messaging/groups/${conversationId}/search/?q=${encodeURIComponent(query)}`;
+        ? `${API_URL}/messaging/one_to_one/${conversationId}/search/?q=${encodeURIComponent(query)}`
+        : `${API_URL}/messaging/groups/${conversationId}/search/?q=${encodeURIComponent(query)}`;
         
       const response = await fetch(endpoint, {
         headers: {
@@ -374,8 +362,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
     try {
       const endpoint = conversationType === 'one_to_one'
-        ? `${API_URL}/api/v1/messaging/one_to_one/messages/${messageId}/`
-        : `${API_URL}/api/v1/messaging/groups/messages/${messageId}/`;
+        ? `${API_URL}/messaging/one_to_one/messages/${messageId}/`
+        : `${API_URL}/messaging/groups/messages/${messageId}/`;
         
       const response = await fetch(endpoint, {
         method: 'PATCH',
@@ -883,7 +871,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-
 
 export default ChatScreen;
