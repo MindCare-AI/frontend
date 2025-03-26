@@ -18,6 +18,37 @@ import { API_URL } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext'; // Add this import
 
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  user_type: 'patient' | 'therapist';
+  preferences: {
+    dark_mode: boolean;
+    language: string;
+    email_notifications: boolean;
+    in_app_notifications: boolean;
+    disabled_notification_types: string[];
+    notification_preferences: string;
+  };
+  settings: {
+    id: number;
+    timezone: string;
+    theme_mode: 'SYSTEM' | 'LIGHT' | 'DARK';
+    profile_visibility: 'PUBLIC' | 'PRIVATE' | 'FRIENDS';
+    theme_preferences: Record<string, string>;
+    privacy_settings: Record<string, string>;
+  };
+  patient_profile?: {
+    id: number;
+    // ... other patient fields
+  };
+  therapist_profile?: {
+    id: number;
+    // ... other therapist fields
+  };
+}
+
 const UserSettings = () => {
   const navigation = useNavigation();
   const { accessToken } = useAuth(); // Add this hook
@@ -65,68 +96,81 @@ const UserSettings = () => {
 
   // Fetch user settings from the backend when the component mounts
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchUserProfileAndSettings = async () => {
       try {
         if (!accessToken) {
           setError('Not authenticated');
           return;
         }
 
-        // First fetch user profile to get the ID
-        const profileResponse = await fetch(`${API_URL}/users/profile/`, {
+        // First fetch user profile
+        const profileResponse = await fetch(`${API_URL}/api/v1/users/me/`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         });
 
-        const profileData = await profileResponse.json();
-        
         if (!profileResponse.ok) {
           throw new Error('Failed to fetch user profile');
         }
 
-        // Store the user ID
+        const profileData: UserProfile = await profileResponse.json();
         setUserId(profileData.id);
 
-        // Then fetch settings using the user ID
-        const settingsResponse = await fetch(`${API_URL}/users/settings/${profileData.id}/`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        });
-        
-        const settingsData = await settingsResponse.json();
-        
-        if (settingsResponse.ok) {
-          const normalizedData = {
+        // If the profile includes settings, use them
+        if (profileData.settings) {
+          const normalizedSettings = {
             ...settings,
-            ...settingsData,
+            ...profileData.settings,
             theme_preferences: {
               ...settings.theme_preferences,
-              ...(settingsData.theme_preferences || {})
+              ...(profileData.settings.theme_preferences || {})
             },
             privacy_settings: {
               ...settings.privacy_settings,
-              ...(settingsData.privacy_settings || {})
+              ...(profileData.settings.privacy_settings || {})
             }
           };
           
-          setSettings(normalizedData);
+          setSettings(normalizedSettings);
         } else {
-          setError(settingsData.detail || 'Failed to retrieve settings.');
+          // If no settings in profile, fetch them separately
+          const settingsResponse = await fetch(`${API_URL}/api/v1/users/settings/${profileData.id}/`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (!settingsResponse.ok) {
+            throw new Error('Failed to fetch user settings');
+          }
+
+          const settingsData = await settingsResponse.json();
+          setSettings(prevSettings => ({
+            ...prevSettings,
+            ...settingsData,
+            theme_preferences: {
+              ...prevSettings.theme_preferences,
+              ...(settingsData.theme_preferences || {})
+            },
+            privacy_settings: {
+              ...prevSettings.privacy_settings,
+              ...(settingsData.privacy_settings || {})
+            }
+          }));
         }
       } catch (err) {
-        console.error('Error fetching settings:', err);
-        setError('An error occurred while fetching your settings.');
+        console.error('Error fetching profile and settings:', err);
+        setError('An error occurred while fetching your profile and settings.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSettings();
-  }, [accessToken]); // Add accessToken as dependency
+    fetchUserProfileAndSettings();
+  }, [accessToken]);
 
   // Update theme preferences
   const updateThemePreferences = (key: string, value: string) => {
