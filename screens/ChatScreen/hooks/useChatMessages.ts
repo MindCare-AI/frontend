@@ -5,7 +5,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Message, Conversation } from '../../../types/chat';
 import { API_BASE_URL } from '../../../config';
 import useDebounce from "./useDebounce";
-import { sendWebSocketMessage } from "../../../utils/websocket";
 
 interface EditMessageParams {
   message: Message;
@@ -179,25 +178,16 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
   // Typing indicator with debounce
   const handleTyping = useDebounce((typing: boolean) => {
     if (!user || conversationType !== 'one_to_one') return;
-    
-    // Send typing indicator through websocket
-    sendWebSocketMessage({
-      type: 'typing',
-      user: user.id,
-      conversation: conversationId,
-      is_typing: typing
-    });
-    
-    // Also use the API endpoint for typing status
-    if (typing) {
-      fetch(`${API_BASE_URL}/api/v1/messaging/one_to_one/${conversationId}/typing/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }).catch(err => console.error('Error sending typing status:', err));
-    }
+
+    // Send typing status via API instead of WebSocket
+    fetch(`${API_BASE_URL}/api/v1/messaging/one_to_one/${conversationId}/typing/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ is_typing: typing })
+    }).catch(err => console.error('Error sending typing status:', err));
   }, 500);
 
   // Cursor-based pagination for loading more messages

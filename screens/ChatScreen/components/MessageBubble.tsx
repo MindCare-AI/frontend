@@ -12,7 +12,7 @@ import ReadReceipts from './ReadReceipts';
 interface MessageBubbleProps {
   message: Message;
   onReaction: (messageId: string, reaction: string) => void;
-  onRemoveReaction: (messageId: string, reaction: string) => void; // Add this line
+  onRemoveReaction: (messageId: string, reaction: string) => void; // Still available if needed elsewhere
   onEdit: (messageId: string) => void;
   onDelete: (messageId: string) => void;
 }
@@ -20,7 +20,7 @@ interface MessageBubbleProps {
 const MessageBubble: React.FC<MessageBubbleProps> = ({ 
   message, 
   onReaction, 
-  onRemoveReaction, // Add this parameter
+  onRemoveReaction, 
   onEdit, 
   onDelete
 }) => {

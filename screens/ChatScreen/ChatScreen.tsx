@@ -158,6 +158,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
   }, [netInfo.isConnected, netInfo.isInternetReachable]);
 
+  // Add polling for real-time updates if needed
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (!loading && !error) {
+        loadMessages();
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [loading, error, loadMessages]);
+
   const renderFooter = () => {
     if ((loading && hasMore) || isRetrying) {
       return <ActivityIndicator style={styles.loader} color="#007AFF" size="small" />;
