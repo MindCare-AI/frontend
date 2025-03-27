@@ -7,7 +7,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 export interface AvatarProps extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> {
   // Additional native props:
-  nativeSource?: { uri: string } | number; // Use for the image on native
+  nativeSource?: { uri: string } | number; 
   fallback?: string;
   style?: any;
   className?: string;

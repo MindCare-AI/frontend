@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { NavigationProp, ParamListBase } from '@react-navigation/native';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import NotificationsScreen from '../screens/NotificationsScreen/NotificationsScreen';
@@ -13,13 +14,17 @@ import UserProfile from '../screens/SettingsScreen/UserProfile';
 import MessagingNavigator from './MessagingNavigator';
 import AppointmentManagementScreen from '../screens/AppointmentManagementScreen/AppointmentManagementScreen';
 import BookAppointmentScreen from '../screens/AppointmentManagementScreen/BookAppointment';
-import { RootStackParamList } from '../types/navigation';
+import { RootStackParamList, SettingsStackParamList, AppointmentStackParamList } from '../types/navigation';
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<RootStackParamList>();
+const SettingsStackNavigator = createStackNavigator<SettingsStackParamList>();
+const AppointmentStackNavigator = createStackNavigator<AppointmentStackParamList>();
 
-// Custom header component with notifications badge
-const NotificationBadge = ({ navigation }) => {
+interface NotificationBadgeProps {
+  navigation: NavigationProp<ParamListBase>;
+}
+
+const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => {
   return (
     <TouchableOpacity
       style={styles.notificationBadge}
@@ -33,22 +38,21 @@ const NotificationBadge = ({ navigation }) => {
   );
 };
 
-// Settings Stack Navigator
 const SettingsStack = () => {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Settings' }} />
-      <Stack.Screen name="UserPreferences" component={UserPreferences} options={{ title: 'User Preferences' }} />
-      <Stack.Screen name="UserSettings" component={UserSettings} options={{ title: 'Account Settings' }} />
-      <Stack.Screen name="UserProfile" component={UserProfile} options={{ title: 'User Profile' }} />
-    </Stack.Navigator>
+    <SettingsStackNavigator.Navigator>
+      <SettingsStackNavigator.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <SettingsStackNavigator.Screen name="UserPreferences" component={UserPreferences} options={{ title: 'User Preferences' }} />
+      <SettingsStackNavigator.Screen name="UserSettings" component={UserSettings} options={{ title: 'Account Settings' }} />
+      <SettingsStackNavigator.Screen name="UserProfile" component={UserProfile} options={{ title: 'User Profile' }} />
+    </SettingsStackNavigator.Navigator>
   );
 };
 
 const AppointmentStack = () => {
   return (
-    <Stack.Navigator>
-      <Stack.Screen 
+    <AppointmentStackNavigator.Navigator>
+      <AppointmentStackNavigator.Screen 
         name="AppointmentManagement" 
         component={AppointmentManagementScreen}
         options={{ 
@@ -56,7 +60,7 @@ const AppointmentStack = () => {
           headerShown: true
         }}
       />
-      <Stack.Screen 
+      <AppointmentStackNavigator.Screen 
         name="BookAppointment" 
         component={BookAppointmentScreen}
         options={{ 
@@ -64,9 +68,12 @@ const AppointmentStack = () => {
           headerShown: true
         }}
       />
-    </Stack.Navigator>
+    </AppointmentStackNavigator.Navigator>
   );
 };
+
+// Add this type for Ionicons names
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const AppNavigator = () => {
   return (
@@ -75,7 +82,7 @@ const AppNavigator = () => {
         headerRight: () => <NotificationBadge navigation={navigation} />,
         headerRightContainerStyle: { paddingRight: 15 },
         tabBarIcon: ({ color, size }) => {
-          let iconName;
+          let iconName: IconName;
           switch (route.name) {
             case 'Home':
               iconName = 'home-outline';
@@ -88,6 +95,9 @@ const AppNavigator = () => {
               break;
             case 'Profile':
               iconName = 'person-outline';
+              break;
+            case 'AppointmentManagement':
+              iconName = 'calendar-outline';
               break;
             default:
               iconName = 'help-outline';
