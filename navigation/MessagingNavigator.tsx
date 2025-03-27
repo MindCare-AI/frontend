@@ -3,17 +3,15 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MessagingScreen from '../screens/MessagingScreen/MessagingScreen';
-import ChatScreen from '../screens/ChatScreen/ChatScreen'; 
+import ChatScreen from '../screens/ChatScreen/ChatScreen';
 import { useAuth } from '../contexts/AuthContext';
 
-// Update navigation params to include title
 export type MessagingStackParamList = {
   Messaging: undefined;
   Chat: {
-    conversationId: number | string;
+    conversationId: string; // Must be string (not number)
     conversationType: 'one_to_one' | 'group';
     title: string;
-    otherParticipantId?: number; // Optional user ID of the other participant (for 1-to-1)
   };
 };
 
@@ -21,10 +19,11 @@ const Stack = createStackNavigator<MessagingStackParamList>();
 
 const MessagingNavigator = () => {
   const { accessToken } = useAuth();
+  
+  console.log('MessagingNavigator accessToken:', accessToken); // ✅ Debug
 
-  // Modified to only check for access token
   if (!accessToken) {
-    return null; // Or return an authentication required screen
+    return null; 
   }
 
   return (
@@ -41,14 +40,12 @@ const MessagingNavigator = () => {
           fontSize: 18,
         },
         headerTitleAlign: 'center',
-        
         headerLeftContainerStyle: {
           paddingLeft: 10,
         },
         headerRightContainerStyle: {
           paddingRight: 10,
         },
-        // Use a custom headerLeft to control the back button consistently
         headerLeft: ({ canGoBack, onPress }) => 
           canGoBack ? (
             <TouchableOpacity 
@@ -69,7 +66,6 @@ const MessagingNavigator = () => {
         component={MessagingScreen}
         options={{ 
           title: 'Messages',
-          // No back button needed, so override the headerLeft
           headerLeft: () => null,
           headerRight: () => (
             <TouchableOpacity 
@@ -87,7 +83,7 @@ const MessagingNavigator = () => {
       <Stack.Screen
         name="Chat"
         component={ChatScreen}
-        options={({ route, navigation }) => ({ 
+        options={({ route }) => ({ 
           title: route.params.title,
           headerBackTitleVisible: false,
           headerTitleAlign: 'center',

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { format } from 'date-fns';
 
 interface ChatMessageProps {
-  message: string;
+  message: string | { content: string; [key: string]: any };
   isBot: boolean;
   timestamp: Date;
 }
@@ -18,6 +18,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isBot, timestamp }) 
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Ensure we render a string for the message
+  const displayMessage =
+    typeof message === 'object' && message !== null
+      ? message.content
+        ? message.content
+        : JSON.stringify(message)
+      : message;
 
   return (
     <Animated.View
@@ -40,7 +48,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, isBot, timestamp }) 
           styles.message,
           isBot ? styles.botMessage : styles.userMessage
         ]}>
-          {message}
+          {displayMessage}
         </Text>
         <Text style={[
           styles.timestamp,

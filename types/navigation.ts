@@ -1,12 +1,15 @@
 //types/navigation.ts
 export type RootStackParamList = {
   Splash: undefined;
-  Auth: { screen: keyof AuthStackParamList } | undefined;
   Onboarding: undefined;
-  App: {
-    screen: keyof MessagingStackParamList;
-    params?: MessagingStackParamList[keyof MessagingStackParamList];
-  } | undefined;
+  Auth: { screen?: string; params?: object };
+  App: undefined; // Nested navigator handles child params
+  Home: undefined;
+  Chatbot: undefined;
+  MessagingTab: undefined;
+  Profile: undefined;
+  AppointmentManagement: undefined;
+  Notifications: undefined;
 };
 
 export type AppTabParamList = {
@@ -14,7 +17,7 @@ export type AppTabParamList = {
   Chatbot: undefined;
   Notifications: undefined;
   Settings: { userId?: string };
-  Messaging: undefined; // Keep this if you use it in a different navigator
+  Messaging: undefined; // Keep this if used in a different navigator
 };
 
 export type AuthStackParamList = {
@@ -36,6 +39,18 @@ export type MessagingStackParamList = {
     title: string;
     otherParticipantId?: number;
   };
+};
+
+export type SettingsStackParamList = {
+  SettingsScreen: undefined;
+  UserPreferences: undefined;
+  UserSettings: undefined;
+  UserProfile: undefined;
+};
+
+export type AppointmentStackParamList = {
+  AppointmentManagement: undefined;
+  BookAppointment: undefined;
 };
 
 declare global {
