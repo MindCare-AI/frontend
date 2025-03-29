@@ -129,7 +129,6 @@ export const useWebSocket = (
 
     connectionStatusRef.current = 'connecting';
 
-    // Call our utility. Note: Provide a dummy for onTypingIndicator if needed.
     ws.current = connectWebSocket(
       conversationId,
       token,
