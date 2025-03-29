@@ -10,11 +10,11 @@ import useMessageActions from './hooks/useMessageActions';
 import MessageBubble from './components/MessageBubble';
 import MessageInput from './components/MessageInput';
 import ChatHeader from './components/ChatHeader';
-import TypingIndicator from './components/TypingIndicator';
 import LoadingIndicator from '../../components/ui/LoadingIndicator';
 import ErrorMessage from '../../components/ui/ErrorMessage';
 import { Message } from '../../types/chat';
 import { useAuth } from '../../contexts/AuthContext';
+import { connectWebSocket } from '../../services/websocket';
 
 type ChatRouteProp = RouteProp<MessagingStackParamList, 'Chat'>;
 type ChatNavigationProp = StackNavigationProp<MessagingStackParamList, 'Chat'>;
@@ -25,24 +25,12 @@ interface ChatScreenProps {
 }
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
-  const { conversationId, conversationType, title} = route.params;
-  const { user } = useAuth();
+  const { conversationId, conversationType, title } = route.params;
+  const { accessToken, user } = useAuth();
   const netInfo = useNetInfo();
   const [isRetrying, setIsRetrying] = useState(false);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-
-  // Validate navigation parameters
-  useEffect(() => {
-    if (!conversationId || !conversationType || !title) {
-      console.error('Invalid navigation parameters:', route.params);
-      navigation.goBack();
-    }
-  }, [conversationId, conversationType, title, navigation]);
-
-  // Debug: Verify navigation parameters
-  useEffect(() => {
-    console.log('ChatScreen opened with:', conversationId, conversationType, title);
-  }, []);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const {
     messages,
@@ -51,17 +39,87 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     inputText,
     handleSend,
     setInputText,
-    isTyping,
     loadMessages,
-    loadMoreMessages,
     conversation,
-    hasMore,
+    hasMore: hasMoreMessages,
     deleteMessage: deleteMessageApi,
     editMessage: editMessageApi,
+    setMessages,
   } = useChatMessages({
     conversationId: String(conversationId),
     conversationType,
   });
+
+  const loadMoreMessagesFromApi = useCallback(async () => {
+    if (!hasMoreMessages || isLoadingMore) return;
+    
+    try {
+      setIsLoadingMore(true);
+      await loadMessages();
+    } catch (error) {
+      console.error('Failed to fetch more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMoreMessages, isLoadingMore, loadMessages]);
+
+  const handleWebSocketMessage = useCallback(
+    (data: any) => {
+      console.log("[WS] Raw data received:", data);
+
+      // Handle different message formats
+      if (data.type === 'conversation_message' || data.message) {
+        const newMsg = data.message || data;
+
+        // Validate message structure
+        if (newMsg.id && newMsg.content && newMsg.sender) {
+          console.log("[WS] Adding valid message:", newMsg);
+          setMessages(prev => {
+            // Check for duplicates before adding
+            const exists = prev.some(msg => msg.id === newMsg.id);
+            if (!exists) {
+              // Maintain chronological order for inverted list
+              return [newMsg, ...prev];
+            }
+            return prev;
+          });
+        }
+      }
+    },
+    [messages, setMessages]
+  );
+
+  useEffect(() => {
+    if (!conversationId) return;
+    
+    if (!accessToken) {
+      console.error('No access token available for WebSocket connection');
+      return;
+    }
+    
+    console.log(`[ChatScreen] Setting up WebSocket for conversation ${conversationId}`);
+    const ws = connectWebSocket(
+      conversationId,
+      accessToken,
+      handleWebSocketMessage
+    );
+    
+    return () => {
+      console.log(`[ChatScreen] Closing WebSocket for conversation ${conversationId}`);
+      ws.close(1000, 'Component unmounted');
+    };
+  }, [conversationId, accessToken, handleWebSocketMessage]);
+
+  useEffect(() => {
+    if (!conversationId || !conversationType || !title) {
+      console.error('Invalid navigation parameters:', route.params);
+      navigation.goBack();
+    }
+  }, [conversationId, conversationType, title, navigation]);
+
+  useEffect(() => {
+    console.log('ChatScreen opened with:', conversationId, conversationType, title);
+  }, []);
 
   const { handleReactionSelect, removeReaction } = useMessageActions({
     conversationId: String(conversationId),
@@ -71,6 +129,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const handleReaction = useCallback(
     async (messageId: string, reaction: string) => {
       try {
+        console.log(`Adding reaction ${reaction} to message ${messageId}`);
         await handleReactionSelect(reaction);
       } catch (error) {
         console.error('Failed to add reaction:', error);
@@ -158,19 +217,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     }
   }, [netInfo.isConnected, netInfo.isInternetReachable]);
 
-  // Add polling for real-time updates if needed
   useEffect(() => {
-    const pollInterval = setInterval(() => {
-      if (!loading && !error) {
-        loadMessages();
-      }
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(pollInterval);
-  }, [loading, error, loadMessages]);
+    if (!netInfo.isConnected) return;
+    
+    const interval = setInterval(() => {
+      loadMessages();
+    }, 30000); // Change from 10000 (10s) to 30000 (30s)
+    
+    return () => clearInterval(interval);
+  }, [loadMessages, netInfo.isConnected]);
 
   const renderFooter = () => {
-    if ((loading && hasMore) || isRetrying) {
+    if ((loading && hasMoreMessages) || isRetrying || isLoadingMore) {
       return <ActivityIndicator style={styles.loader} color="#007AFF" size="small" />;
     }
     return null;
@@ -204,15 +262,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
               onDelete={handleDeleteMessage}
             />
           )}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id + item.timestamp} // More unique key
           inverted
-          onEndReached={hasMore ? loadMoreMessages : null}
-          onEndReachedThreshold={0.5}
+          onEndReached={hasMoreMessages ? loadMoreMessagesFromApi : null}
+          onEndReachedThreshold={0.1}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
           ListFooterComponent={renderFooter}
           contentContainerStyle={styles.listContent}
         />
-        
-        <TypingIndicator visible={isTyping} />
         
         <MessageInput
           value={inputText}

@@ -23,6 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
 import { resetOnboardingStatus } from '../../utils/onboarding';
+import { setCachedToken } from '../../utils/auth';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -212,9 +213,11 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
                 access: data.access,
                 refresh: data.refresh,
               });
+              // Cache the access token synchronously for use in WebSocket connection, etc.
+              setCachedToken(data.access);
               
               try {
-                 const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+                const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
                   method: "GET",
                   headers: {
                     "Authorization": `Bearer ${data.access}`,

@@ -13,7 +13,6 @@ interface DocumentPickerResponse {
   fileCopyUri?: string;
 }
 
-// Only import DocumentPicker when on native platforms
 const DocumentPicker = Platform.OS !== 'web' ? require('react-native-document-picker') : null;
 
 interface Attachment {
