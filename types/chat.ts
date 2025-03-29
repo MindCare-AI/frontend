@@ -24,6 +24,10 @@ export interface Message {
     content: string;
     timestamp: string;
   }[];
+  is_chatbot?: boolean;
+  // Add any missing fields from WebSocket payload
+  conversation?: number;
+  message_type?: string;
 }
 
 export interface MessageProps {
@@ -46,12 +50,15 @@ export interface Conversation {
   id: string;
   name?: string;
   title?: string; // For displaying conversation title
-  participants: Participant[]; // Changed from string[] to Participant[]
-  otherParticipant?: Participant; // For one-to-one chats
+  // API returns snake_case fields
+  last_message?: string;     // Matches Django's field name for last message
+  unread_count?: number;     // Matches Django's field name for unread count
+  // Optional camelCase aliases for internal usage
   lastMessage?: string;
-  timestamp?: string;
   unreadCount?: number;
-  unread_count?: number; // Some APIs use snake_case
+  participants?: Participant[];
+  otherParticipant?: Participant; // For one-to-one chats
+  timestamp?: string;
   conversation_type: 'direct' | 'group' | 'one_to_one' | 'chatbot';
 }
 
@@ -86,4 +93,12 @@ export interface ApiErrorResponse {
   message: string;
   errors?: Record<string, string[]>;
   status_code?: number;
+}
+
+// New interfaces for message pagination
+export interface PaginatedMessagesResponse {
+  results: Message[];
+  has_more: boolean;
+  next_cursor?: string;
+  count?: number;
 }

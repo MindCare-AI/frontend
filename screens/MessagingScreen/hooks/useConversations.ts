@@ -13,7 +13,6 @@ const useConversations = () => {
   const [hasMore, setHasMore] = useState<boolean>(true);
   const limit = 20;
   
-  // Use the real access token from auth context
   const { accessToken } = useAuth();
 
   const loadConversations = useCallback(async (refresh = false) => {
@@ -25,43 +24,48 @@ const useConversations = () => {
     
     try {
       setLoading(true);
+      // When refreshing, reset to page 1
       const newPage = refresh ? 1 : page;
+      
+      // Build query params using only the page param (per API docs)
       const queryParams = new URLSearchParams({
-        page: newPage.toString()
-        // Don't use query param unless specified in API docs
-        // The API docs show only 'page' is supported
+        page: newPage.toString(),
       });
-
-      // Fetch both one-to-one and group conversations in parallel
+      
+      // Build endpoints: one_to_one and groups
+      const oneToOneEndpoint = `${API_BASE_URL}/api/v1/messaging/one_to_one/?${queryParams.toString()}`;
+      const groupsEndpoint = `${API_BASE_URL}/api/v1/messaging/groups/?${queryParams.toString()}`;
+      
+      // Fetch both endpoints in parallel
       const [oneToOneResponse, groupsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/messaging/one_to_one/?${queryParams}`, {
+        fetch(oneToOneEndpoint, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
           }
         }),
-        fetch(`${API_BASE_URL}/api/v1/messaging/groups/?${queryParams}`, {
+        fetch(groupsEndpoint, {
           headers: {
             'Authorization': `Bearer ${accessToken}`
           }
         })
       ]);
       
-      // Handle possible errors from either endpoint
+      // If both endpoints fail, throw an error
       if (!oneToOneResponse.ok && !groupsResponse.ok) {
         throw new Error('Failed to fetch conversations');
       }
-
-      // Parse responses - handle case where one endpoint fails but the other succeeds
+      
+      // Parse responses; if one fails, treat it as empty
       const oneToOneData = oneToOneResponse.ok ? await oneToOneResponse.json() : { results: [] };
       const groupsData = groupsResponse.ok ? await groupsResponse.json() : { results: [] };
       
-      // Format one-to-one conversations according to API response structure
+      // Format one-to-one conversations
       const formattedOneToOne = (oneToOneData.results || []).map((conv: any) => ({
         id: conv.id,
         otherParticipant: {
           id: conv.other_participant || '0',
           name: conv.other_user_name || 'Unknown User',
-          avatar: undefined  // Not provided in the API
+          avatar: undefined, // Not provided by the API
         },
         participants: conv.participants || [],
         name: conv.other_user_name || 'Chat',
@@ -72,7 +76,7 @@ const useConversations = () => {
         conversation_type: 'one_to_one',
       }));
       
-      // Format group conversations according to API response structure
+      // Format group conversations
       const formattedGroups = (groupsData.results || []).map((conv: any) => ({
         id: conv.id,
         otherParticipant: undefined,
@@ -85,22 +89,19 @@ const useConversations = () => {
         conversation_type: 'group',
       }));
       
-      // Combine and sort all conversations
+      // Combine and sort all conversations (newest first)
       const formattedConversations = [...formattedOneToOne, ...formattedGroups]
-        .sort((a, b) => {
-          // Sort by timestamp (newest first)
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-        });
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       
-      // Update the state with new data
+      // Update state: if refreshing, replace conversations; otherwise append to previous list
       setConversations(prev => refresh ? formattedConversations : [...prev, ...formattedConversations]);
       
-      // Check if there are more pages in either endpoint using the next field
+      // Check if there are more pages by verifying the presence of a 'next' field in either response
       const hasMoreOneToOne = !!oneToOneData.next;
       const hasMoreGroups = !!groupsData.next;
       setHasMore(hasMoreOneToOne || hasMoreGroups);
       
-      // Extract next page number from URL or increment
+      // Increment page if more data exists
       if (hasMoreOneToOne || hasMoreGroups) {
         setPage(newPage + 1);
       }

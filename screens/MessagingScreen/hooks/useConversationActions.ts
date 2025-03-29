@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../../../config';
 import { useAuth } from '../../../contexts/AuthContext';
 
 const deleteConversation = async (conversation: Conversation, accessToken: string): Promise<void> => {
-  // Get the right endpoint based on conversation type
+  // Use proper pluralization: "groups" for group conversations, "one_to_one" for others.
   const endpoint = conversation.conversation_type === 'group' ? 'groups' : 'one_to_one';
   
   const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/${conversation.id}/`, {
@@ -14,13 +14,15 @@ const deleteConversation = async (conversation: Conversation, accessToken: strin
       'Authorization': `Bearer ${accessToken}`,
     },
   });
+  
   if (!response.ok) {
-    throw new Error('Failed to delete conversation');
+    const errorText = await response.text();
+    throw new Error(`Failed to delete conversation: ${errorText}`);
   }
 };
 
 const markAsRead = async (conversation: Conversation, accessToken: string): Promise<void> => {
-  // Get the right endpoint based on conversation type
+  // Use proper pluralization: "groups" for group conversations, "one_to_one" for others.
   const endpoint = conversation.conversation_type === 'group' ? 'groups' : 'one_to_one';
   
   const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/${conversation.id}/`, {
@@ -31,8 +33,10 @@ const markAsRead = async (conversation: Conversation, accessToken: string): Prom
     },
     body: JSON.stringify({ unread_count: 0 }),
   });
+  
   if (!response.ok) {
-    throw new Error('Failed to mark conversation as read');
+    const errorText = await response.text();
+    throw new Error(`Failed to mark conversation as read: ${errorText}`);
   }
 };
 

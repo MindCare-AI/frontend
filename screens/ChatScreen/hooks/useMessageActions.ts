@@ -100,8 +100,9 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
       // Get the right endpoint based on conversation type
       const endpoint = conversationType === 'group' ? 'groups' : 'one_to_one';
       
-      // DELETE requests don't typically include a body, but some APIs require it
-      // If your API requires a body, use this approach
+      // Updated URL: no reaction query parameter since the API doesn't require it.
+      const url = `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/reactions/`;
+      
       const options: RequestInit = {
         method: 'DELETE',
         headers: {
@@ -109,14 +110,7 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
         }
       };
       
-      // If your API requires a body for DELETE, uncomment and modify this:
-      // options.body = JSON.stringify({ reaction });
-      // options.headers['Content-Type'] = 'application/json';
-      
-      const response = await fetch(
-        `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/reactions/?reaction=${reaction}`, 
-        options
-      );
+      const response = await fetch(url, options);
       
       if (!response.ok) {
         const errorText = await response.text();

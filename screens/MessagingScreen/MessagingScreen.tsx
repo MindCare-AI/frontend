@@ -20,7 +20,6 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
   const { conversations, loading, error, searchQuery, handleSearch, loadMore, refresh } = useConversations();
 
   const renderConversationItem = ({ item }: { item: Conversation }) => {
-    // Create a normalized conversation with defaults
     const normalizedConversation = {
       ...item,
       lastMessage: item.lastMessage ?? 'No messages yet',
@@ -32,7 +31,7 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
       <ConversationItem
         conversation={normalizedConversation}
         onPress={() => {
-          navigation.navigate('Chat', { // ✅ Correctly typed for MessagingNavigator
+          navigation.navigate('Chat', {
             conversationId: String(item.id),
             conversationType: item.conversation_type as 'one_to_one' | 'group',
             title: item.name || item.otherParticipant?.name || 'Chat',
@@ -52,18 +51,22 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
         <FlatList
           data={conversations}
           renderItem={renderConversationItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           onEndReached={loadMore}
           onRefresh={refresh}
           refreshing={loading}
           contentContainerStyle={styles.listContent}
         />
       )}
-      <NewChatButton onPress={() => navigation.navigate('Chat', {
-        conversationId: '',
-        conversationType: 'one_to_one',
-        title: 'New Chat'
-      })} />
+      <NewChatButton
+        onPress={() =>
+          navigation.navigate('Chat', {
+            conversationId: '',
+            conversationType: 'one_to_one',
+            title: 'New Chat',
+          })
+        }
+      />
     </View>
   );
 };

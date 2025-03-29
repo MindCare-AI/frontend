@@ -2,6 +2,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config';
 
+let cachedToken: string | null = null;
+
+export const setCachedToken = (token: string | null) => {
+  cachedToken = token;
+};
+
+export const getAuthToken = (): string | null => {
+  return cachedToken;
+};
+
 export const getAuthHeader = async () => {
   const token = await AsyncStorage.getItem('accessToken');
   return {
