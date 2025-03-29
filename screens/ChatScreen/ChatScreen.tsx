@@ -15,6 +15,7 @@ import ErrorMessage from '../../components/ui/ErrorMessage';
 import { Message } from '../../types/chat';
 import { useAuth } from '../../contexts/AuthContext';
 import { connectWebSocket } from '../../services/websocket';
+import { useWebSocket } from '../../services/websocket';
 
 type ChatRouteProp = RouteProp<MessagingStackParamList, 'Chat'>;
 type ChatNavigationProp = StackNavigationProp<MessagingStackParamList, 'Chat'>;
@@ -66,19 +67,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const handleWebSocketMessage = useCallback(
     (data: any) => {
       console.log("[WS] Raw data received:", data);
-
-      // Handle different message formats
       if (data.type === 'conversation_message' || data.message) {
         const newMsg = data.message || data;
-
-        // Validate message structure
         if (newMsg.id && newMsg.content && newMsg.sender) {
           console.log("[WS] Adding valid message:", newMsg);
+          // Use functional update to avoid stale dependency on "messages"
           setMessages(prev => {
-            // Check for duplicates before adding
-            const exists = prev.some(msg => msg.id === newMsg.id);
-            if (!exists) {
-              // Maintain chronological order for inverted list
+            if (!prev.some(msg => msg.id === newMsg.id)) {
               return [newMsg, ...prev];
             }
             return prev;
@@ -86,29 +81,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         }
       }
     },
-    [messages, setMessages]
+    [setMessages] // Removed "messages" from dependencies
   );
 
-  useEffect(() => {
-    if (!conversationId) return;
-    
-    if (!accessToken) {
-      console.error('No access token available for WebSocket connection');
-      return;
-    }
-    
-    console.log(`[ChatScreen] Setting up WebSocket for conversation ${conversationId}`);
-    const ws = connectWebSocket(
-      conversationId,
-      accessToken,
-      handleWebSocketMessage
-    );
-    
-    return () => {
-      console.log(`[ChatScreen] Closing WebSocket for conversation ${conversationId}`);
-      ws.close(1000, 'Component unmounted');
-    };
-  }, [conversationId, accessToken, handleWebSocketMessage]);
+  const { sendMessage, connectionStatus } = useWebSocket(String(conversationId), handleWebSocketMessage);
 
   useEffect(() => {
     if (!conversationId || !conversationType || !title) {
