@@ -24,18 +24,16 @@ const getEndpoint = (conversationType: string): string => {
     case 'group':
       return 'groups';
     case 'one_to_one':
-      // Updated endpoint based on backend expectation
       return 'one_to_one';
-    case 'chatbot':
-      return 'chatbot';
     default:
       throw new Error('Invalid conversation type');
   }
 };
 
+// Update the props interface to remove 'chatbot':
 interface UseChatMessagesProps {
   conversationId: string;
-  conversationType: 'one_to_one' | 'group' | 'chatbot';
+  conversationType: 'one_to_one' | 'group';
 }
 
 const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesProps) => {
