@@ -33,11 +33,16 @@ export type AuthStackParamList = {
 
 // New MessagingStackParamList to specify nested messaging routes
 export type MessagingStackParamList = {
+  Messaging: undefined;
   Chat: {
     conversationId: string | number;
     conversationType: 'one_to_one' | 'group';
     title: string;
     otherParticipantId?: number;
+  };
+  NewConversation: undefined;
+  GroupDetails?: {
+    groupId: string | number;
   };
 };
 

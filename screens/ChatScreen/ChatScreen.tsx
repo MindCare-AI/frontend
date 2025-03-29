@@ -84,10 +84,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     [setMessages] // Removed "messages" from dependencies
   );
 
-  const { sendMessage, connectionStatus } = useWebSocket(String(conversationId), handleWebSocketMessage);
+  const validConversationId =
+    typeof conversationId === 'string' ? conversationId.trim() : '';
+
+  const wsHook =
+    (title !== 'New Chat' && validConversationId !== '')
+      ? useWebSocket(validConversationId, handleWebSocketMessage)
+      : { sendMessage: () => {}, connectionStatus: 'disconnected' };
+
+  const { sendMessage, connectionStatus } = wsHook;
 
   useEffect(() => {
-    if (!conversationId || !conversationType || !title) {
+    const isNewChat = title === 'New Chat';
+    if (!conversationType || !title || (!isNewChat && conversationId === '')) {
       console.error('Invalid navigation parameters:', route.params);
       navigation.goBack();
     }
@@ -228,7 +237,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         <FlatList
-          data={messages}
+          data={messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())}
           renderItem={({ item }) => (
             <MessageBubble 
               message={item} 

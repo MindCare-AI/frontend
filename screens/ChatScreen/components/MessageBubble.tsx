@@ -1,4 +1,3 @@
-//screens/ChatScreen/components/MessageBubble.tsx
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -233,11 +232,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   userBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0B57D0', // Professional blue for user messages
     borderBottomRightRadius: 2,
   },
   otherBubble: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7', // Light gray for received messages
     borderBottomLeftRadius: 2,
     elevation: 1,
   },
@@ -246,7 +245,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   otherText: {
-    color: '#333',
+    color: '#333333', // Darker text for better readability
     fontSize: 16,
   },
   footer: {
