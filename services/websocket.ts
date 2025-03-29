@@ -106,7 +106,7 @@ export const useWebSocket = (
   const ws = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
-  const reconnectDelay = 3000; 
+  const reconnectDelay = 2000; 
   const onMessageReceivedRef = useRef(onMessageReceived);
   const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('disconnected');
 
@@ -124,7 +124,7 @@ export const useWebSocket = (
     const token = getAuthToken();
     if (!token) {
       console.error('No authentication token available');
-      return;
+      return; 
     }
 
     connectionStatusRef.current = 'connecting';
