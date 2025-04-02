@@ -124,7 +124,15 @@ const AppNavigator = () => {
       <Tab.Screen 
         name="Settings" 
         component={SettingsStackNavigator} 
-        options={{ tabBarLabel: 'Settings' }} 
+        options={{ tabBarLabel: 'Settings' }}
+        listeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            // If the nested stack has routes beyond the initial one, navigate back to the initial screen.
+            if (route.state && route.state.index > 0) {
+              navigation.navigate('Settings', { screen: 'SettingsHome' });
+            }
+          },
+        })}
       />
       <Tab.Screen
         name="Appointments"
