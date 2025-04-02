@@ -133,11 +133,10 @@ export const useProfile = (): ProfileHookReturn => {
   );
 
   const fetchProfile = useCallback(async () => {
-    if (!user?.id || !accessToken) {
-      console.log('Missing user ID or access token');
+    if (!user?.id || !accessToken || isInitialized) {
       return;
     }
-  
+
     setLoading(true);
     
     try {
@@ -202,16 +201,16 @@ export const useProfile = (): ProfileHookReturn => {
       setError(err instanceof Error ? err.message : 'Failed to fetch profile');
     } finally {
       setLoading(false);
-    }
-  }, [user?.id, user?.user_type, user?.patient_profile?.unique_id, user?.therapist_profile?.unique_id, accessToken, updateUser]);
-
-  // Only fetch profile once when component mounts
-  useEffect(() => {
-    if (!isInitialized && accessToken && user?.id) {
-      fetchProfile();
       setIsInitialized(true);
     }
-  }, [fetchProfile, isInitialized, accessToken, user?.id]);
+  }, [user?.id, user?.user_type, user?.patient_profile?.unique_id, user?.therapist_profile?.unique_id, accessToken, updateUser, isInitialized]);
+
+  // Simplified effect that only runs once
+  useEffect(() => {
+    if (!isInitialized && user?.id && accessToken) {
+      fetchProfile();
+    }
+  }, [fetchProfile, isInitialized, user?.id, accessToken]);
 
   // Reset fetch counter when user changes
   useEffect(() => {

@@ -133,9 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log("Patient profiles response:", JSON.stringify(profileResponse.data));
           
           if (profileResponse.data.results && profileResponse.data.results.length > 0) {
-            const profile = profileResponse.data.results[0];
+            // Use the actual unique_id from the profile
             userData.patient_profile = {
-              unique_id: profile.unique_id // Use the UUID instead of numeric ID
+              unique_id: profileResponse.data.results[0].id.toString()
             };
             console.log("Added patient profile ID:", userData.patient_profile);
           } else {
