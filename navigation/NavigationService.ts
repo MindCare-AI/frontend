@@ -9,7 +9,8 @@ export function navigate<RouteName extends keyof RootStackParamList>(
   params?: RootStackParamList[RouteName]
 ) {
   if (navigationRef.isReady()) {
-    navigationRef.navigate(name, params);
+    // @ts-expect-error: the type definition expects never but this works at runtime
+    navigationRef.navigate<RouteName>(name as never, params);
   }
 }
 

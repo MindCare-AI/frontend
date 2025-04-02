@@ -1,235 +1,272 @@
-//screens/Onboarding/OnboardingScreen.tsx
-import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  Image, 
-  StyleSheet, 
-  TouchableOpacity,
-  FlatList,
-  Dimensions,
-  SafeAreaView
-} from 'react-native';
-import { NavigationProp } from '@react-navigation/native';
-import { markOnboardingComplete } from "../../utils/onboarding"; // Fixed import
+import React, { useState, useEffect } from 'react';
+import { StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Brain, HandHeart, MessageSquare } from 'lucide-react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../components/ui/ToastContext';
+import UserTypeSelection from '../../components/UserTypeSelection';
+import OnboardingSlide from '../../components/OnboardingSlide';
+import OnboardingLayout from '../../components/OnboardingLayout';
+import axios from 'axios';
+import { API_URL } from '../../config';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../types/navigation';
 
-interface OnboardingStep {
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+export interface OnboardingSlideProps {
   title: string;
   description: string;
-  image: any; // Changed to any for require() image source
+  icon: React.ReactNode;
+  isActive: boolean;
+  onNext?: () => void;
 }
 
-type OnboardingScreenProps = {
-  navigation: NavigationProp<any>;
-};
+const OnboardingScreen = () => {
+  const [step, setStep] = useState(0);
+  const [userType, setUserType] = useState<'patient' | 'therapist' | null>(null);
+  const navigation = useNavigation<NavigationProp>();
+  const { toast } = useToast();
+  const { user, accessToken, isLoading, fetchUserData } = useAuth();
+  const totalSteps = 4;
 
-const { width } = Dimensions.get('window');
+  useEffect(() => {
+    if (!isLoading) {
+      console.log('Initial check - Auth loading complete');
+      checkUserRole();
+    }
+  }, [isLoading]);
 
-const OnboardingScreen = ({ navigation }: OnboardingScreenProps) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  
-  const steps: OnboardingStep[] = [
-    {
-      title: "Welcome to MindCare AI",
-      description: "Your AI companion for mental wellbeing and mindfulness",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "Track Your Mood",
-      description: "Log how you're feeling daily to recognize patterns and improve self-awareness",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "Guided Meditation",
-      description: "Access personalized meditation sessions to reduce stress and improve focus",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-    {
-      title: "AI-Powered Support",
-      description: "Chat with our AI assistant anytime you need someone to talk to",
-      image: require('../../assets/images/logo_mindcare.svg'), // Fixed path
-    },
-  ];
+  // Monitor user_type changes to handle navigation
+  useEffect(() => {
+    if (!isLoading && user) {
+      console.log('User_type changed effect - current user_type:', user?.user_type);
+      
+      // Using typeof to avoid TypeScript errors
+      if (typeof user.user_type === 'string' && user.user_type !== '') {
+        console.log('User already has a type, navigating to App:', user.user_type);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      }
+    }
+  }, [user?.user_type, isLoading, navigation]);
 
-  const handleNext = () => {
-    if (currentIndex < steps.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      flatListRef.current?.scrollToIndex({ animated: true, index: currentIndex + 1 });
-    } else {
-      handleComplete();
+  const checkUserRole = async () => {
+    try {
+      console.log('Checking user role - current user:', user);
+      
+      // Using typeof for better type safety
+      if (user && typeof user.user_type === 'string' && user.user_type !== '') {
+        console.log('User has a role, skipping onboarding:', user.user_type);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      } else {
+        console.log('User needs onboarding, current user_type:', user?.user_type || 'undefined');
+      }
+    } catch (error) {
+      console.error('Error checking user role:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to check user role',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleSkip = () => {
-    handleComplete();
-  };
+  // Direct API call to set user type without modifying auth context
+  const setUserTypeInBackend = async (selectedType: 'patient' | 'therapist') => {
+    if (!accessToken) {
+      console.error('No access token available');
+      return;
+    }
 
-  const handleComplete = () => {
-    // Mark onboarding as complete
-    markOnboardingComplete();
-    // Navigate to Welcome screen after onboarding
-    navigation.navigate('Welcome'); // Using navigate instead of replace
-  };
-
-  const renderDot = (index: number) => {
-    return (
-      <View
-        key={index}
-        style={[
-          styles.dot,
-          {
-            width: index === currentIndex ? 20 : 10,
-            backgroundColor: index === currentIndex 
-              ? '#002D62' 
-              : index < currentIndex 
-                ? '#002D6280' 
-                : '#CFCFCF',
+    try {
+      // Make sure this matches your API's expected payload structure
+      const payload = { user_type: selectedType };
+      
+      console.log('Setting user type in backend:', selectedType);
+      const response = await axios.post(
+        `${API_URL}/users/set-user-type/`, 
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
           }
-        ]}
-      />
-    );
+        }
+      );
+      
+      console.log('User type set successfully, response:', response.status);
+      
+      // Refresh user data to get updated user_type
+      await fetchUserData();
+      
+      return true;
+    } catch (error) {
+      console.error('Error setting user type:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status: number, data: any } };
+        console.error('API error details:', axiosError.response?.data);
+      }
+      throw error;
+    }
   };
 
-  const renderItem = ({ item }: { item: OnboardingStep }) => {
-    return (
-      <View style={styles.slide}>
-        <View style={styles.imageContainer}>
-          <Image 
-            source={item.image} 
-            style={styles.image}
-            resizeMode="cover"
-          />
-        </View>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
-      </View>
-    );
+  const handleComplete = async () => {
+    if (!userType) {
+      console.error('No user type selected');
+      toast({
+        title: 'Error',
+        description: 'Please select your role to continue',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      console.log('Completing onboarding, setting user type to:', userType);
+      
+      // Set user type directly via API
+      await setUserTypeInBackend(userType);
+      
+      // The navigation will be handled by the useEffect that watches user.user_type
+      // after fetchUserData() updates the user state
+      
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete onboarding. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Fix the handleUserTypeSelect function
+  const handleUserTypeSelect = (type: 'patient' | 'therapist') => {
+    // Set the user type first
+    setUserType(type);
+    console.log('User type selected:', type);
+    
+    // Then move to the next step (or complete if it's the last step)
+    setTimeout(() => {
+      if (step < totalSteps - 1) {
+        setStep(step + 1);
+      } else {
+        // Directly use the selected type instead of relying on state
+        handleCompleteWithType(type);
+      }
+    }, 100); // Small timeout to ensure state updates
+  };
+
+  // Add this helper function to use the type directly
+  const handleCompleteWithType = async (selectedType: 'patient' | 'therapist') => {
+    try {
+      console.log('Completing onboarding with type:', selectedType);
+      
+      // Set user type directly via API using the passed-in type
+      await setUserTypeInBackend(selectedType);
+      
+      // Optional: Force navigation if the useEffect doesn't trigger fast enough
+      setTimeout(() => {
+        console.log('Forcing navigation to App screen after role update');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'App' }],
+        });
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to complete onboarding. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Update the handleNext function to handle the final step differently
+  const handleNext = () => {
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
+    } else if (userType) {
+      // Only call handleComplete if userType is set
+      handleComplete();
+    } else {
+      // Show an error if we're on the last step but no user type is selected
+      toast({
+        title: 'Error',
+        description: 'Please select your role to continue',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 0) {
+      setStep(step - 1);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.dotsContainer}>
-        {steps.map((_, index) => renderDot(index))}
-      </View>
+    <OnboardingLayout
+      totalSteps={totalSteps}
+      currentStep={step}
+      onBack={step > 0 ? handleBack : undefined}
+      showProgress={true}
+    >
+      {step === 0 && (
+        <OnboardingSlide
+          title="Welcome to MindCare AI"
+          description="Your digital companion for mental wellness and therapy management"
+          icon={<Brain size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
 
-      <FlatList
-        ref={flatListRef}
-        data={steps}
-        renderItem={renderItem}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.x / width);
-          setCurrentIndex(index);
-        }}
-        keyExtractor={(_, index) => index.toString()}
-      />
+      {step === 1 && (
+        <OnboardingSlide
+          title="Personalized Support"
+          description="Access tools tailored to your unique needs and goals"
+          icon={<HandHeart size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
 
-      <View style={styles.buttonContainer}>
-        {currentIndex < steps.length - 1 ? (
-          <>
-            <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-              <Text style={styles.skipButtonText}>Skip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleNext} style={styles.nextButton}>
-              <Text style={styles.nextButtonText}>Next</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity onPress={handleComplete} style={styles.getStartedButton}>
-              <Text style={styles.nextButtonText}>Get Started</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </SafeAreaView>
+      {step === 2 && (
+        <OnboardingSlide
+          title="Stay Connected"
+          description="Communication tools that bridge the gap between sessions"
+          icon={<MessageSquare size={40} color="black" />}
+          isActive={true}
+          onNext={handleNext}
+        />
+      )}
+
+      {step === 3 && (
+        <OnboardingSlide
+          title="Who Are You?"
+          description="Select your role to personalize your experience"
+          isActive={true}
+        >
+          <UserTypeSelection onSelect={handleUserTypeSelect} />
+        </OnboardingSlide>
+      )}
+    </OnboardingLayout>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E4F0F6',
-  },
-  slide: {
-    width,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imageContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#4A90E280',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#002D62',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    lineHeight: 22,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 20,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    marginBottom: 20,
-  },
-  skipButton: {
-    padding: 10,
-  },
-  skipButtonText: {
-    color: '#666',
-    fontSize: 16,
-  },
-  nextButton: {
-    backgroundColor: '#002D62',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 3,
-  },
-  getStartedButton: {
-    backgroundColor: '#002D62',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    elevation: 3,
-  },
-  nextButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: 'white',
   },
 });
 
