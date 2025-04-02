@@ -14,17 +14,18 @@ interface PatientProfileResponse {
 
 // Define the interface for patient profile creation response
 interface NewPatientProfileResponse {
-  id: string | number;
+  id: number;
+  unique_id: string;  // Add this field
+  user: number;
   first_name: string;
   last_name: string;
-  date_of_birth: string | null;
-  gender: string;
-  address: string;
-  phone_number?: string;
-  emergency_contact: EmergencyContact;
-  medical_history: string;
-  current_medications: string;
-  blood_type: string;
+  email: string;
+  phone_number: string | null;
+  medical_history: string | null;
+  current_medications: string | null;
+  blood_type: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface PatientProfile {
@@ -105,99 +106,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       
-      const userData = response.data;
+      const userData = {
+        ...response.data,
+        user_type: response.data.user_type || '' // Preserve empty string for onboarding
+      };
       
-      // Preserve empty user_type to maintain onboarding state
-      if (!userData.user_type) {
-        userData.user_type = '';
-      }
+      console.log("User data from API (with type):", userData);
       
-      console.log("User data from API (with type):", {
-        ...userData,
-        user_type: userData.user_type || 'empty'
-      });
-      
-      setUser(userData);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      
-      // Check if we need to fetch or create a patient profile
-      if (userData.user_type === 'patient' && !userData.patient_profile) {
+      // Only fetch profile if user has a type (don't block onboarding)
+      if (userData.user_type === 'patient') {
         try {
-          // First try to fetch existing profiles
-          const profileResponse: AxiosResponse<PatientProfileResponse> = await axios.get(`${API_URL}/patient/profiles/`, {
-            headers: {
-              Authorization: `Bearer ${authState.accessToken}`
+          const profileResponse: AxiosResponse<PatientProfileResponse> = await axios.get(
+            `${API_URL}/patient/profiles/`,
+            {
+              headers: {
+                Authorization: `Bearer ${authState.accessToken}`
+              }
             }
-          });
+          );
           
           console.log("Patient profiles response:", JSON.stringify(profileResponse.data));
           
-          if (profileResponse.data.results && profileResponse.data.results.length > 0) {
-            // Use the actual unique_id from the profile
+          if (profileResponse.data.results?.length > 0) {
+            // Use the correct unique_id from the profile
             userData.patient_profile = {
-              unique_id: profileResponse.data.results[0].id.toString()
+              unique_id: profileResponse.data.results[0].unique_id // Use unique_id instead of id
             };
             console.log("Added patient profile ID:", userData.patient_profile);
           } else {
-            // No profile exists, create one
+            // Create new profile only if user has type but no profile
             console.log("Creating new patient profile...");
             try {
-              // Remove phone_number if userData doesn't have it
               const profileData = {
                 first_name: userData.username || '',
-                last_name: '', 
-                date_of_birth: null,
-                gender: '',
-                address: '',
-                // Only include phone_number if it exists
-                ...(userData.phone_number ? { phone_number: userData.phone_number } : {}),
-                emergency_contact: {
-                  name: '',
-                  relationship: '',
-                  phone: '',
-                  email: ''
-                },
-                medical_history: '',
-                current_medications: '',
-                blood_type: ''
+                last_name: '',
+                // ...other profile fields...
               };
               
-              console.log("Creating profile with data:", JSON.stringify(profileData));
-              
-              const newProfileResponse: AxiosResponse<NewPatientProfileResponse> = await axios.post(
-                `${API_URL}/patient/profiles/`, 
+              const newProfileResponse = await axios.post<NewPatientProfileResponse>(
+                `${API_URL}/patient/profiles/`,
                 profileData,
                 {
                   headers: {
                     Authorization: `Bearer ${authState.accessToken}`
-                  }
                 }
-              );
+              });
               
-              console.log("New profile created:", JSON.stringify(newProfileResponse.data));
-              
-              // Add the new profile to user object
+              // Store the correct unique_id from the new profile
               userData.patient_profile = {
-                unique_id: newProfileResponse.data.id.toString()
+                unique_id: newProfileResponse.data.unique_id // Use unique_id from response
               };
-              console.log("Created new patient profile:", userData.patient_profile);
-            } catch (createError: any) {
-              console.error("Error creating patient profile:", createError?.response?.data || createError);
+            } catch (createError) {
+              console.error("Error creating patient profile:", createError);
             }
           }
-        } catch (profileError: any) {
-          console.error("Error fetching patient profiles:", profileError?.response?.data || profileError);
+        } catch (profileError) {
+          console.error("Error fetching patient profiles:", profileError);
         }
       }
       
-      // Save the updated user data - don't modify user_type
-      setUser(userData); // Make sure userData.user_type is preserved exactly as received
+      // Save user data without modifying user_type
+      setUser(userData);
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
       return userData;
-    } catch (error: any) {
-      console.error('Error fetching user data:', error?.response?.data || error);
-      // Don't sign out automatically here, let the component decide
+    } catch (error) {
+      console.error('Error fetching user data:', error);
       return null;
     }
   };
