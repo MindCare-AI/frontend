@@ -1,3 +1,4 @@
+//utils/debug.ts
 export const debugWebSocket = (enabled: boolean = true) => {
   return {
     log: (message: string, ...args: any[]) => {

@@ -9,7 +9,10 @@ export type RootStackParamList = {
   MessagingTab: undefined;
   Profile: undefined;
   AppointmentManagement: undefined;
-  Notifications: undefined;
+  Notifications: undefined; // Add this
+  NotificationDetail: { id: string }; // And this
+  Settings: undefined;
+  Appointments: undefined;
 };
 
 export type AppTabParamList = {
@@ -47,16 +50,28 @@ export type MessagingStackParamList = {
 };
 
 export type SettingsStackParamList = {
-  SettingsScreen: undefined;
-  UserPreferences: undefined;
+  SettingsHome: undefined;
   UserSettings: undefined;
   UserProfile: undefined;
+  UserPreferences: undefined;
+  TherapistAvailability: undefined;
+  HealthMetrics: undefined;  // Added new screen
+  MedicalHistory: undefined; // Added new screen
 };
 
 export type AppointmentStackParamList = {
   AppointmentManagement: undefined;
   BookAppointment: undefined;
 };
+
+// Add the Appointment interface export:
+export interface Appointment {
+  id: string;
+  date: string;
+  time?: string;
+  patientName?: string;
+  status?: string;
+}
 
 declare global {
   namespace ReactNavigation {

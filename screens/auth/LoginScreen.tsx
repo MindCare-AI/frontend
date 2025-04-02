@@ -11,6 +11,8 @@ import {
   Animated,
   Alert,
   Linking,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { NavigationProp, CommonActions } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation"; 
@@ -24,6 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
 import { resetOnboardingStatus } from '../../utils/onboarding';
 import { setCachedToken } from '../../utils/auth';
+import { getShadowStyles } from '../../utils/styles';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -37,6 +40,8 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailValid, setIsEmailValid] = useState<boolean | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Logging in...");
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const { signIn } = useAuth();
@@ -125,12 +130,15 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       // If user_type is empty or undefined, always show onboarding
       if (!userProfile?.user_type || userProfile.user_type.trim() === "") {
         console.log("User has no user_type, navigating to onboarding");
+        setLoadingMessage("Preparing onboarding...");
         
         // Reset the onboarding flag first
         await resetOnboardingStatus();
         
-        // Based on your navigation output logs and the error message,
-        // it seems Onboarding is likely in the root stack, not the Auth stack
+        // Hide loading before navigation to prevent overlay issues
+        setIsLoading(false);
+        
+        // Navigate to onboarding
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
@@ -143,6 +151,11 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       
       // For users with a user_type
       console.log("User has user_type:", userProfile.user_type, "going to Home");
+      setLoadingMessage("Loading home screen...");
+      
+      // Hide loading before navigation to prevent overlay issues
+      setIsLoading(false);
+      
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
@@ -154,6 +167,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       );
     } catch (error) {
       console.error("Error in navigation:", error);
+      setIsLoading(false);
       Alert.alert(
         'Navigation Error',
         'An error occurred during login navigation. Please check logs.'
@@ -200,6 +214,10 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       console.log("Login response:", data);
 
       if (response.ok) {
+        // Show loading overlay immediately after successful login
+        setIsLoading(true);
+        setLoadingMessage("Authenticating...");
+        
         // Success animation
         gsap.to(formRef.current, {
           y: -20,
@@ -209,29 +227,38 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
           onComplete: () => {
             // Execute async operations after animation completes
             (async () => {
-              await signIn({
-                access: data.access,
-                refresh: data.refresh,
-              });
-              // Cache the access token synchronously for use in WebSocket connection, etc.
-              setCachedToken(data.access);
-              
               try {
-                const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
-                  method: "GET",
-                  headers: {
-                    "Authorization": `Bearer ${data.access}`,
-                    "Content-Type": "application/json"
-                  }
+                await signIn({
+                  access: data.access,
+                  refresh: data.refresh,
                 });
-                const profileData = await profileResponse.json();
-                console.log("User profile:", profileData);
-                // Pass profileData so that checkAndNavigate can test user_type
-                checkAndNavigate(profileData);
-              } catch (profileError) {
-                console.error("Error fetching user profile:", profileError);
-                // In case of error, you can decide what to do (default to onboarding, for example)
-                checkAndNavigate();
+                // Cache the access token synchronously for use in WebSocket connection, etc.
+                setCachedToken(data.access);
+                
+                setLoadingMessage("...");
+                
+                try {
+                  const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+                    method: "GET",
+                    headers: {
+                      "Authorization": `Bearer ${data.access}`,
+                      "Content-Type": "application/json"
+                    }
+                  });
+                  const profileData = await profileResponse.json();
+                  console.log("User profile:", profileData);
+                  // Pass profileData so that checkAndNavigate can test user_type
+                  checkAndNavigate(profileData);
+                } catch (profileError) {
+                  console.error("Error fetching user profile:", profileError);
+                  // Hide loading in case of error
+                  setIsLoading(false);
+                  // In case of error, you can decide what to do (default to onboarding, for example)
+                  checkAndNavigate();
+                }
+              } catch (error) {
+                console.error("Authentication error:", error);
+                setIsLoading(false);
               }
             })();
           }
@@ -504,6 +531,21 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* Loading overlay */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isLoading}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#002D62" />
+            <Text style={styles.loadingText}>{loadingMessage}</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -535,12 +577,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 24,
     borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-    marginHorizontal: 2,
+    ...getShadowStyles(5),
+    // Remove deprecated shadow properties
   },
   title: {
     fontSize: 26,
@@ -640,6 +678,33 @@ const styles = StyleSheet.create({
     color: '#002D62',
     fontWeight: '500',
     fontSize: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '80%',
+    maxWidth: 300,
+    ...getShadowStyles(5),
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#002D62',
+    textAlign: 'center',
   },
 });
 

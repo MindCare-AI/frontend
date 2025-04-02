@@ -1,4 +1,3 @@
-//App.tsx
 import 'react-native-gesture-handler';
 import React from 'react';
 import RootNavigator from './navigation/RootNavigator';
@@ -9,7 +8,7 @@ import { ToastProvider } from './components/ui/ToastContext';
 
 LogBox.ignoreLogs(['Warning: ...']);
 
-const App = () => {
+export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
@@ -19,6 +18,4 @@ const App = () => {
       </ToastProvider>
     </AuthProvider>
   );
-};
-
-export default App;
+}
