@@ -78,35 +78,23 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
 
   useEffect(() => {
     if (!user || !accessToken) return;
-  
-    const profileId = user.patient_profile?.unique_id || user.therapist_profile?.unique_id;
-    if (!profileId) return;
-  
-    // Prevent unnecessary fetches
-    if (localProfile?.id === profile?.id) return;
-  
-    const loadProfile = async () => {
-      try {
-        await refetchProfile();
-      } catch (error) {
-        console.error('Error loading profile:', error);
-      }
-    };
-  
-    loadProfile();
-  }, [user?.patient_profile?.unique_id, user?.therapist_profile?.unique_id, accessToken, localProfile?.id, profile?.id]);
+    
+    // Only fetch if we don't have a local profile yet
+    if (!localProfile && !loading) {
+      refetchProfile();
+    }
+  }, [user?.patient_profile?.unique_id, accessToken]); // Remove dependencies that change frequently
 
-  // Debug effect with null check
-  React.useEffect(() => {
+  // Update debug effect to run less frequently
+  useEffect(() => {
     console.log("Debug User Info:", {
       hasUser: !!user,
       userType: user?.user_type ?? 'unknown',
       hasPatientProfile: !!user?.patient_profile,
-      patientProfileId: user?.patient_profile?.unique_id ?? undefined,
-      profileUserType: userType ?? 'unknown',
-      hasProfile: !!profile,
+      patientProfileId: user?.patient_profile?.unique_id,
+      profileUserType: userType
     });
-  }, [user, userType, profile]);
+  }, [user?.id, user?.user_type, user?.patient_profile?.unique_id]);
 
   // Error handling effect
   React.useEffect(() => {
