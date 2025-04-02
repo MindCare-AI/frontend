@@ -1,3 +1,4 @@
+//navigation/types.tsx
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
@@ -17,4 +18,14 @@ export type AuthStackParamList = {
   Signup: undefined;
   ForgotPassword: undefined;
   SetNewPassword: { uid: string; token: string };
+};
+
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  UserSettings: undefined;
+  UserProfile: undefined;
+  UserPreferences: undefined;
+  TherapistAvailability: undefined;
+  HealthMetrics: undefined; // Add this
+  MedicalHistory: undefined; // Add this
 };

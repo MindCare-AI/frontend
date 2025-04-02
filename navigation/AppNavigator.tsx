@@ -1,3 +1,4 @@
+//navigation/AppNavigator.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -6,22 +7,21 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationProp, ParamListBase } from '@react-navigation/native';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
-import NotificationsScreen from '../screens/NotificationsScreen/NotificationsScreen';
-import SettingsScreen from '../screens/SettingsScreen/SettingsScreen';
-import UserPreferences from '../screens/SettingsScreen/UserPreferences';
-import UserSettings from '../screens/SettingsScreen/UserSettings';
-import UserProfile from '../screens/SettingsScreen/UserProfile';
 import MessagingNavigator from './MessagingNavigator';
 import AppointmentManagementScreen from '../screens/AppointmentManagementScreen/AppointmentManagementScreen';
 import BookAppointmentScreen from '../screens/AppointmentManagementScreen/BookAppointment';
-import { RootStackParamList, SettingsStackParamList, AppointmentStackParamList } from '../types/navigation';
+import { RootStackParamList } from '../types/navigation';
+import { SettingsHomeScreen } from '../screens/SettingsScreen/SettingsHomeScreen';
+import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
+import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
+import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
-const SettingsStackNavigator = createStackNavigator<SettingsStackParamList>();
-const AppointmentStackNavigator = createStackNavigator<AppointmentStackParamList>();
+const SettingsStack = createStackNavigator();
+const AppointmentStack = createStackNavigator();
 
 interface NotificationBadgeProps {
-  navigation: NavigationProp<ParamListBase>;
+  navigation: NavigationProp<RootStackParamList>;
 }
 
 const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => {
@@ -31,28 +31,37 @@ const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => 
       onPress={() => navigation.navigate('Notifications')}
     >
       <Ionicons name="notifications-outline" size={24} color="#333" />
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>3</Text>
-      </View>
     </TouchableOpacity>
   );
 };
 
-const SettingsStack = () => {
+const SettingsStackNavigator = () => {
   return (
-    <SettingsStackNavigator.Navigator>
-      <SettingsStackNavigator.Screen name="SettingsScreen" component={SettingsScreen} options={{ title: 'Settings' }} />
-      <SettingsStackNavigator.Screen name="UserPreferences" component={UserPreferences} options={{ title: 'User Preferences' }} />
-      <SettingsStackNavigator.Screen name="UserSettings" component={UserSettings} options={{ title: 'Account Settings' }} />
-      <SettingsStackNavigator.Screen name="UserProfile" component={UserProfile} options={{ title: 'User Profile' }} />
-    </SettingsStackNavigator.Navigator>
+    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <SettingsStack.Screen name="SettingsHome" component={SettingsHomeScreen} />
+      <SettingsStack.Screen 
+        name="UserPreferences" 
+        component={UserPreferencesScreen} 
+        options={{ title: 'Preferences' }} 
+      />
+      <SettingsStack.Screen 
+        name="UserSettings" 
+        component={UserSettingsScreen} 
+        options={{ title: 'Account Settings' }} 
+      />
+      <SettingsStack.Screen 
+        name="UserProfile" 
+        component={UserProfileScreen} 
+        options={{ title: 'Profile' }} 
+      />
+    </SettingsStack.Navigator>
   );
 };
 
-const AppointmentStack = () => {
+const AppointmentStackNavigator = () => {
   return (
-    <AppointmentStackNavigator.Navigator>
-      <AppointmentStackNavigator.Screen 
+    <AppointmentStack.Navigator>
+      <AppointmentStack.Screen 
         name="AppointmentManagement" 
         component={AppointmentManagementScreen}
         options={{ 
@@ -60,7 +69,7 @@ const AppointmentStack = () => {
           headerShown: true
         }}
       />
-      <AppointmentStackNavigator.Screen 
+      <AppointmentStack.Screen 
         name="BookAppointment" 
         component={BookAppointmentScreen}
         options={{ 
@@ -68,11 +77,10 @@ const AppointmentStack = () => {
           headerShown: true
         }}
       />
-    </AppointmentStackNavigator.Navigator>
+    </AppointmentStack.Navigator>
   );
 };
 
-// Add this type for Ionicons names
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const AppNavigator = () => {
@@ -93,10 +101,10 @@ const AppNavigator = () => {
             case 'MessagingTab':
               iconName = 'chatbubble-outline';
               break;
-            case 'Profile':
+            case 'Settings':
               iconName = 'person-outline';
               break;
-            case 'AppointmentManagement':
+            case 'Appointments':
               iconName = 'calendar-outline';
               break;
             default:
@@ -112,11 +120,15 @@ const AppNavigator = () => {
         name="MessagingTab"
         component={MessagingNavigator}
         options={{ tabBarLabel: 'Messages' }}
+      />  
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsStackNavigator} 
+        options={{ tabBarLabel: 'Settings' }} 
       />
-      <Tab.Screen name="Profile" component={SettingsStack} options={{ tabBarLabel: 'Settings' }} />
       <Tab.Screen
-        name="AppointmentManagement"
-        component={AppointmentStack}
+        name="Appointments"
+        component={AppointmentStackNavigator}
         options={{ tabBarLabel: 'Appointments' }}
       />
     </Tab.Navigator>
@@ -125,24 +137,7 @@ const AppNavigator = () => {
 
 const styles = StyleSheet.create({
   notificationBadge: {
-    position: 'relative',
-    padding: 5,
-  },
-  badge: {
-    position: 'absolute',
-    right: -2,
-    top: 0,
-    backgroundColor: 'red',
-    borderRadius: 9,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+    padding: 8,
   },
 });
 

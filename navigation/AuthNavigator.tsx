@@ -1,3 +1,4 @@
+//navigation/AuthNavigator.tsx
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthStackParamList } from '../types/navigation';

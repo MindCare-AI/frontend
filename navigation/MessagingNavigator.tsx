@@ -1,3 +1,4 @@
+//navigation/MessagingNavigator.tsx
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { TouchableOpacity, Platform } from 'react-native';
