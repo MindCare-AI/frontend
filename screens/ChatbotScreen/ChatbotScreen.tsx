@@ -38,16 +38,14 @@ export default function ChatbotScreen() {
   // Initialize chatbot conversation
   const initializeChatbotConversation = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/`, {
+      const response = await fetch(`${API_URL}/api/v1/messaging/chatbot/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
-
       if (!response.ok) throw new Error('Failed to initialize chatbot conversation');
-
       const data = await response.json();
       setConversationId(data.id);
       return data.id;
@@ -58,55 +56,54 @@ export default function ChatbotScreen() {
     }
   }, [accessToken]);
 
+  // Create new conversation
+  const createNewConversation = async (): Promise<string | null> => {
+    try {
+      const response = await fetch(`${API_URL}/api/v1/messaging/one_to_one/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Failed to create conversation');
+      const data = await response.json();
+      return data.id.toString();
+    } catch (error) {
+      console.error('Create conversation error:', error);
+      Alert.alert('Error', 'Could not create conversation');
+      return null;
+    }
+  };
+
   // Fetch messages
   const fetchMessages = useCallback(async () => {
     if (!conversationId) return;
-
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/`, {
+      const response = await fetch(`${API_URL}/api/v1/messaging/chatbot/${conversationId}/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
-
       if (!response.ok) throw new Error('Failed to fetch messages');
-
       const data = await response.json();
-      // If response contains a "messages" key, process as before.
       if (data.messages) {
-        const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-        const formattedMessages = messagesArray.map((msg: any) => ({
-          id: msg.id.toString(),
-          sender: msg.is_chatbot ? 'Samantha' : 'You',
-          content: msg.content,
-          timestamp: msg.timestamp,
-          is_chatbot: msg.is_chatbot,
-        }));
-        if (
-          formattedMessages.length > 0 &&
-          formattedMessages[formattedMessages.length - 1].is_chatbot
-        ) {
-          setIsTyping(false);
-        }
-        setMessages(formattedMessages);
+        setMessages(Array.isArray(data.messages) ? data.messages : [data.messages]);
       } else {
         console.info('No messages key found in response:', data);
-        // Instead of clearing messages, simply turn off the typing indicator.
-        setIsTyping(false);
+        setMessages([data]);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   }, [conversationId, accessToken]);
 
-  // Send a message
+  // Send a message to the chatbot
   const sendMessage = useCallback(async () => {
     if (!input.trim() || !conversationId) return;
-
     try {
-      // Use a temporary ID for the optimistic update.
       const tempId = 'temp-' + Date.now().toString();
       const userMessage = {
         id: tempId,
@@ -115,13 +112,10 @@ export default function ChatbotScreen() {
         timestamp: new Date().toISOString(),
         is_chatbot: false,
       };
-
-      // Optimistically add the user message
-      setMessages((prev) => [...prev, userMessage]);
+      setMessages(prev => [...prev, userMessage]);
       setInput('');
       setIsTyping(true);
-
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/send_message/`, {
+      const response = await fetch(`${API_URL}/api/v1/messaging/chatbot/${conversationId}/send_message/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -129,12 +123,7 @@ export default function ChatbotScreen() {
         },
         body: JSON.stringify({ content: input.trim() }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      // Parse the response immediately
+      if (!response.ok) throw new Error('Failed to send message');
       const result = await response.json();
       console.log('Response from chatbot:', result);
       if (result.bot_response && result.user_message) {
@@ -152,15 +141,12 @@ export default function ChatbotScreen() {
           timestamp: result.bot_response.timestamp,
           is_chatbot: true,
         };
-
-        // Replace the optimistic message with the server response and append the bot message.
-        setMessages((prev) => {
-          const updated = prev.map((msg) => (msg.id === tempId ? formattedUser : msg));
+        setMessages(prev => {
+          const updated = prev.map(msg => (msg.id === tempId ? formattedUser : msg));
           return [...updated, formattedBot];
         });
         setIsTyping(false);
       } else {
-        // Fallback: poll for messages
         setTimeout(() => fetchMessages(), 1500);
       }
     } catch (error) {

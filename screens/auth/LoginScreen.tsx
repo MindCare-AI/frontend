@@ -11,8 +11,10 @@ import {
   Animated,
   Alert,
   Linking,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
-import { NavigationProp } from "@react-navigation/native";
+import { NavigationProp, CommonActions } from "@react-navigation/native";
 import { RootStackParamList } from "../../types/navigation"; 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Icon from "react-native-vector-icons/FontAwesome";
@@ -22,6 +24,9 @@ import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
+import { resetOnboardingStatus } from '../../utils/onboarding';
+import { setCachedToken } from '../../utils/auth';
+import { getShadowStyles } from '../../utils/styles';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -35,13 +40,28 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailValid, setIsEmailValid] = useState<boolean | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Logging in...");
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const { signIn } = useAuth();
 
-  const logoRef = useRef(null);
-  const formRef = useRef(null);
-  const socialButtonsRef = useRef(null);
+  const logoRef = useRef<View | null>(null);
+  const formRef = useRef<View | null>(null);
+  const socialButtonsRef = useRef<View | null>(null);
+
+  useEffect(() => {
+    // Log all available route names for debugging
+    try {
+      const state = navigation.getState();
+      console.log("Available routes in this navigator:", state.routeNames);
+      
+      // Also log the current navigation state
+      console.log("Current navigation state:", JSON.stringify(state, null, 2));
+    } catch (error) {
+      console.error("Error inspecting navigation:", error);
+    }
+  }, [navigation]);
 
   useEffect(() => {
     // Initial animation timeline
@@ -58,14 +78,15 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       opacity: 0,
       duration: 0.8,
       ease: "power2.out"
-    }, "-=0.5")
-    .from(socialButtonsRef.current?.children || [], {
-      y: 20,
-      opacity: 0,
-      duration: 0.4,
-      stagger: 0.1,
-      ease: "power2.out"
-    }, "-=0.3");
+    }, "-=0.5");
+    // Remove or comment out the following tween since React Native does not use traditional CSS selectors
+    // .from('.socialButton', {
+    //   y: 20,
+    //   opacity: 0,
+    //   duration: 0.4,
+    //   stagger: 0.1,
+    //   ease: "power2.out"
+    // }, "-=0.3");
   }, []);
 
   const validateEmail = (email: string) => {
@@ -101,7 +122,60 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
     });
   };
 
-  const handleLogin = async () => {
+  // Check if the user has seen the onboarding
+  const checkAndNavigate = async (userProfile?: any) => {
+    try {
+      console.log("Navigating with profile:", userProfile);
+      
+      // If user_type is empty or undefined, always show onboarding
+      if (!userProfile?.user_type || userProfile.user_type.trim() === "") {
+        console.log("User has no user_type, navigating to onboarding");
+        setLoadingMessage("Preparing onboarding...");
+        
+        // Reset the onboarding flag first
+        await resetOnboardingStatus();
+        
+        // Hide loading before navigation to prevent overlay issues
+        setIsLoading(false);
+        
+        // Navigate to onboarding
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Onboarding' }],
+          })
+        );
+        
+        return;
+      }
+      
+      // For users with a user_type
+      console.log("User has user_type:", userProfile.user_type, "going to Home");
+      setLoadingMessage("Loading home screen...");
+      
+      // Hide loading before navigation to prevent overlay issues
+      setIsLoading(false);
+      
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{
+            name: 'App',
+            params: { screen: 'Home' }
+          }],
+        })
+      );
+    } catch (error) {
+      console.error("Error in navigation:", error);
+      setIsLoading(false);
+      Alert.alert(
+        'Navigation Error',
+        'An error occurred during login navigation. Please check logs.'
+      );
+    }
+  };
+
+  const handleLoginAsync = async () => {
     if (!formData.email || !formData.password) {
       setLoginError("Please fill in all fields.");
       shakeError();
@@ -140,25 +214,53 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       console.log("Login response:", data);
 
       if (response.ok) {
+        // Show loading overlay immediately after successful login
+        setIsLoading(true);
+        setLoadingMessage("Authenticating...");
+        
         // Success animation
         gsap.to(formRef.current, {
           y: -20,
           opacity: 0,
           duration: 0.5,
           ease: "power2.in",
-          onComplete: async () => {
-            await signIn({
-              access: data.access,
-              refresh: data.refresh,
-            });
-            
-            navigation.reset({
-              index: 0,
-              routes: [{ 
-                name: 'App',
-                params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
-              }],
-            });
+          onComplete: () => {
+            // Execute async operations after animation completes
+            (async () => {
+              try {
+                await signIn({
+                  access: data.access,
+                  refresh: data.refresh,
+                });
+                // Cache the access token synchronously for use in WebSocket connection, etc.
+                setCachedToken(data.access);
+                
+                setLoadingMessage("...");
+                
+                try {
+                  const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+                    method: "GET",
+                    headers: {
+                      "Authorization": `Bearer ${data.access}`,
+                      "Content-Type": "application/json"
+                    }
+                  });
+                  const profileData = await profileResponse.json();
+                  console.log("User profile:", profileData);
+                  // Pass profileData so that checkAndNavigate can test user_type
+                  checkAndNavigate(profileData);
+                } catch (profileError) {
+                  console.error("Error fetching user profile:", profileError);
+                  // Hide loading in case of error
+                  setIsLoading(false);
+                  // In case of error, you can decide what to do (default to onboarding, for example)
+                  checkAndNavigate();
+                }
+              } catch (error) {
+                console.error("Authentication error:", error);
+                setIsLoading(false);
+              }
+            })();
           }
         });
       } else {
@@ -170,6 +272,13 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
       setLoginError("An error occurred during login. Please try again.");
       shakeError();
     }
+  };
+
+  // Synchronous wrapper function
+  const handleLogin = () => {
+    handleLoginAsync().catch(err => {
+      console.error("Unhandled login error:", err);
+    });
   };
 
   const handleGoogleLogin = async () => {
@@ -266,14 +375,51 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
             ['refreshToken', data.refresh]
           ]);
 
-          // Navigate to app
-          navigation.reset({
-            index: 0,
-            routes: [{ 
-              name: 'App',
-              params: { screen: 'Home' } // Changed from 'Welcome' to 'Home'
-            }]
-          });
+          // Fetch user profile before navigating
+          try {
+            const profileResponse = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${data.access}`,
+                "Content-Type": "application/json"
+              }
+            });
+            const profileData = await profileResponse.json();
+            console.log("OAuth user profile:", profileData);
+
+            // Use signIn from AuthContext to properly set the tokens
+            await signIn({
+              access: data.access,
+              refresh: data.refresh,
+            });
+
+            // Check profile and navigate accordingly
+            if (!profileData?.user_type || profileData.user_type.trim() === "") {
+              console.log("OAuth user has no user_type, navigating to onboarding");
+              await resetOnboardingStatus();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Onboarding' }],
+                })
+              );
+            } else {
+              console.log("OAuth user has user_type, going to Home");
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{
+                    name: 'App',
+                    params: { screen: 'Home' }
+                  }],
+                })
+              );
+            }
+          } catch (profileError) {
+            console.error("Error fetching OAuth user profile:", profileError);
+            // Default to standard checkAndNavigate
+            await checkAndNavigate();
+          }
         } catch (error) {
           console.error('OAuth callback error:', error);
           Alert.alert(
@@ -385,11 +531,27 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      
+      {/* Loading overlay */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isLoading}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#002D62" />
+            <Text style={styles.loadingText}>{loadingMessage}</Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  // ... styles remain unchanged
   container: {
     flex: 1,
     backgroundColor: "#E4F0F6",
@@ -397,7 +559,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     padding: 20,
-    paddingBottom: 40, // Add more bottom padding for better scrolling experience
+    paddingBottom: 40,
   },
   logoContainer: {
     alignItems: "center",
@@ -409,30 +571,26 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#002D62",
     marginTop: 10,
-    letterSpacing: 0.5, // Add letter spacing for better readability
+    letterSpacing: 0.5,
   },
   loginContainer: {
     backgroundColor: "#fff",
-    padding: 24, // Increase padding for better spacing
-    borderRadius: 12, // Slightly increase border radius
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 }, // Enhance shadow effect
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5, // Increase elevation for better material design
-    marginHorizontal: 2, // Add slight horizontal margin
+    padding: 24,
+    borderRadius: 12,
+    ...getShadowStyles(5),
+    // Remove deprecated shadow properties
   },
   title: {
-    fontSize: 26, // Slightly larger font
+    fontSize: 26,
     fontWeight: "bold",
     color: "#002D62",
-    marginBottom: 24, // Increase spacing
+    marginBottom: 24,
     textAlign: "center",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18, // Increase spacing between inputs
+    marginBottom: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#CFCFCF",
@@ -440,86 +598,113 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 54, // Slightly taller inputs
+    height: 54,
     paddingHorizontal: 16,
     fontSize: 16,
     color: "#333",
   },
   inputIcon: {
-    padding: 12, // Increase touch target size
+    padding: 12,
   },
   inputError: {
     borderColor: "#E74C3C",
-    borderWidth: 1.5, // Make error border slightly thicker
+    borderWidth: 1.5,
   },
   errorText: {
     color: "#E74C3C",
     fontSize: 14,
     marginBottom: 15,
     textAlign: "center",
-    fontWeight: "500", // Make error text slightly bolder
+    fontWeight: "500",
   },
   forgotPassword: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 18, // Increase spacing
-    fontSize: 15, // Slightly larger
+    marginTop: 18,
+    fontSize: 15,
     textDecorationLine: "underline",
-    fontWeight: "500", // Make it slightly bolder
+    fontWeight: "500",
   },
   loginButton: {
     width: "100%",
     backgroundColor: "#002D62",
-    padding: 16, // Slightly taller button
+    padding: 16,
     borderRadius: 10,
     alignItems: "center",
-    elevation: 4, // Enhance elevation
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3,
-    marginTop: 6, // Add some spacing from the input
+    marginTop: 6,
   },
   loginButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-    letterSpacing: 0.5, // Add letter spacing for better readability
+    letterSpacing: 0.5,
   },
   createAccount: {
     color: "#002D62",
     textAlign: "center",
-    marginTop: 22, // Increase spacing
-    marginBottom: 8, // Add bottom margin
-    fontSize: 15, // Slightly larger
-    fontWeight: "500", // Make it slightly bolder
+    marginTop: 22,
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "500",
   },
   socialButtonsContainer: {
-    marginTop: 24, // Increase spacing
-    marginBottom: 4, // Add bottom margin
+    marginTop: 24,
+    marginBottom: 4,
     width: '100%',
   },
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14, // Increase padding
-    borderRadius: 10, // Match login button radius
+    padding: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#CFCFCF',
     marginVertical: 8,
     backgroundColor: '#FFFFFF',
-    elevation: 1, // Add subtle elevation
+    elevation: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   socialButtonText: {
-    marginLeft: 12, // Increase spacing from icon
+    marginLeft: 12,
     color: '#002D62',
     fontWeight: '500',
     fontSize: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '80%',
+    maxWidth: 300,
+    ...getShadowStyles(5),
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#002D62',
+    textAlign: 'center',
   },
 });
 

@@ -1,29 +1,87 @@
+//navigation/AppNavigator.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { NavigationProp, ParamListBase } from '@react-navigation/native';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
-import NotificationsScreen from '../screens/NotificationsScreen/NotificationsScreen';
-import SettingsScreen from '../screens/SettingsScreen/SettingsScreen';
 import MessagingNavigator from './MessagingNavigator';
+import AppointmentManagementScreen from '../screens/AppointmentManagementScreen/AppointmentManagementScreen';
+import BookAppointmentScreen from '../screens/AppointmentManagementScreen/BookAppointment';
+import { RootStackParamList } from '../types/navigation';
+import { SettingsHomeScreen } from '../screens/SettingsScreen/SettingsHomeScreen';
+import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
+import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
+import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<RootStackParamList>();
+const SettingsStack = createStackNavigator();
+const AppointmentStack = createStackNavigator();
 
-// Custom header component with notifications badge
-const NotificationBadge = ({ navigation }) => {
+interface NotificationBadgeProps {
+  navigation: NavigationProp<RootStackParamList>;
+}
+
+const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => {
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.notificationBadge}
       onPress={() => navigation.navigate('Notifications')}
     >
       <Ionicons name="notifications-outline" size={24} color="#333" />
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>3</Text>
-      </View>
     </TouchableOpacity>
   );
 };
+
+const SettingsStackNavigator = () => {
+  return (
+    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <SettingsStack.Screen name="SettingsHome" component={SettingsHomeScreen} />
+      <SettingsStack.Screen 
+        name="UserPreferences" 
+        component={UserPreferencesScreen} 
+        options={{ title: 'Preferences' }} 
+      />
+      <SettingsStack.Screen 
+        name="UserSettings" 
+        component={UserSettingsScreen} 
+        options={{ title: 'Account Settings' }} 
+      />
+      <SettingsStack.Screen 
+        name="UserProfile" 
+        component={UserProfileScreen} 
+        options={{ title: 'Profile' }} 
+      />
+    </SettingsStack.Navigator>
+  );
+};
+
+const AppointmentStackNavigator = () => {
+  return (
+    <AppointmentStack.Navigator>
+      <AppointmentStack.Screen 
+        name="AppointmentManagement" 
+        component={AppointmentManagementScreen}
+        options={{ 
+          title: 'Appointments',
+          headerShown: true
+        }}
+      />
+      <AppointmentStack.Screen 
+        name="BookAppointment" 
+        component={BookAppointmentScreen}
+        options={{ 
+          title: 'Book Appointment',
+          headerShown: true
+        }}
+      />
+    </AppointmentStack.Navigator>
+  );
+};
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const AppNavigator = () => {
   return (
@@ -32,7 +90,7 @@ const AppNavigator = () => {
         headerRight: () => <NotificationBadge navigation={navigation} />,
         headerRightContainerStyle: { paddingRight: 15 },
         tabBarIcon: ({ color, size }) => {
-          let iconName;
+          let iconName: IconName;
           switch (route.name) {
             case 'Home':
               iconName = 'home-outline';
@@ -43,8 +101,11 @@ const AppNavigator = () => {
             case 'MessagingTab':
               iconName = 'chatbubble-outline';
               break;
-            case 'Profile':
+            case 'Settings':
               iconName = 'person-outline';
+              break;
+            case 'Appointments':
+              iconName = 'calendar-outline';
               break;
             default:
               iconName = 'help-outline';
@@ -55,36 +116,28 @@ const AppNavigator = () => {
     >
       <Tab.Screen name="Home" component={FeedsScreen} />
       <Tab.Screen name="Chatbot" component={ChatbotScreen} />
-      <Tab.Screen 
-        name="MessagingTab" 
+      <Tab.Screen
+        name="MessagingTab"
         component={MessagingNavigator}
         options={{ tabBarLabel: 'Messages' }}
+      />  
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsStackNavigator} 
+        options={{ tabBarLabel: 'Settings' }} 
       />
-      <Tab.Screen name="Profile" component={SettingsScreen} />
+      <Tab.Screen
+        name="Appointments"
+        component={AppointmentStackNavigator}
+        options={{ tabBarLabel: 'Appointments' }}
+      />
     </Tab.Navigator>
   );
 };
 
 const styles = StyleSheet.create({
   notificationBadge: {
-    position: 'relative',
-    padding: 5,
-  },
-  badge: {
-    position: 'absolute',
-    right: -2,
-    top: 0,
-    backgroundColor: 'red',
-    borderRadius: 9,
-    width: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+    padding: 8,
   },
 });
 
