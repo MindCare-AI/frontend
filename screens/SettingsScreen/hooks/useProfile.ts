@@ -133,89 +133,100 @@ export const useProfile = (): ProfileHookReturn => {
   );
 
   const fetchProfile = useCallback(async () => {
-    if (!user?.id || !accessToken || isInitialized) {
-      return;
-    }
-
-    setLoading(true);
+    // Prevent duplicate fetches
+    if (loading || isInitialized) return;
     
+    setLoading(true);
+    setError(null);
+
     try {
-      if (!user.patient_profile?.unique_id && !user.therapist_profile?.unique_id) {
-        // Try to fetch all profiles first to find matching one
-        const listEndpoint = `${API_URL}/${user.user_type}/profiles/`;
-        console.log('Fetching profiles list from:', listEndpoint);
-        
-        const listResponse = await fetch(listEndpoint, {
+      if (!user?.id || !accessToken) {
+        throw new Error('No user ID or access token available');
+      }
+
+      const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+      let profilesUrl = '';
+      let profileId = '';
+
+      if (normalizedUserType === 'patient' || user?.patient_profile) {
+        profilesUrl = `${baseUrl}/patient/profiles`;
+        profileId = user?.patient_profile?.unique_id || '';
+      } else if (normalizedUserType === 'therapist' || user?.therapist_profile) {
+        profilesUrl = `${baseUrl}/therapist/profiles`;
+        profileId = user?.therapist_profile?.unique_id || '';
+      } else {
+        throw new Error('Invalid user type');
+      }
+
+      // Only try UUID endpoint if we have a valid UUID
+      if (profileId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log("Fetching profile detail from:", `${profilesUrl}/${profileId}/`);
+        const detailResponse = await fetch(`${profilesUrl}/${profileId}/`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json'
           }
         });
-  
-        if (!listResponse.ok) {
-          throw new Error(`Failed to fetch profiles list: ${listResponse.statusText}`);
-        }
-  
-        const data: ProfileResponse = await listResponse.json();
-        // Add type guard and conversion
-        const matchingProfile = data.results.find(p => p.user === normalizeId(user.id));
-  
-        if (matchingProfile) {
-          if (updateUser) {
-            await updateUser({
-              ...user,
-              [`${user.user_type}_profile`]: {
-                unique_id: matchingProfile.unique_id // Use UUID
-              }
-            });
-          }
-          setProfile(matchingProfile);
-          setError(null);
+
+        if (detailResponse.ok) {
+          const profileData = await detailResponse.json();
+          setProfile(profileData);
+          setIsInitialized(true);
           return;
         }
       }
-  
-      // If we have a profile ID, use the detail endpoint
-      const profileId = user.patient_profile?.unique_id || user.therapist_profile?.unique_id;
-      if (profileId) {
-        const detailEndpoint = `${API_URL}/${user.user_type}/profiles/${profileId}/`;
-        console.log('Fetching profile detail from:', detailEndpoint);
-  
-        const response = await fetch(detailEndpoint, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-          }
-        });
-  
-        if (!response.ok) {
-          throw new Error(`Failed to fetch profile: ${response.statusText}`);
+
+      // Fallback to list endpoint
+      console.log("Fetching profiles list from:", profilesUrl);
+      const response = await fetch(profilesUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
         }
-  
-        const data = await response.json();
-        setProfile(data);
-        setError(null);
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch profiles list: ${response.statusText}`);
       }
-    } catch (err) {
-      console.error('Profile fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch profile');
+
+      const data: ProfileResponse = await response.json();
+      if (data.results.length > 0) {
+        setProfile(data.results[0]);
+        // Update user with correct UUID if needed and different from current
+        if (updateUser && user && data.results[0].unique_id !== profileId) {
+          await updateUser({
+            ...user,
+            [`${normalizedUserType}_profile`]: {
+              unique_id: data.results[0].unique_id
+            }
+          });
+        }
+      }
+      setIsInitialized(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(message);
+      console.error('Profile fetch error:', error);
     } finally {
       setLoading(false);
-      setIsInitialized(true);
     }
-  }, [user?.id, user?.user_type, user?.patient_profile?.unique_id, user?.therapist_profile?.unique_id, accessToken, updateUser, isInitialized]);
+  }, [accessToken, user?.id, normalizedUserType, updateUser, loading, isInitialized]);
 
-  // Simplified effect that only runs once
+  // Single effect for initialization
   useEffect(() => {
     if (!isInitialized && user?.id && accessToken) {
       fetchProfile();
     }
   }, [fetchProfile, isInitialized, user?.id, accessToken]);
 
-  // Reset fetch counter when user changes
+  // Reset state when user changes
   useEffect(() => {
-    setFetchCount(0);
-  }, [userId]);
+    if (!user?.id) {
+      setIsInitialized(false);
+      setProfile(null);
+      setError(null);
+    }
+  }, [user?.id]);
 
   const linkProfile = useCallback(async (user: UserData) => {
     if (user.patient_profile || user.therapist_profile) return;
