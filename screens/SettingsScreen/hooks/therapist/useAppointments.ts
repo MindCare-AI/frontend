@@ -5,15 +5,24 @@ import { useAuth } from '../../../../contexts/AuthContext';
 
 interface Appointment {
   id: number;
-  therapist: number;
-  therapist_name: string;
-  patient: number;
-  patient_name: string;
+  unique_id: string; // Add UUID field
+  therapist: {
+    id: number;
+    unique_id: string;
+    full_name: string;
+  };
+  patient: {
+    id: number;
+    unique_id: string;
+    full_name: string;
+  };
   appointment_date: string;
-  duration: string;
-  status: 'scheduled' | string;
-  notes: string;
+  duration: number; // Duration in minutes
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  notes: string | null;
   created_at: string;
+  updated_at: string;
+  video_session_link: string | null;
 }
 
 interface PaginatedResponse {
@@ -24,7 +33,7 @@ interface PaginatedResponse {
 }
 
 export const useTherapistAppointments = () => {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,19 +41,22 @@ export const useTherapistAppointments = () => {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      if (!accessToken) {
-        throw new Error('No access token available');
+      if (!accessToken || !user?.therapist_profile?.unique_id) {
+        throw new Error('No access token or therapist profile available');
       }
 
-      const response = await fetch(`${API_URL}/therapist/appointments/`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        },
-      });
+      const response = await fetch(
+        `${API_URL}/therapist/appointments/${user.therapist_profile.unique_id}/`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          },
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch appointments');
+        throw new Error(`Failed to fetch appointments: ${response.statusText}`);
       }
 
       const data: PaginatedResponse = await response.json();
@@ -57,7 +69,7 @@ export const useTherapistAppointments = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [accessToken]);
+  }, [accessToken, user?.therapist_profile?.unique_id]);
 
   const refreshAppointments = useCallback(() => {
     setRefreshing(true);
@@ -68,27 +80,29 @@ export const useTherapistAppointments = () => {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  const cancelAppointment = async (appointmentId: number) => {
+  const cancelAppointment = async (appointmentId: string) => {
     try {
-      if (!accessToken) {
-        throw new Error('No access token available');
+      if (!accessToken || !user?.therapist_profile?.unique_id) {
+        throw new Error('No access token or therapist profile available');
       }
 
       const response = await fetch(
-        `${API_URL}/therapist/appointments/${appointmentId}/`, {
-          method: 'DELETE',
+        `${API_URL}/therapist/appointments/${appointmentId}/cancel/`, 
+        {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to cancel appointment');
+        throw new Error(`Failed to cancel appointment: ${response.statusText}`);
       }
 
-      refreshAppointments();
+      await fetchAppointments();
       return true;
     } catch (err) {
       console.error('Error cancelling appointment:', err);
