@@ -1,44 +1,42 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar, CalendarCheck, Plus } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '@/types/navigation';
+import { API_BASE_URL } from '../../config'; // Use API_BASE_URL instead of API_URL
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AppointmentManagement'>;
 
-// Mock data for appointments
-const APPOINTMENTS = [
-  {
-    id: 'a1',
-    therapist: 'Dr. Sarah Johnson',
-    date: '2023-06-15',
-    time: '10:00',
-    status: 'upcoming',
-  },
-  {
-    id: 'a2',
-    therapist: 'Dr. Michael Chen',
-    date: '2023-06-22',
-    time: '14:00',
-    status: 'upcoming',
-  },
-  {
-    id: 'a3',
-    therapist: 'Dr. Lisa Patel',
-    date: '2023-05-30',
-    time: '11:00',
-    status: 'completed',
-  },
-];
-
 const AppointmentManagementScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+
+  // Use your authenticated patient's unique id here
+  const patientId = '2'; // Replace with actual patient ID
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const formatDate = (dateString: string) => {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      setIsLoading(true);
+      try {
+        // Correct URL without the extra '/api/v1' prefix
+        const response = await fetch(`${API_BASE_URL}/patient/profiles/${patientId}/appointments/`);
+        const data = await response.json();
+        setAppointments(data);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAppointments();
+  }, [patientId]);
 
   return (
     <ScrollView style={styles.container}>
@@ -47,7 +45,7 @@ const AppointmentManagementScreen: React.FC = () => {
         <Text style={styles.headerTitle}>Your Appointments</Text>
         <TouchableOpacity
           style={styles.bookButton}
-          onPress={() => navigation.navigate('BookAppointment')} // Replace with the correct screen name
+          onPress={() => navigation.navigate('BookAppointment')}
         >
           <Plus size={18} color="white" />
           <Text style={styles.bookButtonText}>Book Appointment</Text>
@@ -56,8 +54,10 @@ const AppointmentManagementScreen: React.FC = () => {
 
       {/* Appointments List */}
       <View style={styles.appointmentsContainer}>
-        {APPOINTMENTS.length > 0 ? (
-          APPOINTMENTS.map((appointment) => (
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#000" />
+        ) : appointments.length > 0 ? (
+          appointments.map((appointment) => (
             <View key={appointment.id} style={styles.card}>
               <View style={styles.cardContent}>
                 <View>
