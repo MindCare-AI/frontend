@@ -185,7 +185,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
     }
   };
 
-  // Update the profile conversion effect
+  //Update the profile conversion effect
   React.useEffect(() => {
     if (!profile || !profile.id || !user?.user_type) return;
     if (localProfile?.id === profile.id) return;
@@ -203,9 +203,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
 
   const recoveryAttempted = useRef(false);
 
-  // Recovery effect (runs only once)
+  //Recovery effect (runs only once)
   React.useEffect(() => {
-    // If localProfile exists or we've attempted recovery, do nothing
+    //If localProfile exists or we've attempted recovery, do nothing
     if (localProfile || recoveryAttempted.current) return;
 
     recoveryAttempted.current = true; // mark as attempted
