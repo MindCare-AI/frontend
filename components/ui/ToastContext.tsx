@@ -1,6 +1,7 @@
+//components/ui/ToastContext.tsx
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Toast from './Toast';
+import { Toast } from './Toast';
 
 export type ToastProps = {
   id?: string;

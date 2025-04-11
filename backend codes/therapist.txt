@@ -1,0 +1,1395 @@
+1)# therapist/filters/therapist_profile_filters.py
+from django_filters import rest_framework as django_filters
+from therapist.models.therapist_profile import TherapistProfile
+
+
+class TherapistProfileFilter(django_filters.FilterSet):
+    specialization = django_filters.CharFilter(lookup_expr="icontains")
+    languages = django_filters.CharFilter(method="filter_languages")
+    available_day = django_filters.CharFilter(method="filter_available_day")
+
+    class Meta:
+        model = TherapistProfile
+        fields = ["specialization", "languages", "available_day"]
+
+    def filter_languages(self, queryset, name, value):
+        return queryset.filter(languages_spoken__contains=value.split(","))
+
+    def filter_available_day(self, queryset, name, value):
+        return queryset.filter(available_days__has_key=value.lower())
+ 
+2)# therapist/models/appointment.py
+import uuid
+from django.db import models
+from django.utils import timezone
+from rest_framework import serializers
+
+
+class Appointment(models.Model):
+    id = models.AutoField(primary_key=True)
+    appointment_id = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False, db_index=True
+    )
+    therapist = models.ForeignKey(
+        "therapist.TherapistProfile",
+        on_delete=models.CASCADE,
+        related_name="therapist_appointments",  # ✅ Unique name
+    )
+    patient = models.ForeignKey(
+        "patient.PatientProfile",
+        on_delete=models.CASCADE,
+        related_name="patient_appointments",  # ✅ Unique name
+    )
+    appointment_date = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("scheduled", "Scheduled"),
+            ("completed", "Completed"),
+            ("cancelled", "Cancelled"),
+        ],
+        default="scheduled",
+    )
+    notes = models.TextField(blank=True)
+    duration = models.DurationField(null=True, blank=True)
+
+    class Meta:
+        db_table = "therapist_appointment"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(appointment_date__gt=models.F("created_at")),
+                name="appointment_future_date_check",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["therapist", "appointment_date"]),
+            models.Index(fields=["patient", "appointment_date"]),
+        ]
+
+    def __str__(self):
+        return f"Appointment {self.appointment_id} with {self.therapist}"
+
+    def clean(self):
+        if self.appointment_date and self.appointment_date <= timezone.now():
+            raise models.ValidationError(
+                {"appointment_date": "Appointment date must be in the future"}
+            )
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = [
+            "id",
+            "patient",
+            "therapist",
+            "appointment_date",
+            "status",
+            "notes",
+            "duration",
+        ]
+
+3)# therapist/models/client_feedback.py
+from django.db import models
+from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+
+
+class ClientFeedback(models.Model):
+    RATING_CHOICES = [
+        (1, "1 - Poor"),
+        (2, "2 - Fair"),
+        (3, "3 - Good"),
+        (4, "4 - Very Good"),
+        (5, "5 - Excellent"),
+    ]
+
+    therapist = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="therapist_feedback_received",
+        limit_choices_to={"user_type": "therapist"},
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="patient_feedback_given",
+        limit_choices_to={"user_type": "patient"},
+    )
+    appointment = models.OneToOneField(
+        "Appointment",
+        on_delete=models.CASCADE,
+        related_name="feedback",
+        null=True,
+        blank=True,
+    )
+    feedback = models.TextField(
+        help_text="Provide detailed feedback about your session"
+    )
+    rating = models.IntegerField(
+        choices=RATING_CHOICES, validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["-timestamp"]),
+            models.Index(fields=["therapist", "rating"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["patient", "therapist", "appointment"],
+                name="unique_appointment_feedback",
+            )
+        ]
+
+    def __str__(self):
+        return f"Feedback for {self.therapist.username} from {self.patient.username}"
+
+    def clean(self):
+        if self.appointment:
+            if self.therapist != self.appointment.therapist:
+                raise ValidationError(
+                    "Feedback therapist must match appointment therapist"
+                )
+            if self.patient != self.appointment.patient:
+                raise ValidationError("Feedback patient must match appointment patient")
+
+4)# therapist/models/session_note.py
+from django.db import models
+from django.conf import settings
+from django.core.exceptions import ValidationError
+
+
+class SessionNote(models.Model):
+    therapist = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="therapist_session_notes",
+        limit_choices_to={"user_type": "therapist"},
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="patient_session_notes",
+        limit_choices_to={"user_type": "patient"},
+    )
+    appointment = models.OneToOneField(
+        "Appointment",
+        on_delete=models.CASCADE,
+        related_name="session_note",
+        null=True,
+        blank=True,
+    )
+    notes = models.TextField()
+    session_date = models.DateField(
+        null=True, blank=True, help_text="Date when the therapy session occurred"
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-session_date", "-timestamp"]
+        indexes = [
+            models.Index(fields=["-session_date"]),
+            models.Index(fields=["therapist", "patient"]),
+        ]
+
+    def __str__(self):
+        return f"Session note for {self.patient.username} by {self.therapist.username}"
+
+    def clean(self):
+        if self.appointment and self.session_date != self.appointment.date_time.date():
+            raise ValidationError("Session date must match appointment date")
+
+5)# therapist/models/therapist_profile.py
+import logging
+import uuid
+from datetime import datetime, timedelta
+from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.conf import settings
+from .appointment import Appointment
+
+logger = logging.getLogger(__name__)
+
+
+class TherapistProfile(models.Model):
+    id = models.AutoField(primary_key=True)
+    unique_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+        help_text="UUID for external references",
+    )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="therapist_profile",
+    )
+
+    specialization = models.CharField(max_length=100, blank=True, default="")
+    license_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="License number format: AA-123456",
+    )
+    years_of_experience = models.IntegerField(
+        validators=[MinValueValidator(0)], default=0
+    )
+
+    bio = models.TextField(blank=True, null=True)
+    profile_pic = models.ImageField(
+        upload_to="therapist_profile_pics/", null=True, blank=True
+    )
+
+    treatment_approaches = models.JSONField(
+        default=dict,
+        blank=True,
+        null=True,
+        help_text="Therapy methods and approaches used",
+    )
+    available_days = models.JSONField(
+        default=dict, blank=True, null=True, help_text="Weekly availability schedule"
+    )
+    license_expiry = models.DateField(blank=True, null=True)
+    video_session_link = models.URLField(blank=True, null=True)
+    languages_spoken = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Languages the therapist can conduct sessions in",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    is_profile_complete = models.BooleanField(default=False)
+    profile_completion_percentage = models.IntegerField(
+        default=0, validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+
+    is_verified = models.BooleanField(default=False)
+    verification_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("in_progress", "In Progress"),
+            ("verified", "Verified"),
+            ("rejected", "Rejected"),
+        ],
+        default="pending",
+    )
+    verification_notes = models.TextField(blank=True, null=True)
+    verification_documents = models.FileField(
+        upload_to="verification_docs/", null=True, blank=True
+    )
+    last_verification_attempt = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "therapist_profile"
+        verbose_name = "Therapist Profile"
+        verbose_name_plural = "Therapist Profiles"
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["specialization"]),
+            models.Index(fields=["is_verified"]),
+        ]
+        app_label = "therapist"
+
+    def __str__(self):
+        return f"Therapist: {self.user.get_full_name() or self.user.email}"
+
+    def clean(self):
+        super().clean()
+
+        if self.license_expiry and self.license_expiry < timezone.now().date():
+            raise ValidationError(
+                {"license_expiry": "License expiry date cannot be in the past"}
+            )
+
+        if self.years_of_experience < 0:
+            raise ValidationError(
+                {"years_of_experience": "Years of experience cannot be negative"}
+            )
+
+        if self.available_days:
+            try:
+                valid_days = {
+                    "monday",
+                    "tuesday",
+                    "wednesday",
+                    "thursday",
+                    "friday",
+                    "saturday",
+                    "sunday",
+                }
+                for day, slots in self.available_days.items():
+                    if day.lower() not in valid_days:
+                        raise ValidationError(f"Invalid day: {day}")
+
+                    if not isinstance(slots, list):
+                        raise ValidationError(f"Schedule for {day} must be a list")
+
+                    for slot in slots:
+                        if (
+                            not isinstance(slot, dict)
+                            or "start" not in slot
+                            or "end" not in slot
+                        ):
+                            raise ValidationError(f"Invalid time slot format in {day}")
+
+                        try:
+                            datetime.strptime(slot["start"], "%H:%M")
+                            datetime.strptime(slot["end"], "%H:%M")
+                        except ValueError:
+                            raise ValidationError(
+                                f"Invalid time format in {day}. Use HH:MM format"
+                            )
+            except AttributeError:
+                raise ValidationError("available_days must be a dictionary")
+            except Exception as e:
+                raise ValidationError(f"Invalid available_days format: {str(e)}")
+
+    def save(self, *args, **kwargs):
+        if not self.unique_id:
+            self.unique_id = uuid.uuid4()
+        self.clean()
+        self._calculate_profile_completion()
+        super().save(*args, **kwargs)
+
+    def _calculate_profile_completion(self):
+        field_weights = {
+            "specialization": 2,
+            "license_number": 3,
+            "bio": 1,
+            "profile_pic": 1,
+            "treatment_approaches": 2,
+            "available_days": 2,
+            "video_session_link": 1,
+            "languages_spoken": 1,
+        }
+
+        if self.license_number:
+            field_weights["license_expiry"] = 2
+
+        total_weight = sum(field_weights.values())
+        weighted_score = 0
+
+        for field, weight in field_weights.items():
+            field_value = getattr(self, field)
+
+            if isinstance(field_value, (dict, list)) and not field_value:
+                continue
+
+            if field == "license_expiry" and self.license_number:
+                if field_value and field_value > timezone.now().date():
+                    weighted_score += weight
+            elif field_value:
+                weighted_score += weight
+
+        self.profile_completion_percentage = int((weighted_score / total_weight) * 100)
+
+        required_fields = {
+            "specialization": bool(self.specialization),
+            "license_number": bool(self.license_number),
+            "license_expiry": bool(self.license_expiry)
+            if self.license_number
+            else True,
+            "available_days": bool(self.available_days),
+        }
+
+        self.is_profile_complete = self.profile_completion_percentage >= 80 and all(
+            required_fields.values()
+        )
+
+        logger.debug(
+            f"Profile completion for {self.user.username}: {self.profile_completion_percentage}%, "
+            f"Complete: {self.is_profile_complete}"
+        )
+
+    def check_availability(self, date_time, duration=60):
+        if not self.available_days:
+            return False
+
+        day = date_time.strftime("%A").lower()
+
+        if day not in self.available_days:
+            return False
+
+        time = date_time.time()
+        end_time = (date_time + timedelta(minutes=duration)).time()
+
+        for slot in self.available_days[day]:
+            slot_start = datetime.strptime(slot["start"], "%H:%M").time()
+            slot_end = datetime.strptime(slot["end"], "%H:%M").time()
+
+            if slot_start <= time and end_time <= slot_end:
+                conflicting_appointments = Appointment.objects.filter(
+                    therapist=self,
+                    appointment_date__range=(
+                        date_time,
+                        date_time + timedelta(minutes=duration),
+                    ),
+                    status__in=["scheduled", "confirmed"],
+                ).exists()
+
+                return not conflicting_appointments
+
+        return False
+
+6)# therapist/permissions/therapist_permissions.py
+from rest_framework.permissions import BasePermission
+from rest_framework import permissions
+
+
+class IsPatient(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.user_type == "patient"
+
+
+class IsVerifiedTherapist(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated
+            and request.user.user_type == "therapist"
+            and hasattr(request.user, "therapist_profile")
+            and request.user.therapist_profile.is_verified
+        )
+
+
+class CanAccessTherapistProfile(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+
+        if user.is_superuser:
+            return True
+
+        if user.user_type == "therapist":
+            return obj.user == user
+
+        if user.user_type == "patient" and obj.is_verified:
+            return True
+
+        return False
+
+
+class IsSuperUserOrSelf(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+
+        if hasattr(obj, "user"):
+            is_self = obj.user == request.user
+        else:
+            is_self = obj == request.user
+
+        return is_self
+
+7)# therapist/serializers/appointment.py
+from rest_framework import serializers
+from therapist.models.appointment import Appointment
+from therapist.models.therapist_profile import TherapistProfile
+
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import ExpressionWrapper, F, DateTimeField
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    therapist_name = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
+    duration_minutes = serializers.IntegerField(write_only=True, required=False)
+
+    class Meta:
+        model = Appointment
+        fields = [
+            "id",
+            "therapist",
+            "therapist_name",
+            "patient",
+            "patient_name",
+            "appointment_date",  # Updated to match the model field name
+            "duration",
+            "duration_minutes",
+            "status",
+            "notes",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at", "duration"]
+        extra_kwargs = {"duration": {"read_only": True}}
+
+    def get_therapist_name(self, obj):
+        return (
+            obj.therapist.user.username
+        )  # Access username through TherapistProfile -> User
+
+    def get_patient_name(self, obj):
+        return (
+            obj.patient.user.username
+        )  # Access username through PatientProfile -> User
+
+    def validate(self, data):
+        status = data.get("status", getattr(self.instance, "status", "scheduled"))
+        therapist = data.get("therapist", getattr(self.instance, "therapist", None))
+        appointment_date = data.get(
+            "appointment_date", getattr(self.instance, "appointment_date", None)
+        )
+        duration_minutes = data.get("duration_minutes", 60)
+
+        if not all([therapist, appointment_date]):
+            raise serializers.ValidationError(
+                {"error": "Therapist and appointment_date are required fields"}
+            )
+
+        if status in ["scheduled", "confirmed"]:
+            if appointment_date <= timezone.now():
+                raise serializers.ValidationError(
+                    {
+                        "appointment_date": "Appointment time must be in the future for scheduled or confirmed status",
+                        "current_time": timezone.now().isoformat(),
+                    }
+                )
+
+            new_end = appointment_date + timedelta(minutes=duration_minutes)
+
+            conflicts = Appointment.objects.annotate(
+                existing_end=ExpressionWrapper(
+                    F("appointment_date") + F("duration"),
+                    output_field=DateTimeField(),
+                )
+            ).filter(
+                therapist=therapist,
+                status__in=["scheduled", "confirmed"],
+                appointment_date__lt=new_end,
+                existing_end__gt=appointment_date,
+            )
+
+            if self.instance:
+                conflicts = conflicts.exclude(pk=self.instance.pk)
+
+            if conflicts.exists():
+                raise serializers.ValidationError(
+                    {
+                        "appointment_date": "This time slot overlaps with existing appointments",
+                        "conflicts": [
+                            {
+                                "time": c.appointment_date.strftime("%Y-%m-%d %H:%M"),
+                                "duration": c.duration,
+                                "status": c.status,
+                            }
+                            for c in conflicts[:3]
+                        ],
+                    }
+                )
+
+            try:
+                therapist_profile = TherapistProfile.objects.get(user=therapist.user)
+                if not therapist_profile.is_verified:
+                    raise serializers.ValidationError(
+                        {"therapist": "Therapist's profile is not verified"}
+                    )
+
+                # Pass duration_minutes directly instead of converting to timedelta
+                if not therapist_profile.check_availability(
+                    appointment_date, duration_minutes
+                ):
+                    available_slots = therapist_profile.available_days.get(
+                        appointment_date.strftime("%A").lower(), []
+                    )
+                    raise serializers.ValidationError(
+                        {
+                            "appointment_date": "Therapist is not available at this time",
+                            "available_slots": [
+                                f"{slot['start']} - {slot['end']}"
+                                for slot in available_slots
+                            ],
+                        }
+                    )
+
+            except TherapistProfile.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"therapist": "Therapist profile does not exist"}
+                )
+
+        if duration_minutes < 1:
+            raise serializers.ValidationError(
+                {"duration_minutes": "Duration must be at least 1 minute."}
+            )
+        data["duration"] = timedelta(minutes=duration_minutes)
+
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop("duration_minutes", None)  # Handled in validate
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop("duration_minutes", None)
+        return super().update(instance, validated_data)
+
+8)# therapist/serializers/client_feedback.py
+from rest_framework import serializers
+from therapist.models.client_feedback import ClientFeedback
+
+
+class ClientFeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientFeedback
+        fields = ["id", "therapist", "patient", "feedback", "rating", "timestamp"]
+
+9)# therapist/serializers/session_note.py
+from rest_framework import serializers
+from therapist.models.session_note import SessionNote
+
+
+class SessionNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionNote
+        fields = ["id", "therapist", "patient", "notes", "timestamp"]
+
+10)# therapist/serializers/therapist_profile.py
+from rest_framework import serializers
+from therapist.models.therapist_profile import TherapistProfile
+
+
+class TherapistProfileSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    profile_completion_percentage = serializers.IntegerField(read_only=True)
+    is_profile_complete = serializers.BooleanField(read_only=True)
+    username = serializers.SerializerMethodField()  # Add this line
+
+    class Meta:
+        model = TherapistProfile
+        fields = [
+            "id",
+            "user",
+            "username",  # Add this line
+            "specialization",
+            "license_number",
+            "years_of_experience",
+            "bio",
+            "profile_pic",
+            "treatment_approaches",
+            "available_days",
+            "license_expiry",
+            "video_session_link",
+            "languages_spoken",
+            "profile_completion_percentage",
+            "is_profile_complete",
+            "created_at",
+            "updated_at",
+            "verification_status",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "username",  # Add this line
+            "created_at",
+            "updated_at",
+            "profile_completion_percentage",
+            "is_profile_complete",
+        ]
+
+    def get_username(self, obj):  # Add this method
+        return obj.user.username  # Access the username through the User model
+
+11)# services/therapist_verification_service.py
+import pytesseract
+import re
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class TherapistVerificationService:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def verify_license(self, document_path):
+        try:
+            from PIL import Image
+
+            image = Image.open(document_path)
+            image.verify()
+            image = Image.open(document_path)
+
+            text = pytesseract.image_to_string(image)
+
+            license_pattern = r"License[:\s]+([A-Z0-9-]+)"
+            match = re.search(license_pattern, text, re.IGNORECASE)
+
+            if match:
+                license_number = match.group(1)
+                return {"success": True, "license_number": license_number, "text": text}
+
+            return {"success": False, "error": "No valid license number found"}
+
+        except Exception as e:
+            self.logger.error(f"License verification failed: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+12)# therapist/views/appointment_views.py
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from therapist.models.appointment import Appointment
+
+from therapist.serializers.appointment import AppointmentSerializer
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="List user's appointments",
+        tags=["Appointments"],
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=str,
+                enum=["scheduled", "confirmed", "cancelled", "completed"],
+                description="Filter by appointment status",
+            )
+        ],
+    ),
+    retrieve=extend_schema(
+        description="Get appointment details", tags=["Appointments"]
+    ),
+    update=extend_schema(description="Update appointment", tags=["Appointments"]),
+    partial_update=extend_schema(
+        description="Patch appointment", tags=["Appointments"]
+    ),
+)
+class AppointmentViewSet(viewsets.ModelViewSet):
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "patch", "put", "delete"]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == "therapist":
+            return Appointment.objects.filter(
+                therapist=user.therapist_profile
+            )  # ✅ Use therapist profile
+        elif user.user_type == "patient":
+            return Appointment.objects.filter(
+                patient=user.patient_profile
+            )  # ✅ Use patient profile
+        return Appointment.objects.none()
+
+    @extend_schema(
+        description="Confirm an appointment",
+        summary="Confirm Appointment",
+        tags=["Appointments"],
+        responses={
+            200: AppointmentSerializer,
+            403: {"description": "Only therapist can confirm appointments"},
+        },
+    )
+    @action(detail=True, methods=["get", "post"])
+    def confirm(self, request, pk=None):
+        # GET is provided only so that the DRF Browsable API renders a form.
+        if request.method == "GET":
+            return Response(
+                {"detail": "This endpoint confirms an appointment. Please use POST."}
+            )
+
+        appointment = self.get_object()
+        if appointment.therapist.user != request.user:
+            return Response(
+                {"error": "Only the therapist can confirm appointments"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        appointment.status = "confirmed"
+        appointment.save()
+        serializer = self.get_serializer(appointment)
+
+        return Response(serializer.data)
+
+    @extend_schema(
+        description="Cancel an appointment",
+        summary="Cancel Appointment",
+        tags=["Appointments"],
+        responses={
+            200: AppointmentSerializer,
+            403: {"description": "Only therapist or patient can cancel appointments"},
+        },
+    )
+    @action(detail=True, methods=["get", "post"])
+    def cancel(self, request, pk=None):
+        # Provide GET method for the Browsable API.
+        if request.method == "GET":
+            return Response(
+                {"detail": "This endpoint cancels an appointment. Please use POST."}
+            )
+
+        appointment = self.get_object()
+        if (
+            appointment.therapist.user != request.user
+            and appointment.patient.user != request.user
+        ):
+            return Response(
+                {"error": "Only the therapist or patient can cancel appointments"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        appointment.status = "cancelled"
+        appointment.save()
+        serializer = self.get_serializer(appointment)
+
+        return Response(serializer.data)
+
+13)# therapist/views/client_feedback_views.py
+from rest_framework import viewsets
+from therapist.models.client_feedback import ClientFeedback
+from therapist.serializers.client_feedback import ClientFeedbackSerializer
+
+
+class ClientFeedbackViewSet(viewsets.ModelViewSet):
+    queryset = ClientFeedback.objects.all()
+    serializer_class = ClientFeedbackSerializer
+
+    def perform_create(self, serializer):
+        # Save the feedback instance.
+        instance = serializer.save()
+
+14)# therapist/views/session_note_views.py
+from rest_framework import viewsets
+from therapist.models.session_note import SessionNote
+from therapist.serializers.session_note import SessionNoteSerializer
+
+
+class SessionNoteViewSet(viewsets.ModelViewSet):
+    queryset = SessionNote.objects.all()
+    serializer_class = SessionNoteSerializer
+
+15)# therapist/views/therapist_profile_views.py
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from therapist.models.appointment import Appointment
+from therapist.models.therapist_profile import TherapistProfile
+from therapist.serializers.appointment import AppointmentSerializer
+from therapist.serializers.therapist_profile import TherapistProfileSerializer
+from therapist.permissions.therapist_permissions import IsPatient
+from therapist.permissions.therapist_permissions import IsSuperUserOrSelf
+import logging
+from rest_framework.exceptions import ValidationError
+import json
+from therapist.services.therapist_verification_service import (
+    TherapistVerificationService,
+)
+from django.db import transaction
+from django.utils import timezone
+from uuid import UUID
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get therapist profile information",
+        summary="Get Therapist Profile",
+        tags=["Therapist Profile"],
+    ),
+    update=extend_schema(
+        description="Update therapist profile information",
+        summary="Update Therapist Profile",
+        tags=["Therapist Profile"],
+    ),
+)
+class TherapistProfileViewSet(viewsets.ModelViewSet):
+    lookup_field = "unique_id"  # Add this line
+    serializer_class = TherapistProfileSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUserOrSelf]
+    http_method_names = ["get", "post", "put", "patch", "delete"]  # Added "post"
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return TherapistProfile.objects.select_related("user").all()
+        return TherapistProfile.objects.select_related("user").filter(
+            user=self.request.user
+        )
+
+    def create(self, request, *args, **kwargs):
+        try:
+            if not request.user.user_type == "therapist":
+                return Response(
+                    {"error": "Only therapists can create profiles"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            if TherapistProfile.objects.filter(user=request.user).exists():
+                return Response(
+                    {"error": "Profile already exists for this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            data = request.data.copy()
+            data["user"] = request.user.id
+
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+
+            with transaction.atomic():
+                profile = serializer.save()
+                logger.info(
+                    f"Created therapist profile for user {request.user.username}"
+                )
+
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Error creating therapist profile: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not create therapist profile"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def perform_update(self, serializer):
+        try:
+            if "user" in self.request.data:
+                raise ValidationError("User field cannot be modified")
+
+            serializer.save()
+            logger.info(
+                f"Updated therapist profile for user {self.request.user.username}"
+            )
+
+        except Exception as e:
+            logger.error(f"Error updating therapist profile: {str(e)}", exc_info=True)
+            raise ValidationError("Could not update therapist profile")
+
+    @extend_schema(
+        description="Check therapist availability details",
+        summary="Check Therapist Availability",
+        tags=["Appointments"],
+    )
+    @action(detail=True, methods=["get"])
+    def availability(self, request, pk=None):
+        try:
+            therapist = self.get_object()
+            return Response(
+                {
+                    "available_days": therapist.available_days,
+                    "video_session_link": therapist.video_session_link,
+                    "languages": therapist.languages_spoken,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error checking availability: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not fetch availability"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="Book an appointment with a therapist",
+        summary="Book Appointment",
+        tags=["Appointments"],
+        request=AppointmentSerializer,
+        responses={
+            201: AppointmentSerializer,
+            400: {"description": "Bad request - invalid data"},
+            403: {"description": "Forbidden - not authorized"},
+            404: {"description": "Not found - therapist profile does not exist"},
+        },
+    )
+    @action(detail=True, methods=["post"], permission_classes=[IsPatient])
+    def book_appointment(self, request, unique_id=None, **kwargs):
+        """
+        Book an appointment with a therapist.
+        """
+        try:
+            # Only convert unique_id to UUID if it's a string
+            if not isinstance(unique_id, UUID):
+                unique_id = UUID(unique_id)
+
+            therapist_profile = TherapistProfile.objects.select_related("user").get(
+                unique_id=unique_id
+            )
+
+            if not therapist_profile.is_verified:
+                return Response(
+                    {"error": "Therapist's profile is not verified"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if request.user == therapist_profile.user:
+                return Response(
+                    {"error": "You cannot book an appointment with yourself"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            appointment_data = {
+                "therapist": therapist_profile.id,
+                "patient": request.user.patient_profile.id,
+                "appointment_date": request.data.get("appointment_date"),
+                "duration_minutes": request.data.get("duration_minutes", 60),
+                "notes": request.data.get("notes", ""),
+                "status": "scheduled",
+            }
+
+            serializer = AppointmentSerializer(data=appointment_data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                appointment = serializer.save()
+                logger.info(
+                    f"Appointment booked - Therapist: {therapist_profile.user.username}, "
+                    f"Patient: {request.user.username}, "
+                    f"Time: {appointment.appointment_date}, "
+                    f"Duration: {appointment.duration}min"
+                )
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except TherapistProfile.DoesNotExist:
+            return Response(
+                {"error": "Therapist profile not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error booking appointment: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not book appointment"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="List all appointments for the therapist",
+        summary="List Appointments",
+        tags=["Appointments"],
+        responses={
+            200: AppointmentSerializer(many=True),
+            500: {"description": "Internal server error"},
+        },
+    )
+    @action(detail=True, methods=["get"])
+    def appointments(self, request, unique_id=None, **kwargs):  # Added **kwargs
+        try:
+            therapist_profile = self.get_object()
+            appointments = Appointment.objects.filter(
+                therapist=therapist_profile
+            ).order_by("appointment_date")
+            serializer = AppointmentSerializer(appointments, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error fetching appointments: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not fetch appointments"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="Update therapist availability schedule",
+        summary="Update Availability",
+        tags=["Therapist"],
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "available_days": {
+                        "type": "object",
+                        "example": {"monday": [{"start": "09:00", "end": "17:00"}]},
+                    }
+                },
+            }
+        },
+        responses={
+            200: {
+                "description": "Availability updated successfully",
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "available_days": {"type": "object"},
+                },
+            },
+            400: {"description": "Invalid schedule format"},
+        },
+    )
+    @action(detail=True, methods=["post"])
+    def update_availability(self, request, pk=None):
+        try:
+            profile = self.get_object()
+
+            if not (schedule := request.data.get("available_days")):
+                return Response(
+                    {"error": "available_days is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            profile.available_days = self._validate_schedule(schedule)
+            profile.save()
+
+            return Response(
+                {
+                    "message": "Availability updated successfully",
+                    "available_days": profile.available_days,
+                }
+            )
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error updating availability: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not update availability"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _validate_schedule(self, schedule):
+        if isinstance(schedule, str):
+            try:
+                schedule = json.loads(schedule)
+            except json.JSONDecodeError:
+                raise ValidationError("Invalid JSON format")
+
+        if not isinstance(schedule, dict):
+            raise ValidationError("Schedule must be a dictionary")
+
+        valid_days = {
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        }
+
+        for day, slots in schedule.items():
+            if day.lower() not in valid_days:
+                raise ValidationError(f"Invalid day: {day}")
+
+            if not isinstance(slots, list):
+                raise ValidationError(f"Schedule for {day} must be a list")
+
+            for slot in slots:
+                if (
+                    not isinstance(slot, dict)
+                    or "start" not in slot
+                    or "end" not in slot
+                ):
+                    raise ValidationError(f"Invalid time slot in {day}")
+
+        return schedule
+
+    @extend_schema(
+        description="Verify therapist license and credentials",
+        summary="Verify Therapist",
+        tags=["Therapist"],
+        request={
+            "multipart/form-data": {
+                "type": "object",
+                "properties": {
+                    "verification_documents": {"type": "string", "format": "binary"}
+                },
+                "required": ["verification_documents"],
+            }
+        },
+        responses={
+            200: {
+                "description": "Verification successful",
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "status": {"type": "string"},
+                    "license_details": {
+                        "type": "object",
+                        "properties": {
+                            "number": {"type": "string"},
+                            "expiry": {"type": "string", "format": "date"},
+                        },
+                    },
+                },
+            },
+            400: {"description": "Verification failed"},
+            500: {"description": "Internal server error"},
+        },
+    )
+    @action(detail=True, methods=["post"])
+    def verify(self, request, pk=None):
+        try:
+            profile = self.get_object()
+
+            if not (docs := request.FILES.get("verification_documents")):
+                return Response(
+                    {"error": "Verification documents required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            with transaction.atomic():
+                profile.verification_documents = docs
+                profile.last_verification_attempt = timezone.now()
+
+                verification_service = TherapistVerificationService()
+                result = verification_service.verify_license(
+                    profile.verification_documents.path
+                )
+
+                if result["success"]:
+                    profile.verification_status = "verified"
+                    profile.is_verified = True
+
+                    if license_number := result.get("license_number"):
+                        profile.license_number = license_number
+                    if license_expiry := result.get("license_expiry"):
+                        profile.license_expiry = license_expiry
+
+                    profile.verification_notes = "Verification completed successfully"
+                    profile.save()
+
+                    return Response(
+                        {
+                            "message": "Verification successful",
+                            "status": profile.verification_status,
+                            "license_details": {
+                                "number": profile.license_number,
+                                "expiry": profile.license_expiry,
+                            },
+                        }
+                    )
+
+                profile.verification_status = "rejected"
+                profile.verification_notes = result.get("error", "Verification failed")
+                profile.save()
+
+                return Response(
+                    {
+                        "error": profile.verification_notes,
+                        "status": profile.verification_status,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except Exception as e:
+            logger.error(f"Verification failed: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Verification process failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+16)# therapist/apps.py
+from django.apps import AppConfig
+
+
+class TherapistConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "therapist"
+
+17)# therapist/urls.py
+from django.urls import path
+from therapist.views.appointment_views import AppointmentViewSet
+from therapist.views.client_feedback_views import ClientFeedbackViewSet
+from therapist.views.session_note_views import SessionNoteViewSet
+from therapist.views.therapist_profile_views import TherapistProfileViewSet
+
+urlpatterns = [
+    # Therapist Profiles
+    path(
+        "profiles/",
+        TherapistProfileViewSet.as_view({"get": "list", "post": "create"}),
+        name="therapist-profiles",
+    ),
+    path(
+        "profiles/<uuid:unique_id>/",
+        TherapistProfileViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="therapist-profile-detail",
+    ),
+    # Therapist Profile Actions
+    path(
+        "profiles/<uuid:unique_id>/book-appointment/",
+        TherapistProfileViewSet.as_view({"post": "book_appointment"}),
+        name="therapist-book-appointment",
+    ),
+    path(
+        "profiles/<int:pk>/availability/",
+        TherapistProfileViewSet.as_view(
+            {"get": "availability", "post": "update_availability"}
+        ),
+        name="therapist-availability",
+    ),
+    path(
+        "profiles/<int:pk>/verify/",
+        TherapistProfileViewSet.as_view({"post": "verify"}),
+        name="therapist-verify",
+    ),
+    path(
+        "profiles/<uuid:unique_id>/appointments/",
+        TherapistProfileViewSet.as_view({"get": "appointments"}),
+        name="therapist-appointments",
+    ),
+    # Appointments
+    path(
+        "appointments/",
+        AppointmentViewSet.as_view({"get": "list", "post": "create"}),
+        name="appointment-list",
+    ),
+    path(
+        "appointments/<int:pk>/",
+        AppointmentViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="appointment-detail",
+    ),
+    # Client Feedback
+    path(
+        "client-feedback/",
+        ClientFeedbackViewSet.as_view({"get": "list", "post": "create"}),
+        name="client-feedback-list",
+    ),
+    path(
+        "client-feedback/<int:pk>/",
+        ClientFeedbackViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="client-feedback-detail",
+    ),
+    # Session Notes
+    path(
+        "session-notes/",
+        SessionNoteViewSet.as_view({"get": "list", "post": "create"}),
+        name="session-notes-list",
+    ),
+    path(
+        "session-notes/<int:pk>/",
+        SessionNoteViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="session-notes-detail",
+    ),
+]
+

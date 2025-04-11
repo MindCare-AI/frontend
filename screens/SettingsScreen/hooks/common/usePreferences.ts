@@ -1,3 +1,4 @@
+//screens/SettingsScreen/hooks/common/usePreferences.ts
 import { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import { useAuth } from '../../../../contexts/AuthContext';

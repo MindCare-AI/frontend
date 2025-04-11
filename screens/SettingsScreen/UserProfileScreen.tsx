@@ -6,92 +6,49 @@ import { NavigationProp } from '@react-navigation/native';
 import { SettingsStackParamList } from '../../types/navigation';
 import { ProfileAvatar } from './components/ProfileAvatar';
 import { PatientEmergencyContact } from './components/patient/PatientEmergencyContact';
-import { PatientMedicalInfo, PatientProfile as MedicalProfile } from './components/patient/PatientMedicalInfo';
+import { PatientMedicalInfo } from './components/patient/PatientMedicalInfo';
 import { useProfile } from './hooks/useProfile';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
-import { EmergencyContact } from '../../types/profile'
 import { gsap } from 'gsap';
 import { LinearGradient } from 'expo-linear-gradient';
+import { 
+  EmergencyContact, 
+  PatientProfile, 
+  TherapistProfile, 
+  FullProfile, 
+  BaseProfile,
+  MedicalProfile 
+} from '../../types/profile';
 
 interface UserProfileScreenProps {
   navigation: NavigationProp<SettingsStackParamList, 'UserProfile'>;
 }
 
-interface FullProfile {
-  id: number;
-  user: number;
-  profile_pic?: string;
-  created_at?: string;
-  updated_at?: string;
-  // Patient-specific
-  user_name?: string;
-  medical_history?: string;
-  current_medications?: string;
-  blood_type?: string;
-  treatment_plan?: string;
-  pain_level?: number;
-  last_appointment?: string;
-  next_appointment?: string;
-  emergency_contact?: EmergencyContact;
-  // Therapist-specific
-  username?: string;
-  specialization?: string;
-  license_number?: string;
-  years_of_experience?: number;
-  bio?: string;
-  treatment_approaches?: string;
-  available_days?: string;
-  license_expiry?: string;
-  video_session_link?: string;
-  languages_spoken?: string;
-  profile_completion_percentage?: number;
-  is_profile_complete?: boolean;
-  verification_status?: 'pending' | 'verified' | 'rejected';
+interface BasicUserInfo {
+  first_name: string;
+  last_name: string;
+  phone_number?: string;
+  date_of_birth?: string;
 }
 
-// Create a type for the patient profile items in API response
-interface PatientProfileListItem {
-  id: string | number;
-  user: string | number;
+interface NotificationPreferences {
+  email_notifications: boolean;
+  in_app_notifications: boolean;
+  disabled_notification_types: string[];
 }
 
-// First, define proper types matching API responses
-interface PatientProfile {
-  id: number;
-  user: number;
-  user_name: string;
-  medical_history: string;
-  current_medications: string;
-  profile_pic: string;
-  blood_type: string;
-  treatment_plan: string;
-  pain_level: number;
-  last_appointment: string;
-  next_appointment: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface TherapistProfile {
-  id: number;
-  user: number;
-  username: string;
+interface TherapistProfessionalInfo {
   specialization: string;
   license_number: string;
   years_of_experience: number;
   bio: string;
-  profile_pic: string;
   treatment_approaches: string;
   available_days: string;
-  license_expiry: string;
+  license_expiry: string | null;
   video_session_link: string;
   languages_spoken: string;
-  profile_completion_percentage: number;
-  is_profile_complete: boolean;
-  created_at: string;
-  updated_at: string;
-  verification_status?: 'pending' | 'verified' | 'rejected'; // Make this match FullProfile
+  verification_status?: 'pending' | 'verified' | 'rejected';
 }
 
 export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => {
@@ -102,7 +59,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
     error,
     saveProfile,
     userType,
-    refetch,
+    refetch: refetchProfile, // rename refetch to refetchProfile for clarity
   } = useProfile();
   
   const [localProfile, setLocalProfile] = React.useState<FullProfile | null>(null);
@@ -116,17 +73,28 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
   const contentRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Debug effect
-  React.useEffect(() => {
+  const MAX_RETRIES = 3;
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    
+    // Only fetch if we don't have a local profile yet
+    if (!localProfile && !loading) {
+      refetchProfile();
+    }
+  }, [user?.patient_profile?.unique_id, accessToken]); // Remove dependencies that change frequently
+
+  // Update debug effect to run less frequently
+  useEffect(() => {
     console.log("Debug User Info:", {
       hasUser: !!user,
-      userType: user?.user_type,
+      userType: user?.user_type ?? 'unknown',
       hasPatientProfile: !!user?.patient_profile,
       patientProfileId: user?.patient_profile?.unique_id,
-      profileUserType: userType,
-      hasProfile: !!profile,
+      profileUserType: userType
     });
-  }, [user, userType, profile]);
+  }, [user?.id, user?.user_type, user?.patient_profile?.unique_id]);
 
   // Error handling effect
   React.useEffect(() => {
@@ -148,46 +116,96 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
     }
   }, [error, signOut]);
 
-  // Conversion effect that only updates if the profile is new
-  React.useEffect(() => {
-    if (profile) {
-      // If we already have a localProfile with the same ID, don't reset
-      const incomingId = ('id' in profile && profile.id) || undefined;
-      if (localProfile && incomingId && localProfile.id === incomingId) {
-        // No change, so do nothing.
-        return;
-      }
-      try {
-        let processedProfile: FullProfile;
-        if ('verification_status' in profile) {
-          // Therapist
-          processedProfile = {
-            ...(profile as TherapistProfile),
-            verification_status: (profile as TherapistProfile).verification_status,
-          };
-        } else {
-          // Patient
-          processedProfile = {
-            ...(profile as PatientProfile),
-            verification_status: undefined,
-          };
-        }
-        setLocalProfile(processedProfile);
-        // Once we get a valid profile, mark as finalized
-        setProfileFinalized(true);
-        console.log('Profile loaded successfully', processedProfile.id);
-      } catch (err) {
-        console.error('Error processing profile data:', err);
-        Alert.alert('Error', 'Could not process profile data');
-      }
+  const processProfileData = (apiResponse: any, userType: string): FullProfile => {
+    // Base profile fields that are always required
+    const baseProfile = {
+      id: apiResponse.id,
+      user: apiResponse.user,
+      first_name: apiResponse.first_name,
+      last_name: apiResponse.last_name,
+      email: apiResponse.email,
+      phone_number: apiResponse.phone_number || null,
+      profile_pic: apiResponse.profile_pic || null,
+      created_at: apiResponse.created_at,
+      updated_at: apiResponse.updated_at,
+      // Initialize all fields with default values
+      medical_history: null,
+      current_medications: null,
+      blood_type: null,
+      treatment_plan: null,
+      pain_level: null,
+      last_appointment: null,
+      next_appointment: null,
+      user_name: '',
+      verification_status: undefined,
+      username: '',
+      specialization: '',
+      license_number: null,
+      years_of_experience: 0,
+      bio: null,
+      treatment_approaches: {},
+      available_days: {},
+      license_expiry: null,
+      video_session_link: null,
+      languages_spoken: [],
+      profile_completion_percentage: 0,
+      is_profile_complete: false
+    };
+  
+    // Add type-specific fields
+    if (userType === 'patient') {
+      return {
+        ...baseProfile,
+        user_name: apiResponse.user_name || '',
+        medical_history: apiResponse.medical_history || null,
+        current_medications: apiResponse.current_medications || null,
+        blood_type: apiResponse.blood_type || null,
+        treatment_plan: apiResponse.treatment_plan || null,
+        pain_level: apiResponse.pain_level || null,
+        last_appointment: apiResponse.last_appointment || null,
+        next_appointment: apiResponse.next_appointment || null
+      };
+    } else {
+      return {
+        ...baseProfile,
+        verification_status: apiResponse.verification_status,
+        username: apiResponse.username || '',
+        specialization: apiResponse.specialization || '',
+        license_number: apiResponse.license_number || null,
+        years_of_experience: apiResponse.years_of_experience || 0,
+        bio: apiResponse.bio || null,
+        treatment_approaches: apiResponse.treatment_approaches || {},
+        available_days: apiResponse.available_days || {},
+        license_expiry: apiResponse.license_expiry || null,
+        video_session_link: apiResponse.video_session_link || null,
+        languages_spoken: apiResponse.languages_spoken || [],
+        profile_completion_percentage: apiResponse.profile_completion_percentage || 0,
+        is_profile_complete: apiResponse.is_profile_complete || false
+      };
     }
-  }, [profile]); // Remove localProfile as dependency so it doesn't re-run unnecessarily
+  };
+
+  //Update the profile conversion effect
+  React.useEffect(() => {
+    if (!profile || !profile.id || !user?.user_type) return;
+    if (localProfile?.id === profile.id) return;
+  
+    try {
+      const processedProfile = processProfileData(profile, user.user_type);
+      setLocalProfile(processedProfile);
+      setProfileFinalized(true);
+      console.log('Profile loaded successfully:', processedProfile.id);
+    } catch (err) {
+      console.error('Error processing profile:', err);
+      Alert.alert('Error', 'Could not process profile data');
+    }
+  }, [profile, user?.user_type]);
 
   const recoveryAttempted = useRef(false);
 
-  // Recovery effect (runs only once)
+  //Recovery effect (runs only once)
   React.useEffect(() => {
-    // If localProfile exists or we've attempted recovery, do nothing
+    //If localProfile exists or we've attempted recovery, do nothing
     if (localProfile || recoveryAttempted.current) return;
 
     recoveryAttempted.current = true; // mark as attempted
@@ -220,6 +238,32 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
       isMounted = false;
     };
   }, [user?.id, accessToken]); // Not depending on localProfile here
+
+  useEffect(() => {
+    if (!user?.id || !accessToken || retryCount >= MAX_RETRIES) return;
+
+    const attemptProfileRecovery = async () => {
+      try {
+        setIsSaving(true);
+        const success = await linkUserToProfile();
+        if (success) {
+          setProfileFinalized(true);
+        } else {
+          setRetryCount(prev => prev + 1);
+          setAutoRecoveryFailed(true);
+        }
+      } catch (err) {
+        console.error("Profile recovery failed:", err);
+        setAutoRecoveryFailed(true);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (!localProfile && !autoRecoveryFailed) {
+      attemptProfileRecovery();
+    }
+  }, [user?.id, accessToken, retryCount, localProfile, autoRecoveryFailed]);
 
   // Animation effect for when profile loads
   useEffect(() => {
@@ -309,10 +353,37 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
       }
   
       const updatedProfile = await response.json();
-      setLocalProfile(user.user_type === 'patient' 
-        ? { ...(updatedProfile as PatientProfile), verification_status: undefined }
-        : { ...(updatedProfile as TherapistProfile) }
-      );
+      const processedProfile: FullProfile = {
+        ...updatedProfile,
+        // Initialize all optional fields as null/undefined
+        medical_history: null,
+        current_medications: null,
+        blood_type: null,
+        treatment_plan: null,
+        pain_level: null,
+        last_appointment: null,
+        next_appointment: null,
+        emergency_contact: undefined,
+        specialization: undefined,
+        license_number: null,
+        years_of_experience: undefined,
+        bio: null,
+        treatment_approaches: undefined,
+        available_days: undefined,
+        license_expiry: null,
+        video_session_link: null,
+        languages_spoken: undefined,
+        profile_completion_percentage: undefined,
+        is_profile_complete: undefined,
+        verification_status: undefined,
+        // Then spread the specific profile type properties
+        ...(user.user_type === 'patient' 
+          ? updatedProfile 
+          : { ...updatedProfile, verification_status: updatedProfile.verification_status }
+        )
+      };
+      
+      setLocalProfile(processedProfile);
       
       // Success animation
       gsap.to(contentRef.current, {
@@ -324,7 +395,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
       });
       
       Alert.alert('Success', 'Profile updated successfully');
-      if (refetch) await refetch();
+      if (refetchProfile) await refetchProfile();
       
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -349,105 +420,115 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
   // Helper function to sanitize profile data
   const sanitizeProfileForAPI = (profile: FullProfile, userType: string) => {
     const baseFields = {
-      profile_pic: profile.profile_pic
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
+      profile_pic: profile.profile_pic || null,
+      phone_number: profile.phone_number || null
     };
     
     if (userType === 'patient') {
       return {
         ...baseFields,
-        medical_history: profile.medical_history || '',
-        current_medications: profile.current_medications || '',
-        blood_type: profile.blood_type || '',
-        treatment_plan: profile.treatment_plan || '',
-        pain_level: profile.pain_level || 0,
+        user_name: profile.user_name || '',
+        medical_history: profile.medical_history || null,
+        current_medications: profile.current_medications || null,
+        blood_type: profile.blood_type || null,
+        treatment_plan: profile.treatment_plan || null,
+        pain_level: profile.pain_level || null,
         last_appointment: profile.last_appointment || null,
-        next_appointment: profile.next_appointment || null,
-        emergency_contact: profile.emergency_contact || null
+        next_appointment: profile.next_appointment || null
       };
     } else {
       return {
         ...baseFields,
+        username: profile.username || '',
         specialization: profile.specialization || '',
-        license_number: profile.license_number || '',
+        license_number: profile.license_number || null,
         years_of_experience: profile.years_of_experience || 0,
-        bio: profile.bio || '',
-        treatment_approaches: profile.treatment_approaches || '',
-        available_days: profile.available_days || '',
+        bio: profile.bio || null,
+        treatment_approaches: profile.treatment_approaches || {},
+        available_days: profile.available_days || {},
         license_expiry: profile.license_expiry || null,
-        video_session_link: profile.video_session_link || '',
-        languages_spoken: profile.languages_spoken || ''
+        video_session_link: profile.video_session_link || null,
+        languages_spoken: profile.languages_spoken || []
       };
     }
   };
 
-  // Link user to profile function
+  // Update linkUserToProfile function
   const linkUserToProfile = async () => {
+    if (!user?.id || !accessToken) {
+      throw new Error('User authentication required');
+    }
+  
     try {
-      setIsSaving(true);
-      
-      if (!user?.id || !accessToken) {
-        throw new Error('User authentication required');
-      }
-
-      const endpoint = user.user_type === 'patient' 
-        ? '/patient/profiles/'
-        : '/therapist/profiles/';
-
-      // Check if profile exists
-      const listResponse = await fetch(`${API_URL}${endpoint}`, {
+      const endpoint = `${API_URL}/${user.user_type}/profiles/`;
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
       });
-
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        throw new Error(`Failed to check existing profiles (${listResponse.status}): ${errorText}`);
+  
+      if (!response.ok) {
+        throw new Error(`Profile fetch failed: ${response.statusText}`);
       }
-
-      const data = await listResponse.json();
-      const existingProfile = Array.isArray(data.results) ? data.results.find(
-        (profile: PatientProfile | TherapistProfile) => 
-          String(profile.user) === String(user.id)
-      ) : null;
-
+  
+      const data = await response.json();
+      const existingProfile = data.results?.find(
+        (p: any) => String(p.user) === String(user.id)
+      );
+  
       if (existingProfile) {
-        console.log('Found existing profile:', existingProfile.id);
-        // Update user with existing profile
         if (updateUser) {
           await updateUser({
             ...user,
-            user_type: user.user_type,
             [`${user.user_type}_profile`]: {
               id: existingProfile.id,
-              unique_id: existingProfile.id.toString()
+              unique_id: String(existingProfile.id)
             }
           });
           await fetchUserData();
-          if (refetch) await refetch();
+          if (refetchProfile) await refetchProfile();
           return true;
         }
-      } else {
-        // No profile exists, notify the user
-        Alert.alert(
-          'Profile Required',
-          'Your profile needs to be set up. This should happen automatically. Please contact support if this issue persists.',
-          [{ text: 'OK' }]
-        );
-        return false;
       }
-    } catch (error) {
-      console.error('Profile linking error:', error);
-      Alert.alert(
-        'Error',
-        error instanceof Error ? error.message : 'Failed to link your profile'
-      );
+      
       return false;
-    } finally {
-      setIsSaving(false);
+    } catch (error) {
+      console.error('Profile linking failed:', error);
+      throw error;
     }
   };
+
+  // Update recovery effect
+  useEffect(() => {
+    if (!user?.id || !accessToken || retryCount >= MAX_RETRIES || localProfile || autoRecoveryFailed) {
+      return;
+    }
+  
+    const attemptRecovery = async () => {
+      try {
+        setIsSaving(true);
+        const success = await linkUserToProfile();
+        if (success) {
+          setProfileFinalized(true);
+        } else {
+          setRetryCount(prev => prev + 1);
+          if (retryCount + 1 >= MAX_RETRIES) {
+            setAutoRecoveryFailed(true);
+          }
+        }
+      } catch (err) {
+        console.error('Profile recovery failed:', err);
+        setAutoRecoveryFailed(true);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+  
+    attemptRecovery();
+  }, [user?.id, accessToken, retryCount, localProfile, autoRecoveryFailed]);
 
   // If auto linking fails, show a retry button.
   if (!localProfile && autoRecoveryFailed) {
@@ -628,7 +709,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
 
           <View ref={avatarRef} style={styles.avatarSection}>
             <ProfileAvatar 
-              profile={localProfile}
+              profile={{ ...localProfile, profile_pic: localProfile?.profile_pic || undefined }}
               onImageChange={(uri: string) =>
                 setLocalProfile({ ...localProfile, profile_pic: uri })
               }
@@ -675,7 +756,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
                       current_medications: localProfile!.current_medications || '',
                       blood_type: localProfile!.blood_type || ''
                     }} 
-                    setProfile={(updatedMedicalInfo: MedicalProfile) => 
+                    setProfile={(updatedMedicalInfo: Partial<MedicalProfile>) => 
                       setLocalProfile(prev => (prev ? { ...prev, ...updatedMedicalInfo, id: prev.id } : prev))
                     } 
                   />
@@ -685,9 +766,11 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
                   <Text style={styles.cardTitle}>Emergency Contact</Text>
                   <Divider style={styles.divider} />
                   <PatientEmergencyContact
-                    emergencyContact={localProfile!.emergency_contact || { name: '', relationship: '', phone: '', email: '' }}
+                    emergencyContact={
+                      localProfile!.emergency_contact || { name: '', relationship: '', phone: '' }
+                    }
                     onEmergencyContactChange={(contact) => 
-                      setLocalProfile(prev => (prev ? { ...prev, emergency_contact: contact, id: prev.id } : prev))
+                      setLocalProfile(prev => (prev ? { ...prev, emergency_contact: contact } : prev))
                     }
                   />
                 </Surface>

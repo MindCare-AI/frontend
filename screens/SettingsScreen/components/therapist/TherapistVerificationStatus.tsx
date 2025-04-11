@@ -29,6 +29,8 @@ const statusColors: Record<VerificationStatus, string> = {
 export const TherapistVerificationStatus: React.FC<TherapistVerificationStatusProps> = ({ profile, refetchProfile }) => {
   const { accessToken } = useAuth();
 
+  const profileEndpoint = `${API_URL}/therapist/profiles/${profile.unique_id}/verify/`;
+
   const handleDocumentUpload = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -43,17 +45,14 @@ export const TherapistVerificationStatus: React.FC<TherapistVerificationStatusPr
       } as any);
 
       try {
-        const response = await fetch(
-          `${API_URL}/therapist/profiles/${profile.unique_id}/verify/`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              // Do not set Content-Type for FormData uploads
-            },
-            body: formData,
-          }
-        );
+        const response = await fetch(profileEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            // Do not set Content-Type when sending FormData
+          },
+          body: formData,
+        });
         if (!response.ok) {
           throw new Error(`Upload failed: ${response.statusText}`);
         }
