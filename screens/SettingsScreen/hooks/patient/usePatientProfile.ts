@@ -4,7 +4,28 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import { useAuth } from '../../../../contexts/AuthContext';
 
-// Add interface for query parameters
+// Updated PatientProfile interface to match backend response
+export interface PatientProfile {
+  id: number;
+  unique_id: string;  // Add UUID field
+  user: number;
+  user_name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string | null;
+  medical_history: string | null;
+  current_medications: string | null;
+  profile_pic: string | null;
+  blood_type: string | null;
+  treatment_plan: string | null;
+  pain_level: number | null;
+  last_appointment: string | null;
+  next_appointment: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ProfileQueryParams {
   blood_type?: string;
   appointment_after?: string;
@@ -12,23 +33,6 @@ interface ProfileQueryParams {
   search?: string;
   ordering?: string;
   page?: number;
-}
-
-// Updated PatientProfile interface to match Django serializer fields
-export interface PatientProfile {
-  id: number;
-  user: number; // Added customer user id field
-  user_name: string; // assuming this is returned directly
-  medical_history?: string;
-  current_medications?: string;
-  profile_pic: string;
-  blood_type?: string;
-  treatment_plan?: string;
-  pain_level?: number;
-  last_appointment?: string;
-  next_appointment?: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export const usePatientProfile = () => {
@@ -42,83 +46,75 @@ export const usePatientProfile = () => {
       setLoading(true);
       setError(null);
       
-      console.log("User type in usePatientProfile:", user?.user_type);
-      
-      if (!accessToken) {
-        console.log("No access token available");
+      if (!accessToken || !user) {
+        console.log("No access token or user available");
         setLoading(false);
         return null;
       }
 
-      try {
-        console.log("Fetching all patient profiles to find one for current user");
-        
-        // Create query string only with defined parameters
-        const queryParams = new URLSearchParams(
-          Object.entries(params || {})
-            .filter(([_, value]) => value !== undefined)
-            .reduce((acc, [key, value]) => ({
-              ...acc,
-              [key]: String(value)
-            }), {})
-        );
-
-        const listResponse = await fetch(
-          `${API_URL}/patient/profiles/${queryParams.toString() ? `?${queryParams}` : ''}`,
+      // Use unique_id (UUID) instead of numeric ID
+      if (user.patient_profile?.unique_id) {
+        const response = await fetch(
+          `${API_URL}/patient/profiles/${user.patient_profile.unique_id}/`,
           {
             headers: { 
               'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
+              'Accept': 'application/json'
             }
           }
         );
 
-        if (listResponse.ok) {
-          const data = await listResponse.json();
-          console.log("Patient profiles response:", data);
-          
-          if (data.results && data.results.length > 0) {
-            const profile = data.results.find((p: PatientProfile) => 
-              p.user === (typeof user?.id === 'string' ? parseInt(user.id, 10) : user?.id)
-            );
-            
-            if (profile) {
-              console.log("Found matching profile:", profile);
-              setProfile(profile);
-              
-              if (updateUser && user && (!user.patient_profile || user.patient_profile.unique_id !== profile.id.toString())) {
-                console.log("Updating user with profile ID:", profile.id);
-                await updateUser({
-                  ...user,
-                  user_type: 'patient',
-                  patient_profile: {
-                    unique_id: profile.id.toString()
-                  }
-                });
-              }
-              
-              setLoading(false);
-              return profile;
-            } else {
-              console.log("No profile found matching user ID:", user?.id);
-              setError('No profile found for your user account.');
-              setLoading(false);
-              return null;
-            }
+        if (response.ok) {
+          const data: PatientProfile = await response.json();
+          setProfile(data);
+          setError(null);
+          return data;
+        }
+      }
+
+      // Fallback: Try to list all profiles and match the user if unique_id isn't available
+      const listResponse = await fetch(
+        `${API_URL}/patient/profiles/`,
+        {
+          headers: { 
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
           }
         }
-      } catch (error) {
-        console.error("Error fetching profile list:", error);
+      );
+
+      if (!listResponse.ok) {
+        throw new Error(`Failed to fetch profiles: ${listResponse.statusText}`);
       }
+
+      const data = await listResponse.json();
+      const matchingProfile = data.results.find(
+        (p: PatientProfile) =>
+          p.user === (typeof user.id === 'string' ? parseInt(user.id, 10) : user.id)
+      );
       
-      setLoading(false);
+      if (matchingProfile && updateUser) {
+        await updateUser({
+          ...user,
+          patient_profile: {
+            unique_id: matchingProfile.unique_id
+          }
+        });
+        
+        setProfile(matchingProfile);
+        setError(null);
+        return matchingProfile;
+      }
+
+      setError('No profile found for your user account.');
       return null;
+
     } catch (error) {
-      console.error("Error in fetchProfile:", error);
-      setError('Unable to fetch profile data.');
-      setLoading(false);
+      console.error("Error fetching profile:", error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch profile');
       return null;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,7 +123,6 @@ export const usePatientProfile = () => {
       setLoading(true);
       setError(null);
 
-      // Check auth silently without throwing
       if (!accessToken || !user?.patient_profile?.unique_id) {
         setError('Authentication required or patient profile not available');
         setLoading(false);
@@ -136,19 +131,13 @@ export const usePatientProfile = () => {
 
       const formData = new FormData();
 
-      // Append all fields from the updatedProfile to formData
       Object.entries(updatedProfile).forEach(([key, value]) => {
         if (value !== undefined) {
           if (key === 'profile_pic' && typeof value === 'string') {
-            // If profile_pic is a URL, append as is
             formData.append(key, value);
-          } else if (key === 'emergency_contact' && typeof value === 'object') {
-            // Handle nested emergency_contact object
-            Object.entries(value).forEach(([ecKey, ecValue]) => {
-              if (ecValue !== undefined) {
-                formData.append(`emergency_contact.${ecKey}`, ecValue as string);
-              }
-            });
+          } else if (key === 'emergency_contact' && typeof value === 'object' && value !== null) {
+            // Stringify emergency_contact as JSON
+            formData.append('emergency_contact', JSON.stringify(value));
           } else {
             formData.append(key, value as any);
           }
@@ -161,7 +150,7 @@ export const usePatientProfile = () => {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-            // Do not specify Content-Type when sending FormData
+            // Do not set Content-Type when sending FormData
           },
           body: formData,
         }

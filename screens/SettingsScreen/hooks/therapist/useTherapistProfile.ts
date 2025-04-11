@@ -3,25 +3,31 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import { useAuth } from '../../../../contexts/AuthContext';
 
+// Update the interface to match backend response
 export interface TherapistProfile {
   id: number;
+  unique_id: string; // Add this field
   user: number;
   username: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string | null;
   specialization: string;
-  license_number: string;
+  license_number: string | null;
   years_of_experience: number;
-  bio: string;
-  profile_pic: string;
-  treatment_approaches: string;
-  available_days: string;
-  license_expiry: string;
-  video_session_link: string;
-  languages_spoken: string;
+  bio: string | null;
+  profile_pic: string | null;
+  treatment_approaches: Record<string, any>;  // Changed to match backend
+  available_days: Record<string, any>;        // Changed to match backend
+  license_expiry: string | null;
+  video_session_link: string | null;
+  languages_spoken: string[];                 // Changed to string array
   profile_completion_percentage: number;
   is_profile_complete: boolean;
   created_at: string;
   updated_at: string;
-  verification_status: 'pending' | string;
+  verification_status: 'pending' | 'verified' | 'rejected';
 }
 
 export const useTherapistProfile = () => {
@@ -49,7 +55,7 @@ export const useTherapistProfile = () => {
       if (!response.ok) {
         throw new Error(`Failed to fetch profile: ${response.statusText}`);
       }
-
+      
       const data = await response.json();
       setProfile(data);
       setError(null);
@@ -62,11 +68,29 @@ export const useTherapistProfile = () => {
     }
   };
 
+  // Update the saveProfile function to handle partial updates correctly
   const saveProfile = async (updatedProfile: Partial<TherapistProfile>) => {
     try {
       if (!accessToken || !user?.therapist_profile?.unique_id) {
         throw new Error('No access token or therapist profile id available');
       }
+
+      // First get current profile to merge with updates
+      const currentProfile = await fetch(
+        `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      ).then(res => res.json());
+
+      // Merge current profile with updates
+      const mergedProfile = {
+        ...currentProfile,
+        ...updatedProfile
+      };
 
       const response = await fetch(
         `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/`,
@@ -77,7 +101,7 @@ export const useTherapistProfile = () => {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
-          body: JSON.stringify(updatedProfile)
+          body: JSON.stringify(mergedProfile)
         }
       );
 

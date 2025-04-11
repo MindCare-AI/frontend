@@ -1,0 +1,3352 @@
+1)# messaging/mixins/edit_history.py
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema
+from django.contrib.contenttypes.models import ContentType
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class EditHistoryMixin:
+    """Mixin to add edit history functionality to message viewsets"""
+
+    @extend_schema(
+        description="Get edit history for a message",
+        summary="Get Edit History",
+        tags=["Message"],
+    )
+    @action(detail=True, methods=["get"])
+    def edit_history(self, request, pk=None):
+        """Get the edit history for a message"""
+        try:
+            instance = self.get_object()
+
+            # Check if user can view history (participant or message owner)
+            if not (
+                instance.sender == request.user
+                or request.user.is_staff
+                or instance.conversation.participants.filter(id=request.user.id).exists()
+            ):
+                return Response(
+                    {"error": "You don't have permission to view edit history"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # For models using Array field for history
+            if hasattr(instance, 'edit_history') and isinstance(instance.edit_history, list):
+                history = instance.edit_history
+            # For models using ContentType and GenericForeignKey
+            else:
+                from ..models.base import MessageEditHistory
+                history_records = MessageEditHistory.objects.filter(
+                    content_type=ContentType.objects.get_for_model(instance),
+                    object_id=instance.id,
+                ).order_by('-edited_at')
+                
+                history = [
+                    {
+                        "previous_content": record.previous_content,
+                        "edited_at": record.edited_at.isoformat(),
+                        "edited_by": {
+                            "id": record.edited_by.id if record.edited_by else None,
+                            "username": record.edited_by.username if record.edited_by else "Unknown",
+                        }
+                    }
+                    for record in history_records
+                ]
+
+            return Response(
+                {
+                    "current": {
+                        "content": instance.content,
+                        "edited_at": instance.edited_at.isoformat() if instance.edited_at else None,
+                        "edited_by": instance.edited_by.id if instance.edited_by else None,
+                    },
+                    "history": history,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error getting edit history: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to retrieve edit history: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def perform_update(self, serializer):
+        """Handle updating a message with proper edit history tracking"""
+        instance = serializer.instance
+        new_content = serializer.validated_data.get("content", instance.content)
+
+        if instance.content != new_content:
+            # For models using Array field for history
+            if hasattr(instance, 'edit_history') and hasattr(instance, 'edit_history'):
+                # Initialize edit_history if needed
+                if instance.edit_history is None:
+                    instance.edit_history = []
+
+                # Add detailed edit record
+                edit_entry = {
+                    "previous_content": instance.content,
+                    "edited_at": timezone.now().isoformat(),
+                    "edited_by": {
+                        "id": str(self.request.user.id),
+                        "username": self.request.user.username,
+                    },
+                }
+
+                instance.edit_history.append(edit_entry)
+            # For models using ContentType and GenericForeignKey
+            else:
+                try:
+                    from ..models.base import MessageEditHistory
+                    MessageEditHistory.objects.create(
+                        content_type=ContentType.objects.get_for_model(instance),
+                        object_id=instance.id,
+                        previous_content=instance.content,
+                        edited_by=self.request.user,
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating edit history: {str(e)}", exc_info=True)
+
+            # Update edit metadata
+            instance.edited = True
+            instance.edited_at = timezone.now()
+            instance.edited_by = self.request.user
+
+        # Save the updated instance
+        serializer.save()
+
+2)# messaging/mixins/reactions.py
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.http import Http404
+from drf_spectacular.utils import extend_schema
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ReactionMixin:
+    """Mixin to add reaction functionality to message viewsets"""
+
+    @extend_schema(
+        summary="Add Reaction",
+        description="Add or update a reaction to a message. Valid reactions include: like, heart, smile, thumbsup.",
+        request={
+            "type": "object",
+            "properties": {"reaction": {"type": "string", "example": "like"}},
+            "required": ["reaction"],
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string"},
+                    "message": {"type": "string"},
+                    "reactions": {"type": "object"},
+                },
+            },
+            400: {"description": "Bad Request"},
+            404: {"description": "Message not found"},
+            500: {"description": "Internal Server Error"},
+        },
+    )
+    @action(detail=True, methods=["post"])
+    def add_reaction(self, request, pk=None):
+        """Add or update a reaction to a message"""
+        try:
+            try:
+                message = self.get_object()
+            except Http404:
+                return Response(
+                    {"error": f"Message with ID {pk} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+                
+            reaction_type = request.data.get("reaction")
+
+            if not reaction_type:
+                return Response(
+                    {"error": "Reaction type is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate reaction type
+            valid_reactions = {"like", "heart", "smile", "thumbsup"}
+            if reaction_type not in valid_reactions:
+                return Response(
+                    {
+                        "error": f'Invalid reaction type. Must be one of: {", ".join(valid_reactions)}'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Initialize reactions dict if needed
+            if not message.reactions:
+                message.reactions = {}
+            if reaction_type not in message.reactions:
+                message.reactions[reaction_type] = []
+
+            # Store user ID as string for JSON serialization (consistent format)
+            user_id = str(request.user.id)
+            if user_id not in message.reactions[reaction_type]:
+                # Store reference to last reactor for signal notification
+                message._last_reactor = request.user
+                message.last_reaction_type = reaction_type
+                
+                # Add user to reaction list
+                message.reactions[reaction_type].append(user_id)
+                message.save()
+
+            return Response(
+                {
+                    "status": "success",
+                    "message": f"Added reaction {reaction_type}",
+                    "reactions": message.reactions,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error adding reaction: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to add reaction"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        summary="Remove Reaction",
+        description="Remove a user's reaction from a message.",
+        request={
+            "type": "object",
+            "properties": {"reaction": {"type": "string", "example": "like"}},
+            "required": ["reaction"],
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string"},
+                    "message": {"type": "string"},
+                    "reactions": {"type": "object"},
+                },
+            },
+            400: {"description": "Bad Request"},
+            404: {"description": "Message not found"},
+            500: {"description": "Internal Server Error"},
+        },
+    )
+    @action(detail=True, methods=["delete"])
+    def remove_reaction(self, request, pk=None):
+        """Remove a user's reaction from a message"""
+        try:
+            try:
+                message = self.get_object()
+            except Http404:
+                return Response(
+                    {"error": f"Message with ID {pk} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+                
+            reaction_type = request.data.get("reaction")
+
+            if not reaction_type:
+                return Response(
+                    {"error": "Reaction type is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not message.reactions or reaction_type not in message.reactions:
+                return Response(
+                    {"error": "No reactions to remove"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Remove user from reaction type - ensure consistent ID format
+            user_id = str(request.user.id)
+            if user_id in message.reactions[reaction_type]:
+                message.reactions[reaction_type].remove(user_id)
+                # Clean up empty reaction types
+                if not message.reactions[reaction_type]:
+                    del message.reactions[reaction_type]
+                message.save()
+
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Reaction removed",
+                    "reactions": message.reactions,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error removing reaction: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to remove reaction"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        summary="List Reactions",
+        description="Get all reactions for a message.",
+        responses={
+            200: {
+                "type": "object",
+                "properties": {"reactions": {"type": "object"}},
+            },
+            404: {"description": "Message not found"},
+            500: {"description": "Internal Server Error"},
+        },
+    )
+    @action(detail=True, methods=["get"])
+    def reactions(self, request, pk=None):
+        """Get all reactions for a message"""
+        try:
+            try:
+                message = self.get_object()
+            except Http404:
+                return Response(
+                    {"error": f"Message with ID {pk} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+                
+            return Response(message.reactions or {})
+
+        except Exception as e:
+            logger.error(f"Error fetching reactions: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to fetch reactions"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+3)# messaging/models/base.py
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class BaseConversation(models.Model):
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="%(class)s_conversations",
+        blank=True,  # Allow blank to prevent immediate validation issues
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    archived = models.BooleanField(default=False)
+    archive_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+
+    def clean(self):
+        super().clean()
+        # When the conversation exists (has a pk), ensure it has at least 2 participants.
+        if self.pk and self.participants.count() < 2:
+            raise ValidationError("Conversation must have at least 2 participants")
+
+    def archive(self):
+        """Archive the conversation"""
+        self.archived = True
+        self.archive_date = timezone.now()
+        self.save()
+
+    def unarchive(self):
+        """Unarchive the conversation"""
+        self.archived = False
+        self.archive_date = None
+        self.save()
+
+    def __str__(self):
+        return f"Conversation {self.pk}"
+
+
+class BaseMessage(models.Model):
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_sent_messages",
+    )
+    content = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    read_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="%(class)s_read_messages", blank=True
+    )
+    reactions = models.JSONField(default=dict)
+
+    # Edit tracking fields
+    edited = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="%(class)s_edited_messages",
+    )
+
+    # Soft deletion fields
+    deleted = models.BooleanField(default=False)
+    deletion_time = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="%(class)s_deleted_messages",
+    )
+
+    # Message metadata
+    message_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("text", "Text Message"),
+            ("image", "Image Message"),
+            ("file", "File Attachment"),
+            ("system", "System Message"),
+        ],
+        default="text",
+    )
+    metadata = models.JSONField(
+        default=dict, help_text="Store additional message metadata"
+    )
+
+    class Meta:
+        abstract = True
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["-timestamp"]),
+            models.Index(fields=["sender", "-timestamp"]),
+            models.Index(fields=["message_type", "-timestamp"]),
+        ]
+
+    def soft_delete(self, deleted_by_user):
+        """Soft delete a message"""
+        try:
+            self.deleted = True
+            self.deletion_time = timezone.now()
+            self.deleted_by = deleted_by_user
+            self.save()
+
+            logger.info(f"Message {self.id} soft deleted by user {deleted_by_user.id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error soft deleting message {self.id}: {str(e)}")
+            return False
+
+    def edit_message(self, new_content: str, edited_by_user):
+        """Edit message content with version tracking"""
+        try:
+            MessageEditHistory.objects.create(
+                content_type=ContentType.objects.get_for_model(self),
+                object_id=self.id,
+                previous_content=self.content,
+                edited_by=edited_by_user,
+            )
+            self.content = new_content
+            self.edited = True
+            self.edited_at = timezone.now()
+            self.edited_by = edited_by_user
+            self.save()
+            return True
+        except Exception as e:
+            logger.error(f"Error editing message {self.id}: {str(e)}")
+            return False
+
+    def add_reaction(self, user, reaction_type: str):
+        """Add a reaction to the message"""
+        if not self.reactions:
+            self.reactions = {}
+
+        if reaction_type not in self.reactions:
+            self.reactions[reaction_type] = []
+
+        if user.id not in self.reactions[reaction_type]:
+            self.reactions[reaction_type].append(user.id)
+            self.save()
+
+    def remove_reaction(self, user):
+        """Remove all reactions by a user"""
+        if not self.reactions:
+            return
+
+        for reaction_type, users in list(self.reactions.items()):
+            if user.id in users:
+                users.remove(user.id)
+                if not users:  # Remove empty reaction types
+                    del self.reactions[reaction_type]
+
+        self.save()
+
+    @property
+    def reactions_changed(self):
+        """Check if reactions have changed since load"""
+        return hasattr(self, '_reactions_changed') and self._reactions_changed
+        
+    @property
+    def last_reactor(self):
+        """Get the last user who reacted"""
+        return getattr(self, '_last_reactor', None)
+        
+    @property 
+    def last_reaction_type(self):
+        """Get the type of the last reaction"""
+        return getattr(self, '_last_reaction_type', None)
+        
+    @last_reaction_type.setter
+    def last_reaction_type(self, value):
+        """Set the type of the last reaction"""
+        self._last_reaction_type = value
+
+
+class MessageEditHistory(models.Model):
+    """Tracks edit history for any message type using a generic foreign key."""
+
+    # Generic Foreign Key fields
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    message = GenericForeignKey("content_type", "object_id")
+
+    # Edit history fields
+    previous_content = models.TextField(help_text="The content before this edit")
+    edited_at = models.DateTimeField(auto_now_add=True)
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="message_edits",
+    )
+
+    class Meta:
+        verbose_name = "Message Edit History"
+        verbose_name_plural = "Message Edit Histories"
+        ordering = ["-edited_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["edited_at"]),
+        ]
+
+    def __str__(self):
+        return f"Edit by {self.edited_by} at {self.edited_at}"
+
+    @property
+    def edit_summary(self):
+        """Returns a human-readable summary of the edit"""
+        return {
+            "editor": self.edited_by.get_full_name() or self.edited_by.username if self.edited_by else "Unknown",
+            "timestamp": self.edited_at,
+            "previous_content": (
+                self.previous_content[:100] + "..." 
+                if len(self.previous_content) > 100 
+                else self.previous_content
+            ),
+        }
+
+4)# messaging/models/group.py
+from django.db import models
+from django.conf import settings
+from .base import BaseConversation, BaseMessage
+
+
+class GroupConversation(BaseConversation):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    moderators = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="moderated_groups"
+    )
+    is_private = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+class GroupMessage(BaseMessage):
+    conversation = models.ForeignKey(
+        GroupConversation, on_delete=models.CASCADE, related_name="messages"
+    )
+    message_type = models.CharField(
+        max_length=10, choices=[("text", "Text"), ("system", "System")], default="text"
+    )
+
+    def __str__(self):
+        return f"Message by {self.sender} in {self.conversation}"
+
+5)# messaging/models/one_to_one.py
+from django.db import models
+from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.dispatch import receiver
+from django.db.models.signals import m2m_changed
+from .base import BaseConversation, BaseMessage
+from django.contrib.postgres.fields import ArrayField
+
+
+class OneToOneConversationParticipant(models.Model):
+    conversation = models.ForeignKey("OneToOneConversation", on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = (("conversation", "user"),)
+
+
+class OneToOneConversation(BaseConversation):
+    participants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        through="OneToOneConversationParticipant",
+        related_name="onetoone_conversations",
+    )
+
+    class Meta:
+        verbose_name = "One-to-One Conversation"
+        verbose_name_plural = "One-to-One Conversations"
+
+    def clean(self):
+        super().clean()
+        if self.pk and self.participants.count() != 2:
+            raise ValidationError(
+                "One-to-one conversations must have exactly 2 participants."
+            )
+
+
+@receiver(m2m_changed, sender=OneToOneConversation.participants.through)
+def validate_one_to_one_participants(sender, instance, action, **kwargs):
+    if action in ["post_add", "post_remove", "post_clear"]:
+        if instance.pk and instance.participants.count() != 2:
+            raise ValidationError(
+                "One-to-one conversations must have exactly 2 participants."
+            )
+
+
+class OneToOneMessage(BaseMessage):
+    conversation = models.ForeignKey(
+        OneToOneConversation, on_delete=models.CASCADE, related_name="messages"
+    )
+    edit_history = ArrayField(
+        models.JSONField(),
+        default=list,
+        blank=True,
+        help_text="History of message edits",
+    )
+
+6)# messaging/serializers/group.py
+from rest_framework import serializers
+from django.conf import settings
+from ..models.group import GroupConversation, GroupMessage
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class GroupConversationSerializer(serializers.ModelSerializer):
+    participant_count = serializers.IntegerField(read_only=True)
+    unread_count = serializers.IntegerField(read_only=True)
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GroupConversation
+        fields = [
+            "id",
+            "name",
+            "description",
+            "participants",
+            "moderators",
+            "is_private",
+            "created_at",
+            "participant_count",
+            "unread_count",
+            "last_message",
+            "archived",
+            "archive_date",
+        ]
+        read_only_fields = ["moderators", "created_at", "archived", "archive_date"]
+
+    def validate(self, attrs):
+        """Validate group creation/update"""
+        if self.instance is None:  # Create operation
+            # Validate group name
+            name = attrs.get("name", "").strip()
+            if not name:
+                raise serializers.ValidationError({"name": "Group name is required"})
+            if len(name) > 100:
+                raise serializers.ValidationError({"name": "Group name too long"})
+
+            # Validate participants
+            participants = attrs.get("participants", [])
+            if len(participants) < 2:
+                raise serializers.ValidationError(
+                    {"participants": "Group must have at least 2 participants"}
+                )
+            if (
+                len(participants)
+                > settings.GROUP_SETTINGS["MAX_PARTICIPANTS_PER_GROUP"]
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "participants": f"Maximum {settings.GROUP_SETTINGS['MAX_PARTICIPANTS_PER_GROUP']} participants allowed"
+                    }
+                )
+
+        return attrs
+
+    def get_last_message(self, obj):
+        """Get latest message details"""
+        try:
+            message = obj.messages.order_by("-timestamp").first()
+            if not message:
+                return None
+
+            return {
+                "id": message.id,
+                "content": message.content[:100]
+                + ("..." if len(message.content) > 100 else ""),
+                "sender_name": message.sender.get_full_name()
+                or message.sender.username,
+                "timestamp": message.timestamp,
+            }
+        except Exception as e:
+            logger.error(f"Error getting last message: {str(e)}")
+            return None
+
+
+class GroupMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source="sender.username", read_only=True)
+    is_edited = serializers.BooleanField(read_only=True)
+    edit_history = serializers.JSONField(read_only=True)
+
+    class Meta:
+        model = GroupMessage
+        fields = [
+            "id",
+            "conversation",
+            "content",
+            "message_type",
+            "sender",
+            "sender_name",
+            "timestamp",
+            "is_edited",
+            "edited_at",
+            "edit_history",
+            "reactions",
+            "deleted",
+            "deletion_time",
+        ]
+        read_only_fields = [
+            "sender",
+            "timestamp",
+            "is_edited",
+            "edited_at",
+            "deleted",
+            "deletion_time",
+        ]
+
+    def validate(self, attrs):
+        """Validate message creation/update"""
+        try:
+            conversation = attrs.get("conversation")
+            request = self.context.get("request")
+            if not request or not request.user:
+                raise serializers.ValidationError("Authentication required")
+
+            user = request.user
+
+            if not conversation:
+                raise serializers.ValidationError(
+                    {"conversation": "This field is required"}
+                )
+
+            # Ensure conversation exists and user is a participant
+            try:
+                conversation = GroupConversation.objects.get(
+                    id=conversation.id, participants=user
+                )
+            except GroupConversation.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"conversation": "Invalid conversation or not a participant"}
+                )
+
+            # Check if conversation is archived
+            if conversation.archived:
+                raise serializers.ValidationError(
+                    "Cannot send messages to archived conversations"
+                )
+
+            # Only check blocked_users if the conversation has that attribute
+            if hasattr(conversation, "blocked_users"):
+                if conversation.blocked_users.filter(id=user.id).exists():
+                    raise serializers.ValidationError(
+                        "You have been blocked from this conversation"
+                    )
+
+            # Validate content
+            content = attrs.get("content", "").strip()
+            if not content:
+                raise serializers.ValidationError(
+                    {"content": "Message content cannot be empty"}
+                )
+            if len(content) > settings.GROUP_SETTINGS["MAX_MESSAGE_LENGTH"]:
+                raise serializers.ValidationError(
+                    {
+                        "content": f"Message too long (max {settings.GROUP_SETTINGS['MAX_MESSAGE_LENGTH']} characters)"
+                    }
+                )
+
+            return attrs
+
+        except Exception as e:
+            logger.error(f"Message validation error: {str(e)}")
+            raise serializers.ValidationError("Message validation failed")
+
+    def to_representation(self, instance):
+        """Override to convert non-serializable objects in reactions"""
+        representation = super().to_representation(instance)
+        reactions = representation.get("reactions")
+        if isinstance(reactions, dict):
+            safe_reactions = {}
+            for key, value in reactions.items():
+                # If value is a CustomUser instance, convert to its id
+                if hasattr(value, "id"):
+                    safe_reactions[key] = value.id
+                else:
+                    safe_reactions[key] = value
+            representation["reactions"] = safe_reactions
+        return representation
+
+    def validate_message_type(self, value):
+        allowed = ["text", "system"]
+        if value not in allowed:
+            raise serializers.ValidationError("Invalid message type for group.")
+        return value
+
+7)# messaging/serializers/one_to_one.py
+from rest_framework import serializers
+from ..models.one_to_one import OneToOneConversation, OneToOneMessage
+from django.utils import timezone
+import logging
+from django.contrib.auth import get_user_model
+
+logger = logging.getLogger(__name__)
+
+
+class OneToOneConversationSerializer(serializers.ModelSerializer):
+    unread_count = serializers.IntegerField(read_only=True)
+    last_message = serializers.SerializerMethodField()
+    other_participant = serializers.SerializerMethodField()
+    other_user_name = serializers.SerializerMethodField()  # New field
+
+    class Meta:
+        model = OneToOneConversation
+        fields = [
+            "id",
+            "participants",
+            "created_at",
+            "unread_count",
+            "last_message",
+            "other_participant",
+            "other_user_name",  # Include it in the serializer output
+        ]
+        read_only_fields = ["created_at", "unread_count"]
+
+    def validate_participants(self, value):
+        try:
+            request = self.context.get("request")
+            if not request:
+                raise serializers.ValidationError("Request context is missing.")
+
+            current_user = request.user
+            if len(value) != 1:
+                raise serializers.ValidationError(
+                    "Must include exactly one other participant."
+                )
+
+            other_user = value[0]
+            if current_user == other_user:
+                raise serializers.ValidationError(
+                    "Cannot create conversation with yourself."
+                )
+
+            # Check user types
+            user_types = {current_user.user_type, other_user.user_type}
+            if user_types != {"patient", "therapist"}:
+                raise serializers.ValidationError(
+                    "Conversation must have one patient and one therapist."
+                )
+
+            # Check existing conversation
+            if self._conversation_exists(current_user, other_user):
+                raise serializers.ValidationError(
+                    "Conversation already exists between these users."
+                )
+
+            return value
+
+        except Exception as e:
+            logger.error(f"Error validating participants: {str(e)}")
+            raise serializers.ValidationError("Invalid participants")
+
+    def _conversation_exists(self, user1, user2):
+        """Check if conversation exists between two users"""
+        return (
+            OneToOneConversation.objects.filter(participants=user1)
+            .filter(participants=user2)
+            .exists()
+        )
+
+    def get_last_message(self, obj):
+        """Get the last message in conversation"""
+        try:
+            message = obj.messages.last()
+            if message:
+                return {
+                    "content": message.content,
+                    "timestamp": message.timestamp,
+                    "sender_id": message.sender_id,
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting last message: {str(e)}")
+            return None
+
+    def get_other_participant(self, obj):
+        """Get details of the other participant"""
+        try:
+            request = self.context.get("request")
+            if not request:
+                return None
+
+            other_user = obj.participants.exclude(id=request.user.id).first()
+            if not other_user:
+                return None
+
+            return {
+                "id": other_user.id,
+                "username": other_user.username,
+                "user_type": other_user.user_type,
+            }
+        except Exception as e:
+            logger.error(f"Error getting other participant: {str(e)}")
+            return None
+
+    def get_other_user_name(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return None
+        other_user = obj.participants.exclude(id=request.user.id).first()
+        if other_user:
+            return other_user.get_full_name() or other_user.username
+        return None
+
+
+class OneToOneMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source="sender.username", read_only=True)
+    is_edited = serializers.BooleanField(read_only=True)
+    message_type = serializers.CharField(required=False, default="text")
+    read_by = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=get_user_model().objects.all(),
+        required=False
+    )
+    reactions = serializers.JSONField(required=False, allow_null=True, default=dict)
+    formatted_reactions = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = OneToOneMessage
+        fields = [
+            "id",
+            "content",
+            "sender",
+            "sender_name",
+            "timestamp",
+            "conversation",
+            "message_type",
+            "reactions",
+            "formatted_reactions",
+            "is_edited",
+            "read_by",
+        ]
+        read_only_fields = ["sender", "timestamp", "sender_name", "is_edited", "formatted_reactions"]
+
+    def validate_content(self, value):
+        """Validate message content"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Message content cannot be empty")
+
+        if len(value) > 5000:  # Maximum message length
+            raise serializers.ValidationError("Message too long")
+
+        return value.strip()
+
+    def validate_reactions(self, value):
+        """Validate message reactions"""
+        if value is None:
+            return {}
+
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Reactions must be a dictionary")
+
+        # Validate reaction types and values
+        valid_reactions = {"like", "heart", "smile", "thumbsup"}
+        
+        for reaction_type, user_ids in value.items():
+            # Check reaction type
+            if reaction_type not in valid_reactions:
+                raise serializers.ValidationError(
+                    f"Invalid reaction type: {reaction_type}"
+                )
+                
+            # Check user IDs list format
+            if not isinstance(user_ids, list):
+                raise serializers.ValidationError(
+                    f"Reaction '{reaction_type}' must contain a list of user IDs"
+                )
+                
+            # Validate each user ID is a string
+            for user_id in user_ids:
+                if not isinstance(user_id, str):
+                    raise serializers.ValidationError(
+                        f"User ID must be a string, got {type(user_id).__name__}"
+                    )
+
+        return value
+
+    def validate_reaction(self, value):
+        """Validate a single reaction"""
+        valid_reactions = {"like", "heart", "smile", "thumbsup"}
+
+        if not isinstance(value, str):
+            raise serializers.ValidationError("Reaction must be a string")
+
+        if value not in valid_reactions:
+            raise serializers.ValidationError(
+                f"Invalid reaction. Must be one of: {', '.join(valid_reactions)}"
+            )
+
+        return value
+
+    def add_reaction(self, user, reaction_type):
+        """Add a reaction from a user"""
+        # Validate reaction
+        self.validate_reaction(reaction_type)
+        
+        # Get instance and its current reactions
+        instance = self.instance
+        reactions = instance.reactions or {}
+        
+        # Initialize the reaction type list if it doesn't exist
+        if reaction_type not in reactions:
+            reactions[reaction_type] = []
+            
+        # Add user ID if not already present
+        user_id = str(user.id)
+        if user_id not in reactions[reaction_type]:
+            reactions[reaction_type].append(user_id)
+            
+        # Update instance
+        instance.reactions = reactions
+        instance.save(update_fields=['reactions'])
+        
+        return reactions
+
+    def remove_reaction(self, user, reaction_type=None):
+        """Remove a user's reaction"""
+        instance = self.instance
+        reactions = instance.reactions or {}
+        user_id = str(user.id)
+        
+        # If reaction type specified, remove from just that type
+        if reaction_type:
+            if reaction_type in reactions and user_id in reactions[reaction_type]:
+                reactions[reaction_type].remove(user_id)
+                # Remove empty lists
+                if not reactions[reaction_type]:
+                    del reactions[reaction_type]
+        else:
+            # Remove from all reaction types
+            for r_type in list(reactions.keys()):
+                if user_id in reactions[r_type]:
+                    reactions[r_type].remove(user_id)
+                    # Remove empty lists
+                    if not reactions[r_type]:
+                        del reactions[r_type]
+        
+        # Update instance
+        instance.reactions = reactions
+        instance.save(update_fields=['reactions'])
+        
+        return reactions
+
+    def get_formatted_reactions(self, obj):
+        """Format reactions for display with user details"""
+        try:
+            reactions = obj.reactions or {}
+            formatted = {}
+            
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            
+            # Process each reaction type
+            for reaction_type, user_ids in reactions.items():
+                # Get user details for each ID
+                user_objects = User.objects.filter(id__in=user_ids)
+                user_map = {str(user.id): user for user in user_objects}
+                
+                formatted[reaction_type] = [
+                    {
+                        "user_id": user_id,
+                        "username": user_map.get(user_id).username if user_id in user_map else "Unknown",
+                        "name": (user_map.get(user_id).get_full_name() or user_map.get(user_id).username) if user_id in user_map else "Unknown",
+                    }
+                    for user_id in user_ids
+                ]
+                
+            return formatted
+            
+        except Exception as e:
+            logger.error(f"Error formatting reactions: {str(e)}")
+            return {}
+
+    def validate_conversation(self, value):
+        """Validate conversation access"""
+        request = self.context.get("request")
+        if not request:
+            raise serializers.ValidationError("Request context is missing")
+
+        if not value.participants.filter(id=request.user.id).exists():
+            raise serializers.ValidationError(
+                "You are not a participant in this conversation"
+            )
+
+        return value
+
+    def get_read_by(self, obj):
+        """Get list of users who have read the message"""
+        try:
+            return [
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "read_at": obj.read_receipts.get(str(user.id)),
+                }
+                for user in obj.read_by.all()
+            ]
+        except Exception as e:
+            logger.error(f"Error getting read receipts: {str(e)}")
+            return []
+
+8)# messaging/services/constants.py
+THERAPEUTIC_GUIDELINES = """You are Samantha, a mental health support assistant...
+...existing guidelines..."""
+
+ERROR_MESSAGES = {
+    "Invalid input": "I couldn't understand that message. Could you please rephrase it?",
+    "Service unavailable": "I need a moment to gather my thoughts. Could we try again shortly?",
+    "Internal error": "I'm experiencing some confusion right now. Let's take a brief pause.",
+}
+
+9)# messaging/services/exceptions.py
+class ChatbotError(Exception):
+    """Base exception for chatbot-related errors"""
+
+    pass
+
+
+class ChatbotConfigError(ChatbotError):
+    """Raised when there's a configuration error"""
+
+    pass
+
+
+class ChatbotAPIError(ChatbotError):
+    """Raised when there's an API-related error"""
+
+    pass
+10)#messaging/signals/handlers.py
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
+from django.core.cache import cache
+from django.utils import timezone
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from ..models.base import BaseMessage
+from ..models.one_to_one import OneToOneMessage
+from ..models.group import GroupMessage
+from ..models.chatbot import ChatbotMessage
+from notifications.services import UnifiedNotificationService
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@receiver([pre_save], sender=BaseMessage)
+def handle_message_edit(sender, instance, **kwargs):
+    """Handle message edit tracking"""
+    try:
+        if instance.pk:  # Only for existing messages
+            old_instance = sender.objects.get(pk=instance.pk)
+
+            # Check if content changed
+            if old_instance.content != instance.content:
+                # Clear cache
+                cache_key = f"message_edit_history_{instance.id}"
+                cache.delete(cache_key)
+
+                # Log edit
+                logger.info(
+                    f"Message {instance.id} edited by {instance.edited_by}"
+                    f" at {instance.edited_at}"
+                )
+            
+            # Check if reactions changed
+            if old_instance.reactions != instance.reactions:
+                # Set a flag for post_save handlers to use
+                instance._reactions_changed = True
+                
+                # Preserve last_reactor info for notifications if not already set
+                if not hasattr(instance, '_last_reactor') or instance._last_reactor is None:
+                    instance._last_reactor = getattr(instance, 'last_reactor', None)
+                    
+                logger.debug(f"Reactions changed for message {instance.id}")
+
+    except Exception as e:
+        logger.error(f"Error handling message edit: {str(e)}", exc_info=True)
+
+
+@receiver([post_save], sender=BaseMessage)
+def handle_message_reaction(sender, instance, created, **kwargs):
+    """Handle reaction notifications and caching"""
+    try:
+        # Check if reactions changed using our flag from pre_save
+        if not created and getattr(instance, '_reactions_changed', False):
+            # Get the user who added/changed the reaction
+            reactor = getattr(instance, '_last_reactor', None)
+
+            # Skip if no reactor (happens during reaction removal)
+            if not reactor:
+                return
+
+            # Notify message sender if different from reactor
+            if reactor != instance.sender:
+                notification_service = UnifiedNotificationService()
+                notification_service.send_notification(
+                    user=instance.sender,
+                    notification_type_name="message_reaction",
+                    title="New Reaction",
+                    message=f"{reactor.get_full_name()} reacted to your message",
+                    metadata={
+                        "message_id": str(instance.id),
+                        "conversation_id": str(instance.conversation.id),
+                        "reactor_id": str(reactor.id),
+                        "reaction_type": getattr(instance, 'last_reaction_type', 'unknown'),
+                        "message_preview": instance.content[:100],
+                    },
+                    send_email=False,
+                    send_in_app=True,
+                    priority="low",
+                )
+
+            # Update reactions cache
+            cache_key = f"message_reactions_{instance.id}"
+            cache.set(cache_key, instance.reactions, timeout=3600)
+
+    except Exception as e:
+        logger.error(f"Error handling message reaction: {str(e)}", exc_info=True)
+
+
+@receiver(post_save, sender=OneToOneMessage)
+@receiver(post_save, sender=GroupMessage)
+@receiver(post_save, sender=ChatbotMessage)
+def update_conversation_on_message_change(sender, instance, created, **kwargs):
+    conversation = instance.conversation
+    conversation.last_activity = timezone.now()
+    conversation.save()
+
+    # Send WebSocket update only for new messages or edited messages
+    if created or getattr(instance, "edited", False):
+        try:
+            channel_layer = get_channel_layer()
+            if not channel_layer:
+                logger.error("Channel layer not available")
+                return
+
+            event_type = "message_create" if created else "message_update"
+
+            message_data = {
+                "type": "conversation_message",  # Match the consumer method name
+                "message": {
+                    "event_type": event_type,
+                    "id": str(instance.id),
+                    "content": instance.content,
+                    "sender_id": str(instance.sender.id) if instance.sender else None,
+                    "sender_name": instance.sender.username if instance.sender else "System",
+                    "timestamp": instance.timestamp.isoformat(),
+                    "conversation_id": str(conversation.id),
+                    "message_type": getattr(instance, "message_type", "text"),
+                    "is_edited": getattr(instance, "edited", False),
+                },
+            }
+
+            async_to_sync(channel_layer.group_send)(
+                f"conversation_{conversation.id}", message_data
+            )
+
+            logger.debug(f"Sent WebSocket {event_type} for message {instance.id}")
+
+        except Exception as e:
+            logger.error(f"Error sending WebSocket message: {str(e)}", exc_info=True)
+
+
+@receiver(post_save, sender=OneToOneMessage)
+@receiver(post_save, sender=GroupMessage)
+def broadcast_message(sender, instance, created, **kwargs):
+    if created:  # Only for new messages
+        try:
+            channel_layer = get_channel_layer()
+            conversation_id = str(instance.conversation.id)
+            
+            # Enhanced message data
+            message_data = {
+                "type": "conversation_message",
+                "message": {
+                    "id": str(instance.id),
+                    "content": instance.content,
+                    "sender_id": str(instance.sender.id),
+                    "sender_name": instance.sender.username,
+                    "conversation_id": conversation_id,
+                    "timestamp": instance.timestamp.isoformat(),
+                    "event_type": "new_message",
+                    "read_by": [],  # Initialize empty read receipts
+                    "message_type": getattr(instance, "message_type", "text")
+                }
+            }
+            
+            # Broadcast to the conversation group
+            async_to_sync(channel_layer.group_send)(
+                f"conversation_{conversation_id}",
+                message_data
+            )
+            
+            logger.debug(f"Broadcasting new message {instance.id} to conversation {conversation_id}")
+            
+        except Exception as e:
+            logger.error(f"Error broadcasting message: {str(e)}", exc_info=True)
+
+11)# messaging/views/group.py
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.db.models import Prefetch, Count
+from django.contrib.auth import get_user_model
+from django.conf import settings
+import logging
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+from ..models.group import GroupConversation, GroupMessage
+from ..serializers.group import GroupConversationSerializer, GroupMessageSerializer
+from ..pagination import CustomMessagePagination
+from messaging.permissions import IsParticipantOrModerator
+from messaging.throttling import GroupMessageThrottle
+from ..mixins.edit_history import EditHistoryMixin
+from ..mixins.reactions import ReactionMixin  # Add this import
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="List all group conversations where the authenticated user is a participant.",
+        summary="List Group Conversations",
+        tags=["Group Conversation"],
+    ),
+    retrieve=extend_schema(
+        description="Retrieve details of a specific group conversation.",
+        summary="Retrieve Group Conversation",
+        tags=["Group Conversation"],
+    ),
+    create=extend_schema(
+        description="Create a new group conversation and automatically add the creator as a participant and moderator.",
+        summary="Create Group Conversation",
+        tags=["Group Conversation"],
+    ),
+    update=extend_schema(
+        description="Update details of a group conversation.",
+        summary="Update Group Conversation",
+        tags=["Group Conversation"],
+    ),
+    partial_update=extend_schema(
+        description="Partially update a group conversation.",
+        summary="Patch Group Conversation",
+        tags=["Group Conversation"],
+    ),
+    destroy=extend_schema(
+        description="Delete a group conversation.",
+        summary="Delete Group Conversation",
+        tags=["Group Conversation"],
+    ),
+)
+class GroupConversationViewSet(viewsets.ModelViewSet):
+    queryset = GroupConversation.objects.all()
+    serializer_class = GroupConversationSerializer
+    permission_classes = [IsParticipantOrModerator]
+    throttle_classes = [GroupMessageThrottle]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return self.queryset.none()
+        return (
+            self.queryset.filter(participants=user)
+            .prefetch_related("participants", "moderators")
+            .annotate(
+                participant_count=Count("participants"), message_count=Count("messages")
+            )
+        )
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        """Create group with atomic transaction (notifications removed)"""
+        try:
+            max_groups = getattr(settings, "MAX_GROUPS_PER_USER", 10)
+            user_groups = GroupConversation.objects.filter(
+                participants=self.request.user
+            ).count()
+            if user_groups >= max_groups:
+                raise ValidationError(f"Maximum group limit ({max_groups}) reached")
+
+            instance = serializer.save()
+            instance.participants.add(self.request.user)
+            instance.moderators.add(self.request.user)
+
+            logger.info(
+                f"Group conversation {instance.id} created by user {self.request.user.id}"
+            )
+            return instance
+
+        except Exception as e:
+            logger.error(f"Group creation failed: {str(e)}")
+            raise ValidationError(f"Failed to create group: {str(e)}")
+
+    @extend_schema(
+        description="Add a user as a moderator to the group (notifications removed).",
+        summary="Add Moderator",
+        tags=["Group Conversation"],
+    )
+    @action(detail=True, methods=["post"])
+    def add_moderator(self, request, pk=None):
+        group = self.get_object()
+        if not group.moderators.filter(id=request.user.id).exists():
+            return Response(
+                {"detail": "You don't have permission to add moderators."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        user = get_object_or_404(get_user_model(), id=request.data.get("user_id"))
+        if not group.participants.filter(id=user.id).exists():
+            return Response(
+                {
+                    "detail": "User must be a participant before being promoted to moderator."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        group.moderators.add(user)
+        return Response(
+            {"detail": f"User {user.username} is now a moderator."},
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="List all moderators of the group.",
+        summary="List Moderators",
+        tags=["Group Conversation"],
+    )
+    @action(detail=True, methods=["get"])
+    def moderators(self, request, pk=None):
+        group = self.get_object()
+        moderator_data = [
+            {
+                "id": mod.id,
+                "username": mod.username,
+                "first_name": mod.first_name,
+                "last_name": mod.last_name,
+                "email": mod.email,
+            }
+            for mod in group.moderators.all()
+        ]
+        return Response(moderator_data)
+
+    @action(detail=True, methods=["post"])
+    def add_participant(self, request, pk=None):
+        """Add participant to group"""
+        try:
+            group = self.get_object()
+
+            # Validate moderator permission
+            if not group.moderators.filter(id=request.user.id).exists():
+                return Response(
+                    {"error": "Only moderators can add participants"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            user_id = request.data.get("user_id")
+            user = get_object_or_404(get_user_model(), id=user_id)
+
+            # Fix: Use the correct settings reference
+            if group.participants.count() >= settings.GROUP_SETTINGS["MAX_PARTICIPANTS_PER_GROUP"]:
+                return Response(
+                    {"error": "Maximum participant limit reached"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check if user is already a participant
+            if group.participants.filter(id=user_id).exists():
+                return Response(
+                    {"message": f"{user.username} is already a member of this group"},
+                    status=status.HTTP_200_OK,
+                )
+
+            group.participants.add(user)
+            return Response(
+                {"message": f"Added {user.username} to group"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Error adding participant: {str(e)}")
+            return Response(
+                {"error": "Failed to add participant"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def remove_participant(self, request, pk=None):
+        """Remove participant with proper validation (notifications removed)"""
+        try:
+            group = self.get_object()
+            user_id = request.data.get("user_id")
+            user = get_object_or_404(get_user_model(), id=user_id)
+
+            if not (
+                request.user.id == user_id
+                or group.moderators.filter(id=request.user.id).exists()
+            ):
+                return Response(
+                    {"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN
+                )
+
+            group.participants.remove(user)
+            group.moderators.remove(user)
+
+            return Response(
+                {"message": f"Removed {user.username} from group"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(f"Error removing participant: {str(e)}")
+            return Response(
+                {"error": "Failed to remove participant"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def pin_message(self, request, pk=None):
+        group = self.get_object()
+        if not group.moderators.filter(id=request.user.id).exists():
+            return Response(
+                {"detail": "Only moderators can pin messages"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        pinned_message_id = request.data.get("message_id")
+        if not pinned_message_id:
+            return Response(
+                {"detail": "Message ID is required to pin a message."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        group.pinned_message_id = pinned_message_id
+        group.save()
+        return Response(
+            {"detail": "Message pinned successfully."}, status=status.HTTP_200_OK
+        )
+
+    @extend_schema(exclude=True)
+    @action(detail=False, methods=["post"])
+    def create_anonymous(self, request):
+        """
+        Create an anonymous group conversation. If a name is not provided, a default
+        anonymous name is set and the conversation is marked as private.
+        """
+        data = request.data.copy()
+        # Set default name if not provided
+        if not data.get("name", "").strip():
+            data["name"] = "Anonymous Conversation"
+        # Force conversation to be private
+        data["is_private"] = True
+        # If participants list is not provided, set it as empty (perform_create will add request.user)
+        if "participants" not in data:
+            data["participants"] = []
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        conversation = self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class GroupMessageViewSet(EditHistoryMixin, ReactionMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for managing group messages
+    """
+    queryset = GroupMessage.objects.all()
+    serializer_class = GroupMessageSerializer
+    permission_classes = [IsParticipantOrModerator]
+    pagination_class = CustomMessagePagination
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Get conversation filter from query params for list view
+        conversation_id = self.request.query_params.get('conversation')
+        
+        queryset = (
+            GroupMessage.objects.filter(conversation__participants=user)
+            .select_related("sender", "conversation")
+            .prefetch_related(
+                Prefetch("conversation__participants"), 
+                Prefetch("read_by")
+            )
+        )
+        
+        # Filter by conversation ID if provided in query params
+        if conversation_id:
+            queryset = queryset.filter(conversation_id=conversation_id)
+        
+        return queryset.order_by("-timestamp")
+
+    def create(self, request, *args, **kwargs):
+        """Create a new group message"""
+        try:
+            # Add sender to request data
+            request.data.update({"sender": request.user.id})
+            
+            # Create message using regular create flow
+            return super().create(request, *args, **kwargs)
+            
+        except Exception as e:
+            logger.error(f"Error creating group message: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to create message: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def perform_create(self, serializer):
+        """Set sender when creating a message"""
+        serializer.save(sender=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """Update an existing group message"""
+        try:
+            instance = self.get_object()
+            
+            # Check if user is message owner
+            if instance.sender != request.user:
+                return Response(
+                    {"error": "You can only edit your own messages"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            return super().update(request, *args, **kwargs)
+            
+        except Exception as e:
+            logger.error(f"Error updating group message: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to update message: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def destroy(self, request, *args, **kwargs):
+        """Delete a group message"""
+        try:
+            instance = self.get_object()
+            
+            # Check if user has permission to delete
+            if (
+                instance.sender != request.user
+                and not instance.conversation.moderators.filter(id=request.user.id).exists()
+            ):
+                return Response(
+                    {"error": "You do not have permission to delete this message."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+                
+            return super().destroy(request, *args, **kwargs)
+            
+        except Exception as e:
+            logger.error(f"Error deleting group message: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to delete message: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def list(self, request, *args, **kwargs):
+        """List group messages with proper pagination"""
+        try:
+            # Get conversation filter from query params
+            conversation_id = request.query_params.get('conversation')
+            
+            # Filter queryset by conversation if provided
+            queryset = self.filter_queryset(self.get_queryset())
+            if conversation_id:
+                queryset = queryset.filter(conversation_id=conversation_id)
+                
+            # Apply pagination
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+                
+            # Fall back to non-paginated response
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+            
+        except Exception as e:
+            logger.error(f"Error listing group messages: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to list messages: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+12)# messaging/views/one_to_one.py
+from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError
+from django.db.models import Count, Max, Q, Prefetch
+from django.utils import timezone
+from django.conf import settings
+from ..mixins.edit_history import EditHistoryMixin
+from ..mixins.reactions import ReactionMixin
+
+# Import extend_schema and extend_schema_view to enrich Swagger/OpenAPI docs.
+# • extend_schema: Adds detailed metadata (description, summary, tags, etc.) to a specific view method.
+# • extend_schema_view: Applies common schema settings to all view methods of a viewset.
+from drf_spectacular.utils import extend_schema, extend_schema_view
+
+from ..models.one_to_one import OneToOneConversation, OneToOneMessage
+from ..serializers.one_to_one import (
+    OneToOneConversationSerializer,
+    OneToOneMessageSerializer,
+)
+
+# New corrected import
+# Removed Firebase import
+# from ..services/firebase import push_message  # DELETE THIS LINE
+import logging
+from django.contrib.auth import get_user_model
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="List all one-to-one conversations for the authenticated user. Each conversation includes annotations for the latest message, its time, unread count, and participant details.",
+        summary="List One-to-One Conversations",
+        tags=["One-to-One Conversation"],
+    ),
+    retrieve=extend_schema(
+        description="Retrieve detailed information for a specific one-to-one conversation, including recent messages and details about the other participant(s).",
+        summary="Retrieve One-to-One Conversation",
+        tags=["One-to-One Conversation"],
+    ),
+    create=extend_schema(
+        description="Create a new one-to-one conversation.",
+        summary="Create One-to-One Conversation",
+        tags=["One-to-One Conversation"],
+    ),
+)
+class OneToOneConversationViewSet(viewsets.ModelViewSet):
+    queryset = OneToOneConversation.objects.all()
+    serializer_class = OneToOneConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Get conversations that the current user is part of,
+        with annotations for latest message info and unread count.
+        """
+        user = self.request.user
+
+        # Prefetch recent messages for each conversation to avoid N+1 queries.
+        message_prefetch = Prefetch(
+            "messages",
+            queryset=OneToOneMessage.objects.order_by("-timestamp"),
+            to_attr="all_messages",
+        )
+
+        # Get all conversations with additional useful data.
+        return (
+            self.queryset.filter(participants=user)
+            .prefetch_related("participants", message_prefetch)
+            .annotate(
+                last_message_time=Max("messages__timestamp"),
+                unread_count=Count(
+                    "messages",
+                    filter=~Q(messages__read_by=user) & ~Q(messages__sender=user),
+                ),
+            )
+            .order_by("-last_message_time")
+        )
+
+    @extend_schema(
+        description="Enhanced list response that returns conversation data enriched with latest message preview and unread message counts. Supports pagination.",
+        summary="Enhanced List One-to-One Conversations",
+        tags=["One-to-One Conversation"],
+    )
+    def list(self, request, *args, **kwargs):
+        """Enhanced list response with additional data."""
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                response_data = self.enrich_conversation_data(serializer.data)
+                return self.get_paginated_response(response_data)
+            serializer = self.get_serializer(queryset, many=True)
+            response_data = self.enrich_conversation_data(serializer.data)
+            return Response(response_data)
+        except Exception as e:
+            return Response(
+                {"detail": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="Enhanced detail view for a one-to-one conversation including participant info and recent message history. Also marks unread messages as read.",
+        summary="Enhanced Retrieve One-to-One Conversation",
+        tags=["One-to-One Conversation"],
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """Enhanced detail view with messages."""
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            response_data = serializer.data
+
+            # Add other participant information
+            other_participants = instance.participants.exclude(id=request.user.id)
+            response_data["other_participants"] = [
+                {
+                    "id": participant.id,
+                    "username": participant.username,
+                    "first_name": participant.first_name,
+                    "last_name": participant.last_name,
+                    "email": participant.email,
+                }
+                for participant in other_participants
+            ]
+
+            # Get recent messages (limit to last 20) and convert to list
+            messages = list(instance.messages.all().order_by("-timestamp")[:20])
+            message_serializer = OneToOneMessageSerializer(messages, many=True)
+            response_data["messages"] = message_serializer.data
+
+            # Mark messages as read using Python filtering on the list
+            unread_messages = [
+                message
+                for message in messages
+                if message.sender != request.user
+                and request.user not in message.read_by.all()
+            ]
+            for message in unread_messages:
+                message.read_by.add(request.user)
+
+            return Response(response_data)
+        except Exception as e:
+            return Response(
+                {"detail": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="Retrieve messages for a specific conversation with support for cursor-based pagination using before and after parameters.",
+        summary="List Conversation Messages",
+        tags=["One-to-One Conversation"],
+    )
+    @action(detail=True, methods=["get"])
+    def messages(self, request, pk=None):
+        try:
+            conversation = self.get_object()
+            page_size = int(request.query_params.get("page_size", 20))
+            before_id = request.query_params.get("before_id")
+            after_id = request.query_params.get("after_id")
+
+            messages = conversation.messages.all()
+            if before_id:
+                before_message = OneToOneMessage.objects.get(id=before_id)
+                messages = messages.filter(timestamp__lt=before_message.timestamp)
+            if after_id:
+                after_message = OneToOneMessage.objects.get(id=after_id)
+                messages = messages.filter(timestamp__gt=after_message.timestamp)
+            messages = messages.order_by("-timestamp")[:page_size]
+            serializer = OneToOneMessageSerializer(messages, many=True)
+
+            unread_messages = messages.exclude(sender=request.user).exclude(
+                read_by=request.user
+            )
+            for message in unread_messages:
+                message.read_by.add(request.user)
+
+            return Response(
+                {"results": serializer.data, "has_more": messages.count() == page_size}
+            )
+        except Exception as e:
+            return Response(
+                {"detail": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @extend_schema(
+        description="Set the conversation status as 'typing' for the authenticated user.",
+        summary="Set Typing Status",
+        tags=["One-to-One Conversation"],
+    )
+    @action(detail=True, methods=["post"])
+    def typing(self, request, pk=None):
+        conversation = self.get_object()
+        conversation.is_typing = True
+        conversation.save()
+        return Response({"status": "typing"}, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        description="Search for messages within the conversation that contain a specified query string.",
+        summary="Search Conversation Messages",
+        tags=["One-to-One Conversation"],
+    )
+    @action(detail=True, methods=["get"])
+    def search(self, request, pk=None):
+        query = request.query_params.get("query")
+        if not query:
+            return Response(
+                {"error": "Query parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        messages = OneToOneMessage.objects.filter(
+            content__icontains=query, conversation=pk
+        )
+        serializer = OneToOneMessageSerializer(messages, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def enrich_conversation_data(self, data):
+        """Add additional information to conversation data for the UI."""
+        user = self.request.user
+        for conversation_data in data:
+            conversation_id = conversation_data["id"]
+            conversation = OneToOneConversation.objects.get(id=conversation_id)
+            other_participants = conversation.participants.exclude(id=user.id)
+            conversation_data["other_participants"] = [
+                {
+                    "id": participant.id,
+                    "username": participant.username,
+                    "first_name": participant.first_name,
+                    "last_name": participant.last_name,
+                    "email": participant.email,
+                }
+                for participant in other_participants
+            ]
+            # Slice the prefetched messages in Python
+            latest_messages = getattr(conversation, "all_messages", [])[:5]
+            if latest_messages:
+                latest_message = latest_messages[0]
+                conversation_data["latest_message"] = {
+                    "id": latest_message.id,
+                    "content": latest_message.content[:100]
+                    + ("..." if len(latest_message.content) > 100 else ""),
+                    "timestamp": latest_message.timestamp,
+                    "is_from_current_user": latest_message.sender_id == user.id,
+                    "sender_name": latest_message.sender.get_full_name()
+                    or latest_message.sender.username,
+                }
+        return data
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        validated_participants = serializer.validated_data.get("participants", [])
+        # Automatically include the authenticated user.
+        validated_participants.append(user)
+        serializer.save(participants=validated_participants)
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create a one-to-one conversation.
+        Expects a payload with 'participant_id' for the second user.
+        """
+        other_participant_id = request.data.get("participant_id")
+        if not other_participant_id:
+            return Response(
+                {"error": "Participant ID is required for one-to-one conversations."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            User = get_user_model()
+            other_participant = User.objects.get(id=other_participant_id)
+            
+            # First check if conversation already exists to avoid duplicates
+            existing_conversation = OneToOneConversation.objects.filter(
+                participants=request.user
+            ).filter(
+                participants=other_participant
+            ).first()
+            
+            if existing_conversation:
+                # Return existing conversation instead of creating a new one
+                serializer = self.get_serializer(existing_conversation)
+                return Response(
+                    serializer.data, 
+                    status=status.HTTP_200_OK
+                )
+                
+            # Validate user types if needed
+            user_types = {request.user.user_type, other_participant.user_type}
+            if user_types != {"patient", "therapist"}:
+                return Response(
+                    {"error": "Conversation must have one patient and one therapist."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Create new conversation with atomic transaction
+            with transaction.atomic():
+                conversation = OneToOneConversation.objects.create()
+                conversation.participants.add(request.user, other_participant)
+                
+            serializer = self.get_serializer(conversation)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+        except User.DoesNotExist:
+            return Response(
+                {"error": "The specified participant does not exist."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.error(f"Error creating conversation: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"Failed to create conversation: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="List all messages in one-to-one conversations for the authenticated user.",
+        summary="List One-to-One Messages",
+        tags=["One-to-One Message"],
+    ),
+    retrieve=extend_schema(
+        description="Retrieve details of a specific one-to-one message.",
+        summary="Retrieve One-to-One Message",
+        tags=["One-to-One Message"],
+    ),
+)
+class OneToOneMessageViewSet(EditHistoryMixin, ReactionMixin, viewsets.ModelViewSet):
+    queryset = OneToOneMessage.objects.all()
+    serializer_class = OneToOneMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(conversation__participants=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            # Get and verify conversation exists
+            conversation_id = request.data.get("conversation")
+            try:
+                conversation = OneToOneConversation.objects.get(
+                    id=conversation_id, participants=request.user
+                )
+            except OneToOneConversation.DoesNotExist:
+                return Response(
+                    {
+                        "error": f"Conversation {conversation_id} not found or you are not a participant."
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Create message
+            message = serializer.save(sender=request.user, conversation=conversation)
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating message: {str(e)}")
+            return Response(
+                {"error": "An unexpected error occurred"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def perform_create(self, serializer):
+        """
+        Set the current user as the sender of the message and notify
+        the other participant via unified notification.
+        """
+        try:
+            # Save the message with the current user as sender
+            instance = serializer.save(sender=self.request.user)
+            conversation = instance.conversation
+
+            # Identify the recipient (non-sender participant)
+            recipient = conversation.participants.exclude(
+                id=self.request.user.id
+            ).first()
+
+            if recipient:
+                try:
+                    from notifications.services import UnifiedNotificationService
+
+                    notification_service = UnifiedNotificationService()
+
+                    # Add debug logging
+                    logger.debug(
+                        f"Attempting to send notification to recipient: {recipient.id}"
+                    )
+
+                    notification = notification_service.send_notification(
+                        user=recipient,
+                        notification_type_name="new_message",
+                        title="New Message",
+                        message=f"You have a new message: {instance.content[:100]}{'...' if len(instance.content) > 100 else ''}",
+                        metadata={
+                            "conversation_id": str(conversation.id),
+                            "message_id": str(instance.id),
+                            "sender_id": str(self.request.user.id),
+                            "message_preview": instance.content[:100]
+                            + ("..." if len(instance.content) > 100 else ""),
+                            "category": "message",
+                            "link": f"/conversations/{conversation.id}/",
+                            "sender_name": self.request.user.get_full_name()
+                            or self.request.user.username,
+                        },
+                        send_email=True,
+                        send_in_app=True,
+                        priority="high",
+                        content_object=instance,
+                    )
+
+                    if notification:
+                        logger.info(
+                            f"Sent notification for message {instance.id} to user {recipient.id}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Notification not sent for message {instance.id} - possibly disabled by user preferences"
+                        )
+
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send notification for message {instance.id}: {str(e)}",
+                        exc_info=True,
+                    )
+
+            return instance
+
+        except IntegrityError as e:
+            logger.error(f"Message creation failed: {str(e)}")
+            raise ValidationError(f"Failed to create message: {str(e)}")
+        except DjangoValidationError as e:
+            logger.error(f"Message validation failed: {str(e)}")
+            raise ValidationError(f"Validation error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error creating message: {str(e)}")
+            raise ValidationError(f"An unexpected error occurred: {str(e)}")
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        """Update message with validation and tracking"""
+        try:
+            instance = self.get_object()
+
+            # Check if user is message sender
+            if instance.sender != request.user:
+                return Response(
+                    {"error": "You can only edit your own messages"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            # Check if message is deleted
+            if instance.deleted:
+                return Response(
+                    {"error": "Deleted messages cannot be edited"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check edit time window
+            edit_window = getattr(
+                settings, "MESSAGE_EDIT_WINDOW", 3600
+            )  # 1 hour default
+            if (timezone.now() - instance.timestamp).seconds > edit_window:
+                return Response(
+                    {
+                        "error": f"Messages can only be edited within {edit_window//60} minutes"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Update message
+            serializer = self.get_serializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Failed to update message: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["post"])
+    def soft_delete(self, request, pk=None):
+        """
+        Soft delete a message
+        """
+        try:
+            instance = self.get_object()
+
+            # Check if user can delete message
+            if not (
+                instance.sender == request.user
+                or request.user.is_staff
+                or instance.conversation.moderators.filter(id=request.user.id).exists()
+            ):
+                return Response(
+                    {"error": "You don't have permission to delete this message"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            instance.deleted = True
+            instance.deletion_time = timezone.now()
+            instance.deleted_by = request.user
+            instance.save()
+
+            return Response(
+                {"message": "Message deleted successfully"}, status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to delete message: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["get"])
+    def edit_history(self, request, pk=None):
+        """
+        Get message edit history
+        """
+        try:
+            instance = self.get_object()
+
+            # Check if user can view history
+            if not (
+                instance.sender == request.user
+                or request.user.is_staff
+                or instance.conversation.participants.filter(
+                    id=request.user.id
+                ).exists()
+            ):
+                return Response(
+                    {"error": "You don't have permission to view edit history"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            return Response(
+                {
+                    "current": {
+                        "content": instance.content,
+                        "edited_at": instance.edited_at,
+                        "edited_by": instance.edited_by.id
+                        if instance.edited_by
+                        else None,
+                    },
+                    "history": instance.edit_history,
+                }
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to retrieve edit history: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+13)#messaging/consumers.py
+import json
+import logging
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.utils import timezone
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
+User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+class ConversationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        try:
+            # Get conversation ID from URL route
+            self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
+            self.group_name = f"conversation_{self.conversation_id}"
+            
+            # Handle authentication
+            if self.scope["user"].is_anonymous:
+                logger.warning("Anonymous user attempted to connect")
+                await self.close(code=4003)
+                return
+                
+            # Check conversation participant
+            is_participant = await self.is_conversation_participant()
+            if not is_participant:
+                logger.warning("User is not a conversation participant")
+                await self.close(code=4004)
+                return
+
+            # Join the group
+            await self.channel_layer.group_add(self.group_name, self.channel_name)
+            await self.accept()
+            
+            # Send success message
+            await self.send(json.dumps({
+                "type": "connection_established",
+                "message": "Connected successfully"
+            }))
+            
+        except Exception as e:
+            logger.error(f"WebSocket connection error: {str(e)}")
+            await self.close(code=4000)
+
+    async def disconnect(self, close_code):
+        try:
+            # Log disconnect with reason
+            if hasattr(self, 'scope') and 'user' in self.scope and hasattr(self, 'conversation_id'):
+                logger.info(
+                    f"User {self.scope['user'].username} disconnected from conversation {self.conversation_id} "
+                    f"with code {close_code}"
+                )
+            
+            # Leave conversation group
+            if hasattr(self, 'group_name') and hasattr(self, 'channel_name'):
+                await self.channel_layer.group_discard(self.group_name, self.channel_name)
+                
+        except Exception as e:
+            logger.error(f"Error in WebSocket disconnect: {str(e)}", exc_info=True)
+
+    async def receive(self, text_data):
+        """Handle incoming WebSocket messages"""
+        try:
+            data = json.loads(text_data)
+            logger.debug(f"Received WebSocket message: {data}")
+
+            # Handle read receipts
+            if data.get("type") == "mark_read":
+                message_id = data.get("message_id")
+                if message_id:
+                    await self.mark_message_as_read(message_id)
+                    # Notify other participants
+                    await self.channel_layer.group_send(
+                        self.group_name,
+                        {
+                            "type": "read_receipt",
+                            "user_id": str(self.scope["user"].id),
+                            "username": self.scope["user"].username,
+                            "message_id": message_id,
+                        },
+                    )
+
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid JSON received in WebSocket message")
+        except Exception as e:
+            logger.error(f"Error processing WebSocket message: {str(e)}", exc_info=True)
+
+    async def conversation_message(self, event):
+        """Send message to WebSocket"""
+        try:
+            message_data = event.get("message", {})
+            
+            # Ensure we're sending the correct event structure
+            await self.send(text_data=json.dumps({
+                "type": "new_message",
+                "message": {
+                    "id": message_data.get("id"),
+                    "content": message_data.get("content"),
+                    "sender_id": message_data.get("sender_id"),
+                    "sender_name": message_data.get("sender_name"),
+                    "conversation_id": message_data.get("conversation_id"),
+                    "timestamp": message_data.get("timestamp"),
+                    "event_type": message_data.get("event_type", "new_message"),
+                    "message_type": message_data.get("message_type", "text")
+                }
+            }))
+            
+            logger.debug(f"Sent message to client: {message_data.get('id')}")
+        except Exception as e:
+            logger.error(f"Error sending conversation message: {str(e)}", exc_info=True)
+
+    async def read_receipt(self, event):
+        """Send read receipt to WebSocket"""
+        try:
+            await self.send(
+                text_data=json.dumps({
+                    "type": "read_receipt",
+                    "user_id": event["user_id"],
+                    "username": event["username"],
+                    "message_id": event["message_id"],
+                })
+            )
+        except Exception as e:
+            logger.error(f"Error sending read receipt: {str(e)}", exc_info=True)
+
+    @database_sync_to_async
+    def get_user_from_token(self, token):
+        """Validate JWT token and get user"""
+        try:
+            # Validate token and get user
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            return User.objects.get(id=user_id)
+        except (TokenError, InvalidToken, User.DoesNotExist) as e:
+            logger.warning(f"Invalid token: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Error validating token: {str(e)}", exc_info=True)
+            return None
+
+    @database_sync_to_async
+    def is_conversation_participant(self):
+        """Check if user is a participant in the conversation"""
+        user = self.scope["user"]
+        try:
+            # Try one-to-one conversation first
+            from messaging.models.one_to_one import OneToOneConversation
+            if OneToOneConversation.objects.filter(
+                id=self.conversation_id, participants=user
+            ).exists():
+                return True
+
+            # Try group conversation
+            from messaging.models.group import GroupConversation
+            if GroupConversation.objects.filter(
+                id=self.conversation_id, participants=user
+            ).exists():
+                return True
+
+            # Try chatbot conversation
+            from messaging.models.chatbot import ChatbotConversation
+            if ChatbotConversation.objects.filter(
+                id=self.conversation_id, user=user
+            ).exists():
+                return True
+
+            logger.warning(
+                f"User {user.username} attempted to access conversation {self.conversation_id} "
+                f"but is not a participant"
+            )
+            return False
+        except Exception as e:
+            logger.error(f"Error checking conversation participant: {str(e)}", exc_info=True)
+            return False
+
+    @database_sync_to_async
+    def mark_message_as_read(self, message_id):
+        """Mark a message as read by the current user"""
+        try:
+            user = self.scope["user"]
+            
+            # Try to find the message in different message types
+            from messaging.models.one_to_one import OneToOneMessage
+            from messaging.models.group import GroupMessage
+            
+            # Check OneToOneMessage
+            try:
+                message = OneToOneMessage.objects.get(id=message_id, conversation__participants=user)
+                if hasattr(message, 'read_by') and user not in message.read_by.all():
+                    message.read_by.add(user)
+                    logger.debug(f"Marked one-to-one message {message_id} as read by {user.username}")
+                return True
+            except OneToOneMessage.DoesNotExist:
+                pass
+                
+            # Check GroupMessage
+            try:
+                message = GroupMessage.objects.get(id=message_id, conversation__participants=user)
+                if hasattr(message, 'read_by') and user not in message.read_by.all():
+                    message.read_by.add(user)
+                    logger.debug(f"Marked group message {message_id} as read by {user.username}")
+                return True
+            except GroupMessage.DoesNotExist:
+                pass
+                
+            logger.warning(f"Message {message_id} not found for user {user.username}")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error marking message as read: {str(e)}", exc_info=True)
+            return False
+
+14)# messaging/exceptions.py
+from rest_framework.exceptions import APIException
+
+
+class ChatbotException(APIException):
+    status_code = 500
+    default_detail = "An error occurred while processing your chatbot request."
+    default_code = "chatbot_error"
+
+15)# messaging/middleware.py
+from cryptography.fernet import Fernet
+from django.conf import settings
+from rest_framework.response import Response
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+import logging
+from django.core.cache import cache
+from django.utils import timezone
+from channels.middleware import BaseMiddleware
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken  # Add this import
+from urllib.parse import parse_qs
+
+logger = logging.getLogger(__name__)
+
+
+class MessageEncryptionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.cipher = Fernet(settings.MESSAGE_ENCRYPTION_KEY)
+
+    def __call__(self, request):
+        response = self.get_response(request)
+
+        if isinstance(response, Response) and "messages" in response.data:
+            response.data["messages"] = [
+                self._encrypt_message(msg) for msg in response.data["messages"]
+            ]
+        return response
+
+    def _encrypt_message(self, message):
+        message["content"] = self.cipher.encrypt(message["content"].encode()).decode()
+        return message
+
+
+class RealTimeMiddleware:
+    """Middleware to handle real-time updates for messaging actions"""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.channel_layer = get_channel_layer()
+
+    def __call__(self, request):
+        response = self.get_response(request)
+
+        try:
+            # Skip if channel layer is not available
+            if not self.channel_layer:
+                return response
+
+            # Check if this is a messaging action that needs real-time updates
+            if self._should_send_update(request, response):
+                self._send_websocket_update(request, response)
+        except Exception as e:
+            logger.error(f"Error in RealTimeMiddleware: {str(e)}", exc_info=True)
+
+        return response
+
+    def _should_send_update(self, request, response):
+        """Determine if the request should trigger a real-time update"""
+        # Only for messaging endpoints, certain methods, and successful responses
+        is_messaging_path = request.path.startswith("/api/messaging/")
+        is_modifying_method = request.method in ["POST", "PUT", "PATCH", "DELETE"]
+        is_successful = 200 <= response.status_code < 300
+
+        return is_messaging_path and is_modifying_method and is_successful
+
+    def _extract_conversation_id(self, path):
+        """Extract conversation ID from request path"""
+        try:
+            # Example paths:
+            # /api/messaging/one_to_one/123/
+            # /api/messaging/groups/123/
+            # /api/messaging/chatbot/123/
+            parts = path.split('/')
+            conversation_types = ['one_to_one', 'groups', 'chatbot']
+            for i, part in enumerate(parts):
+                if part in conversation_types and i + 1 < len(parts):
+                    potential_id = parts[i + 1]
+                    # Check if the ID part is a valid numeric ID
+                    if potential_id and potential_id.isdigit():
+                        return potential_id
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting conversation ID: {str(e)}")
+            return None
+
+    def _send_websocket_update(self, request, response):
+        """Send WebSocket update for real-time messaging"""
+        try:
+            conversation_id = self._extract_conversation_id(request.path)
+            if not conversation_id:
+                return
+
+            # Cache key for rate limiting
+            cache_key = f"ws_update_{conversation_id}_{request.user.id}"
+            cache.add(cache_key, 1, timeout=1)  # Simple rate limiting
+
+            # Determine action type based on method and endpoint
+            if "message" in request.path.lower():
+                if request.method == "POST":
+                    action = "message_created"
+                elif request.method in ["PUT", "PATCH"]:
+                    action = "message_updated"
+                elif request.method == "DELETE":
+                    action = "message_deleted"
+                else:
+                    action = "message_action"
+            else:
+                action = "conversation_updated"
+
+            # Prepare update data
+            update_data = {
+                "type": "conversation.message",
+                "message": {
+                    "event_type": action,
+                    "user_id": str(request.user.id),
+                    "username": request.user.username,
+                    "data": response.data if hasattr(response, "data") else {},
+                    "timestamp": timezone.now().isoformat(),
+                    "conversation_id": conversation_id,
+                },
+            }
+
+            # Send to appropriate group
+            group_name = f"conversation_{conversation_id}"
+            async_to_sync(self.channel_layer.group_send)(group_name, update_data)
+
+        except Exception as e:
+            logger.error(f"Failed to send WebSocket update: {str(e)}", exc_info=True)
+
+
+class WebSocketAuthMiddleware(BaseMiddleware):
+    async def __call__(self, scope, receive, send):
+        try:
+            query_string = scope.get("query_string", b"").decode()
+            query_params = parse_qs(query_string)
+            token = query_params.get('token', [None])[0]
+            
+            if not token:
+                logger.warning("No token provided in WebSocket connection")
+                scope['user'] = AnonymousUser()
+                return await super().__call__(scope, receive, send)
+            
+            user = await self.get_user_from_token(token)
+            if not user:
+                logger.warning("Invalid token or user not found")
+                scope['user'] = AnonymousUser()
+                return await super().__call__(scope, receive, send)
+                
+            scope['user'] = user
+            return await super().__call__(scope, receive, send)
+            
+        except Exception as e:
+            logger.error(f"WebSocket auth error: {str(e)}", exc_info=True)
+            scope['user'] = AnonymousUser()
+            return await super().__call__(scope, receive, send)
+
+    @database_sync_to_async
+    def get_user_from_token(self, token):
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            User = get_user_model()
+            return User.objects.get(id=user_id)
+        except (TokenError, InvalidToken, User.DoesNotExist) as e:
+            logger.warning(f"Token validation failed: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in token validation: {str(e)}", exc_info=True)
+            return None
+
+16)# messaging/pagination.py
+from rest_framework.pagination import CursorPagination
+from rest_framework.response import Response
+from cryptography.fernet import Fernet
+from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class MessagePagination(CursorPagination):
+    """Base cursor pagination for messages"""
+
+    page_size = 20
+    ordering = "-timestamp"
+    cursor_query_param = "cursor"
+
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "next": self.get_next_link(),
+                "previous": self.get_previous_link(),
+                "results": data,
+                "total_count": self.page.paginator.count,
+            }
+        )
+
+
+class EncryptedMessagePagination(MessagePagination):
+    """Cursor pagination with content encryption"""
+
+    def __init__(self):
+        super().__init__()
+        self.cipher = Fernet(settings.MESSAGE_ENCRYPTION_KEY)
+
+    def get_paginated_response(self, data):
+        try:
+            # Encrypt message content
+            encrypted_data = [
+                {**msg, "content": self._encrypt_content(msg.get("content", ""))}
+                for msg in data
+            ]
+
+            return super().get_paginated_response(encrypted_data)
+
+        except Exception as e:
+            logger.error(f"Error encrypting paginated data: {str(e)}", exc_info=True)
+            return Response({"error": "Failed to process messages"}, status=500)
+
+    def _encrypt_content(self, content):
+        """Encrypt message content"""
+        if not content:
+            return ""
+        try:
+            return self.cipher.encrypt(content.encode()).decode()
+        except Exception as e:
+            logger.error(f"Encryption error: {str(e)}")
+            return ""
+
+
+class CustomMessagePagination(CursorPagination):
+    """Custom cursor pagination for messages"""
+
+    page_size = 50
+    ordering = "-timestamp"
+    cursor_query_param = "cursor"
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        count = 0
+        # Handle case where self.page is a list without paginator
+        if hasattr(self, 'page'):
+            if hasattr(self.page, 'paginator'):
+                count = self.page.paginator.count
+            elif isinstance(self.page, list):
+                count = len(self.page)
+                
+        return Response(
+            {
+                "next": self.get_next_link(),
+                "previous": self.get_previous_link(),
+                "count": count,
+                "results": data,
+                "next_cursor": self.get_next_cursor(),
+            }
+        )
+
+    def get_next_cursor(self):
+        try:
+            if hasattr(self, 'page') and self.page and hasattr(self.page, 'has_next') and self.page.has_next:
+                last_item = self.page[-1]
+                return str(last_item.id)
+            elif isinstance(getattr(self, 'page', None), list) and len(self.page) >= self.page_size:
+                # If we have exactly page_size items, there might be more
+                last_item = self.page[-1]
+                return str(last_item.id)
+            return None
+        except Exception as e:
+            logger.error(f"Error getting next cursor: {str(e)}")
+            return None
+
+    def get_paginated_response_schema(self, schema):
+        return {
+            "type": "object",
+            "properties": {
+                "next": {"type": "string", "format": "uri", "nullable": True},
+                "previous": {"type": "string", "format": "uri", "nullable": True},
+                "count": {"type": "integer"},
+                "results": schema,
+                "next_cursor": {"type": "string", "nullable": True},
+            },
+        }
+
+17)# messaging/permissions.py
+from rest_framework.permissions import BasePermission
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class IsPatient(BasePermission):
+    """
+    Custom permission to only allow patients to access chatbot and patient-specific features
+    """
+
+    def has_permission(self, request, view):
+        try:
+            return bool(
+                request.user
+                and request.user.is_authenticated
+                and request.user.user_type == "patient"
+            )
+        except Exception as e:
+            logger.error(f"Error checking patient permission: {str(e)}")
+            return False
+
+
+class IsTherapist(BasePermission):
+    """
+    Custom permission to only allow therapists to access therapy-specific features
+    """
+
+    def has_permission(self, request, view):
+        try:
+            return bool(
+                request.user
+                and request.user.is_authenticated
+                and request.user.user_type == "therapist"
+            )
+        except Exception as e:
+            logger.error(f"Error checking therapist permission: {str(e)}")
+            return False
+
+
+class IsParticipant(BasePermission):
+    """
+    Custom permission to only allow participants of a conversation to access it
+    """
+
+    def has_object_permission(self, request, view, obj):
+        try:
+            return request.user in obj.participants.all()
+        except Exception as e:
+            logger.error(f"Error checking participant permission: {str(e)}")
+            return False
+
+
+class IsMessageOwner(BasePermission):
+    """
+    Custom permission to only allow message owners to modify their messages
+    """
+
+    def has_object_permission(self, request, view, obj):
+        try:
+            return obj.sender == request.user
+        except Exception as e:
+            logger.error(f"Error checking message owner permission: {str(e)}")
+            return False
+
+
+class IsModerator(BasePermission):
+    """
+    Custom permission to allow moderators to manage conversations
+    """
+
+    def has_object_permission(self, request, view, obj):
+        try:
+            # Check if user is a moderator and hasn't been removed
+            return (
+                request.user in obj.moderators.all()
+                and not obj.removed_moderators.filter(id=request.user.id).exists()
+            )
+        except Exception as e:
+            logger.error(f"Error checking moderator permission: {str(e)}")
+            return False
+
+
+class CanSendMessage(BasePermission):
+    """
+    Custom permission to check if user can send messages in a conversation
+    """
+
+    def has_object_permission(self, request, view, obj):
+        try:
+            user = request.user
+            # Check if conversation is active and user isn't blocked
+            return (
+                not obj.is_archived
+                and user in obj.participants.all()
+                and not obj.blocked_users.filter(id=user.id).exists()
+            )
+        except Exception as e:
+            logger.error(f"Error checking message permission: {str(e)}")
+            return False
+
+
+from rest_framework import permissions
+
+class IsParticipantOrModerator(permissions.BasePermission):
+    """
+    Custom permission to only allow participants or moderators of a conversation.
+    """
+
+    def has_permission(self, request, view):
+        # Always allow GET, HEAD, OPTIONS requests
+        if request.method in permissions.SAFE_METHODS:
+            # For detail views (retrieve, update, delete)
+            if getattr(view, 'detail', False) and view.kwargs.get('pk'):
+                return True  # We'll do the check in has_object_permission
+            # For list views
+            return request.user.is_authenticated
+        # For unsafe methods like POST, PUT, PATCH
+        return request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        # Get the conversation object directly or via the message
+        if hasattr(obj, 'conversation'):
+            conversation = obj.conversation
+        else:
+            conversation = obj
+            
+        # Check if user is a participant
+        try:
+            user_is_participant = conversation.participants.filter(id=request.user.id).exists()
+        except Exception as e:
+            logger.error(f"Error checking participant status: {str(e)}")
+            user_is_participant = False
+            
+        # Check if user is a moderator (for group conversations)
+        try:
+            user_is_moderator = hasattr(conversation, 'moderators') and conversation.moderators.filter(id=request.user.id).exists()
+        except Exception as e:
+            logger.error(f"Error checking moderator status: {str(e)}")
+            user_is_moderator = False
+            
+        # For GET requests, allow if user is a participant
+        if request.method in permissions.SAFE_METHODS:
+            return user_is_participant
+            
+        # For PUT/PATCH/DELETE, check if it's the message owner or a moderator
+        if hasattr(obj, 'sender') and request.method in ['PUT', 'PATCH', 'DELETE']:
+            return obj.sender == request.user or user_is_moderator
+            
+        # For conversation-level actions, check moderator status
+        if hasattr(view, 'action') and view.action in ['add_participant', 'remove_participant', 'add_moderator', 'pin_message']:
+            return user_is_moderator
+            
+        # Default: allow if participant
+        return user_is_participant
+
+18)# messaging/routing.py
+from django.urls import re_path
+from . import consumers
+
+websocket_urlpatterns = [
+    re_path(
+        r"^ws/messaging/(?P<conversation_id>\w+)/$",
+        consumers.ConversationConsumer.as_asgi()
+    ),
+]
+
+19)# messaging/signals.py
+from django.db.models.signals import post_save, post_delete, pre_save
+from django.dispatch import receiver
+from django.utils import timezone
+from django.core.cache import cache
+import logging
+
+# Add new imports for WebSocket updates
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from .models.one_to_one import OneToOneMessage
+from .models.group import GroupMessage
+from .models.chatbot import ChatbotMessage
+from .models.base import BaseMessage
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_delete, sender=OneToOneMessage)
+@receiver(post_delete, sender=GroupMessage)
+@receiver(post_delete, sender=ChatbotMessage)
+def update_conversation_on_message_change_delete(sender, instance, **kwargs):
+    conversation = instance.conversation
+    conversation.last_activity = timezone.now()
+    conversation.save()
+
+
+@receiver(pre_save, sender=BaseMessage)
+def handle_message_edit(sender, instance, **kwargs):
+    """Handle message edit tracking"""
+    try:
+        if instance.pk:  # Only for existing messages
+            old_instance = sender.objects.get(pk=instance.pk)
+
+            # Check if content changed
+            if old_instance.content != instance.content:
+                # Clear cache
+                cache_key = f"message_edit_history_{instance.id}"
+                cache.delete(cache_key)
+
+                # Log edit
+                logger.info(
+                    f"Message {instance.id} edited by {instance.edited_by}"
+                    f" at {instance.edited_at}"
+                )
+
+    except Exception as e:
+        logger.error(f"Error handling message edit: {str(e)}", exc_info=True)
+
+
+@receiver(post_save, sender=BaseMessage)
+def handle_message_reaction(sender, instance, created, **kwargs):
+    """Handle reaction caching"""
+    try:
+        if not created and hasattr(instance, "reactions"):
+            # Update reactions cache
+            cache_key = f"message_reactions_{instance.id}"
+            cache.set(cache_key, instance.reactions, timeout=3600)
+
+    except Exception as e:
+        logger.error(f"Error handling message reaction: {str(e)}", exc_info=True)
+
+20)# messaging/tasks.py
+from celery import shared_task
+from .models.chatbot import ChatbotMessage
+from .services.chatbot import chatbot_service
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def exponential_backoff(retries):
+    """Calculate exponential backoff delay in seconds"""
+    return 2**retries * 60  # 1min, 2min, 4min, etc.
+
+
+@shared_task(
+    bind=True, autoretry_for=(Exception,), max_retries=3, countdown=exponential_backoff
+)
+def process_chatbot_response(self, conversation_id, message_id):
+    """
+    Process chatbot response asynchronously with error handling and retries.
+    Uses exponential backoff for retries.
+    """
+    try:
+        # Get the user's message and conversation
+        user_message = ChatbotMessage.objects.get(id=message_id)
+        conversation = user_message.conversation
+
+        # Get conversation history (last 10 messages) in chronological order
+        history = list(
+            conversation.messages.filter(timestamp__lt=user_message.timestamp).order_by(
+                "-timestamp"
+            )[:10]
+        )
+        history.reverse()  # Put in chronological order
+
+        # Format history for chatbot service
+        formatted_history = [
+            {
+                "content": msg.content,
+                "is_bot": msg.is_bot,
+                "sender": "Samantha" if msg.is_bot else user_message.sender.username,
+            }
+            for msg in history
+        ]
+
+        # Get chatbot response
+        response = chatbot_service.get_response(
+            message=user_message.content, history=formatted_history
+        )
+
+        if not response["success"]:
+            logger.error(f"Chatbot service error: {response.get('error')}")
+            error_message = response["response"]  # Use provided fallback message
+        else:
+            error_message = None
+
+        # Create bot response message
+        ChatbotMessage.objects.create(
+            conversation=conversation,
+            content=error_message or response["response"],
+            is_bot=True,
+            metadata={
+                "error": bool(error_message),
+                "attempt": self.request.retries + 1,
+            },
+        )
+
+    except ChatbotMessage.DoesNotExist:
+        logger.error(f"Message {message_id} not found")
+        raise
+    except Exception as e:
+        logger.error(f"Chatbot processing failed: {str(e)}")
+        # Retry with exponential backoff
+        raise self.retry(exc=e)
+
+# Removed redundant exponential_backoff function definition
+
+21)# messaging/throttling.py
+from rest_framework.throttling import UserRateThrottle
+from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class BaseMessageThrottle(UserRateThrottle):
+    """Base throttle class for messaging rate limits"""
+
+    def get_cache_key(self, request, view):
+        """Get cache key with enhanced staff and premium user handling"""
+        user = request.user
+
+        # No throttling for staff or premium users
+        if user.is_staff or getattr(user, "is_premium", False):
+            return None
+
+        # Get custom rate for user type if defined
+        if hasattr(user, "user_type"):
+            custom_rate = settings.USER_TYPE_THROTTLE_RATES.get(user.user_type)
+            if custom_rate:
+                self.rate = custom_rate
+
+        return super().get_cache_key(request, view)
+
+    def allow_request(self, request, view):
+        """Enhanced allowance check with logging"""
+        allowed = super().allow_request(request, view)
+
+        if not allowed:
+            logger.warning(
+                f"Rate limit exceeded for user {request.user.id} "
+                f"in scope {self.scope}"
+            )
+
+        return allowed
+
+
+class MessageRateThrottle(BaseMessageThrottle):
+    """General message rate throttling"""
+
+    scope = "message_default"
+    rate = settings.THROTTLE_RATES.get("message_default", "60/minute")
+
+
+class TypingIndicatorThrottle(BaseMessageThrottle):
+    """Throttle for typing indicator updates"""
+
+    scope = "typing"
+    rate = settings.THROTTLE_RATES.get("typing", "30/minute")
+
+
+class ChatbotRateThrottle(BaseMessageThrottle):
+    """Chatbot-specific rate throttling"""
+
+    scope = "chatbot"
+    rate = settings.THROTTLE_RATES.get("chatbot", "30/minute")
+
+
+class GroupMessageThrottle(BaseMessageThrottle):
+    """Group message rate throttling"""
+    scope = "group_message"
+    rate = settings.THROTTLE_RATES.get("group_message", "10/min")
+
+
+class OneToOneMessageThrottle(BaseMessageThrottle):
+    """One-to-one message rate throttling"""
+
+    scope = "one_to_one_message"
+    rate = settings.THROTTLE_RATES.get("one_to_one_message", "200/hour")
+
+
+class BurstMessageThrottle(BaseMessageThrottle):
+    """Burst message prevention"""
+
+    scope = "burst_message"
+    rate = settings.THROTTLE_RATES.get("burst_message", "10/minute")
+
+22)# messaging/urls.py
+from django.urls import path
+from .views.one_to_one import OneToOneConversationViewSet, OneToOneMessageViewSet
+from .views.group import GroupConversationViewSet, GroupMessageViewSet
+from .views.chatbot import ChatbotConversationViewSet
+
+# One-to-One Messaging
+one_to_one_conversation_list = OneToOneConversationViewSet.as_view(
+    {"get": "list", "post": "create"}
+)
+one_to_one_conversation_detail = OneToOneConversationViewSet.as_view(
+    {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+)
+one_to_one_message_list = OneToOneMessageViewSet.as_view(
+    {"get": "list", "post": "create"}
+)
+one_to_one_message_detail = OneToOneMessageViewSet.as_view(
+    {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+)
+
+# Group Messaging
+group_conversation_list = GroupConversationViewSet.as_view(
+    {"get": "list", "post": "create"}
+)
+group_conversation_detail = GroupConversationViewSet.as_view(
+    {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+)
+group_message_list = GroupMessageViewSet.as_view({"get": "list", "post": "create"})
+group_message_detail = GroupMessageViewSet.as_view(
+    {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+)
+
+# Chatbot
+chatbot_conversation_create = ChatbotConversationViewSet.as_view({"post": "create"})
+chatbot_conversation_detail = ChatbotConversationViewSet.as_view({"get": "retrieve"})
+chatbot_send_message = ChatbotConversationViewSet.as_view({"post": "send_message"})
+
+urlpatterns = [
+    # One-to-One Messaging
+    path(
+        "one_to_one/", one_to_one_conversation_list, name="one-to-one-conversation-list"
+    ),
+    path(
+        "one_to_one/<int:pk>/",
+        one_to_one_conversation_detail,
+        name="one-to-one-conversation-detail",
+    ),
+    path(
+        "one_to_one/messages/", one_to_one_message_list, name="one-to-one-message-list"
+    ),
+    path(
+        "one_to_one/messages/<int:pk>/",
+        one_to_one_message_detail,
+        name="one-to-one-message-detail",
+    ),
+    # One-to-One Message Actions
+    path(
+        "one_to_one/messages/<int:pk>/reactions/",
+        OneToOneMessageViewSet.as_view(
+            {"post": "add_reaction", "delete": "remove_reaction"}
+        ),
+        name="one-to-one-message-reactions",
+    ),
+    path(
+        "one_to_one/messages/<int:pk>/edit_history/",
+        OneToOneMessageViewSet.as_view({"get": "edit_history"}),
+        name="one-to-one-message-edit-history",
+    ),
+    path(
+        "one_to_one/<int:pk>/typing/",
+        OneToOneConversationViewSet.as_view({"post": "typing"}),
+        name="one-to-one-typing",
+    ),
+    path(
+        "one_to_one/<int:pk>/search/",
+        OneToOneConversationViewSet.as_view({"get": "search"}),
+        name="one-to-one-search",
+    ),
+    # Group Messaging
+    path("groups/", group_conversation_list, name="group-conversation-list"),
+    path(
+        "groups/<int:pk>/", group_conversation_detail, name="group-conversation-detail"
+    ),
+    path("groups/messages/", group_message_list, name="group-message-list"),
+    path(
+        "groups/messages/<int:pk>/", group_message_detail, name="group-message-detail"
+    ),
+    # Group Participant Management (ADD THESE ENDPOINTS)
+    path(
+        "groups/<int:pk>/add_participant/",
+        GroupConversationViewSet.as_view({"post": "add_participant"}),
+        name="group-add-participant",
+    ),
+    path(
+        "groups/<int:pk>/remove_participant/",
+        GroupConversationViewSet.as_view({"post": "remove_participant"}),
+        name="group-remove-participant",
+    ),
+    path(
+        "groups/<int:pk>/add_moderator/",
+        GroupConversationViewSet.as_view({"post": "add_moderator"}),
+        name="group-add-moderator",
+    ),
+    path(
+        "groups/<int:pk>/moderators/",
+        GroupConversationViewSet.as_view({"get": "moderators"}),
+        name="group-moderators",
+    ),
+    path(
+        "groups/<int:pk>/pin_message/",
+        GroupConversationViewSet.as_view({"post": "pin_message"}),
+        name="group-pin-message",
+    ),
+    # Group Message Actions
+    path(
+        "groups/messages/<int:pk>/reactions/",
+        GroupMessageViewSet.as_view(
+            {"post": "add_reaction", "delete": "remove_reaction"}
+        ),
+        name="group-message-reactions",
+    ),
+    path(
+        "groups/messages/<int:pk>/edit_history/",
+        GroupMessageViewSet.as_view({"get": "edit_history"}),
+        name="group-message-edit-history",
+    ),
+    path(
+        "groups/anonymous/",
+        GroupConversationViewSet.as_view({"post": "create_anonymous"}),
+        name="create-anonymous-group",
+    ),
+    # Chatbot
+    path("chatbot/", chatbot_conversation_create, name="chatbot-conversation-create"),
+    path(
+        "chatbot/<int:pk>/",
+        chatbot_conversation_detail,
+        name="chatbot-conversation-detail",
+    ),
+    path(
+        "chatbot/<int:pk>/send_message/",
+        chatbot_send_message,
+        name="chatbot-send-message",
+    ),
+]
+
