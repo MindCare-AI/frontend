@@ -1,9 +1,11 @@
+//screens/SettingsScreen/hooks/useProfile.ts
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { usePatientProfile } from './patient/usePatientProfile';
 import { useTherapistProfile } from './therapist/useTherapistProfile';
 import { useAuth } from '../../../contexts/AuthContext';
 import { API_URL } from '../../../config';
+import axios from 'axios';
 
 type UserType = 'patient' | 'therapist' | '';
 
@@ -92,6 +94,13 @@ interface ProfileResponse {
   results: Array<ProfileType & { unique_id: string }>;
 }
 
+interface ProfileDetailResponse {
+  id: number;
+  unique_id: string;
+  user: number;
+  // other profile fields...
+}
+
 type ProfileType = PatientProfile | TherapistProfile;
 
 const normalizeId = (id: string | number): number => {
@@ -114,11 +123,8 @@ export const useProfile = (): ProfileHookReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [fetchCount, setFetchCount] = useState(0); // Add fetch counter
-
-  const userId = user?.id;
-  const profileId = user?.patient_profile?.unique_id || user?.therapist_profile?.unique_id;
-
+  const [fetchCount, setFetchCount] = useState(0);
+  
   const patientProfileData = usePatientProfile();
   const therapistProfileData = useTherapistProfile();
 
@@ -126,183 +132,95 @@ export const useProfile = (): ProfileHookReturn => {
     () => ((user?.user_type || '') as UserType).toLowerCase(),
     [user?.user_type]
   );
-
-  const userType = useMemo(() => 
-    normalizedUserType === 'patient' ? 'patient' : 'therapist', 
-    [normalizedUserType]
-  );
-
-  const fetchProfile = useCallback(async () => {
-    // Prevent duplicate fetches
-    if (loading || isInitialized) return;
-    
-    setLoading(true);
-    setError(null);
-
+  
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 1000;
+  
+  const fetchWithRetry = async (retries = 0): Promise<any> => {
+    if (!user || !accessToken) throw new Error('User or token missing');
     try {
-      if (!user?.id || !accessToken) {
-        throw new Error('No user ID or access token available');
-      }
-
-      const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
-      let profilesUrl = '';
-      let profileId = '';
-
-      if (normalizedUserType === 'patient' || user?.patient_profile) {
-        profilesUrl = `${baseUrl}/patient/profiles`;
-        profileId = user?.patient_profile?.unique_id || '';
-      } else if (normalizedUserType === 'therapist' || user?.therapist_profile) {
-        profilesUrl = `${baseUrl}/therapist/profiles`;
-        profileId = user?.therapist_profile?.unique_id || '';
-      } else {
-        throw new Error('Invalid user type');
-      }
-
-      // Only try UUID endpoint if we have a valid UUID
-      if (profileId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-        console.log("Fetching profile detail from:", `${profilesUrl}/${profileId}/`);
-        const detailResponse = await fetch(`${profilesUrl}/${profileId}/`, {
+      const response = await fetch(
+        `${API_URL}/${user.user_type}/profiles/?user=${user.id}`,
+        {
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
-          }
-        });
-
-        if (detailResponse.ok) {
-          const profileData = await detailResponse.json();
-          setProfile(profileData);
-          setIsInitialized(true);
-          return;
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/json',
+          },
         }
-      }
-
-      // Fallback to list endpoint
-      console.log("Fetching profiles list from:", profilesUrl);
-      const response = await fetch(profilesUrl, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
-
+      );
+      
       if (!response.ok) {
-        throw new Error(`Failed to fetch profiles list: ${response.statusText}`);
+        throw new Error('Profile not ready');
       }
-
-      const data: ProfileResponse = await response.json();
-      if (data.results.length > 0) {
-        setProfile(data.results[0]);
-        // Update user with correct UUID if needed and different from current
-        if (updateUser && user && data.results[0].unique_id !== profileId) {
-          await updateUser({
-            ...user,
-            [`${normalizedUserType}_profile`]: {
-              unique_id: data.results[0].unique_id
-            }
-          });
-        }
+      
+      const data = await response.json();
+      if (!data.results || data.results.length === 0) {
+        throw new Error('Profile not ready');
       }
-      setIsInitialized(true);
+      
+      return data.results[0];
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      setError(message);
-      console.error('Profile fetch error:', error);
-    } finally {
-      setLoading(false);
+      if (retries < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return fetchWithRetry(retries + 1);
+      }
+      throw error;
     }
-  }, [accessToken, user?.id, normalizedUserType, updateUser, loading, isInitialized]);
-
-  // Single effect for initialization
+  };
+  
+  const fetchProfile = useCallback(async () => {
+    if (!user?.user_type) {
+      console.log('No user type - allowing onboarding');
+      return; // Preserve onboarding flow
+    }
+  
+    try {
+      const profileData = await fetchWithRetry();
+      setProfile(profileData);
+      setError(null);
+    } catch (error) {
+      console.error('Profile fetch error:', error);
+      setError('Profile setup incomplete - finish onboarding');
+    }
+  }, [accessToken]);
+  
+  // Single initialization effect
   useEffect(() => {
-    if (!isInitialized && user?.id && accessToken) {
+    if (isInitialized && user?.id) {
       fetchProfile();
     }
-  }, [fetchProfile, isInitialized, user?.id, accessToken]);
-
+  }, []);
+  
   // Reset state when user changes
   useEffect(() => {
-    if (!user?.id) {
-      setIsInitialized(false);
-      setProfile(null);
-      setError(null);
-    }
+    setFetchCount(0);
+    setIsInitialized(false);
+    setProfile(null);
+    setError(null);
   }, [user?.id]);
-
-  const linkProfile = useCallback(async (user: UserData) => {
-    if (user.patient_profile || user.therapist_profile) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/profiles/link/${user.id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to link profile');
-      }
-
-      const linkedProfile = await response.json();
-      
-      if (updateUser) {
-        await updateUser({
-          ...user,
-          id: user.id.toString(), // Convert id to string to match User interface
-          [`${user.user_type}_profile`]: {
-            unique_id: linkedProfile.id.toString(),
-            id: linkedProfile.id.toString(), // Convert id to string
-          },
-        });
-      }
-    } catch (err) {
-      console.error('Error linking profile:', err);
-      throw err;
-    }
-  }, [accessToken, updateUser]);
-
-  // Update the return statements
+  
   if (normalizedUserType === 'patient' || (normalizedUserType === '' && user?.patient_profile)) {
-    const patientData = patientProfileData || {
-      profile: null,
-      loading: false,
-      error: null,
-      saveProfile: async () => null
-    };
-
     return {
-      ...patientData,
-      profile,
+      ...patientProfileData,
+      profile: profile as PatientProfile | null,
       loading,
       error,
-      saveProfile: patientData.saveProfile,
       refetch: fetchProfile,
       userType: 'patient' as UserType,
     };
   }
-
+  
   if (normalizedUserType === 'therapist' || (normalizedUserType === '' && user?.therapist_profile)) {
-    const therapistData = therapistProfileData || {
-      profile: null,
-      loading: false,
-      error: null,
-      saveProfile: async () => null
-    };
-
     return {
-      ...therapistData,
-      profile,
+      ...therapistProfileData,
+      profile: profile as TherapistProfile | null,
       loading,
       error,
-      saveProfile: therapistData.saveProfile,
       refetch: fetchProfile,
       userType: 'therapist' as UserType,
     };
   }
-
-  // Default return
+  
   return {
     profile: null,
     loading,

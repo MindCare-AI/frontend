@@ -1,3 +1,4 @@
+//screens/SettingsScreen/components/NotificationPreferencesSection.tsx
 import React from 'react';
 import { View } from 'react-native';
 import { Surface, Text, Switch, Divider } from 'react-native-paper';

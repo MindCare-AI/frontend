@@ -52,7 +52,7 @@ export const usePatientProfile = () => {
         return null;
       }
 
-      // If we have a profile ID, fetch directly using unique_id
+      // Use unique_id (UUID) instead of numeric ID
       if (user.patient_profile?.unique_id) {
         const response = await fetch(
           `${API_URL}/patient/profiles/${user.patient_profile.unique_id}/`,
@@ -72,7 +72,7 @@ export const usePatientProfile = () => {
         }
       }
 
-      // If no direct profile, try list endpoint
+      // Fallback: Try to list all profiles and match the user if unique_id isn't available
       const listResponse = await fetch(
         `${API_URL}/patient/profiles/`,
         {
@@ -88,16 +88,16 @@ export const usePatientProfile = () => {
       }
 
       const data = await listResponse.json();
-      const matchingProfile = data.results.find((p: PatientProfile) => 
-        p.user === (typeof user.id === 'string' ? parseInt(user.id, 10) : user.id)
+      const matchingProfile = data.results.find(
+        (p: PatientProfile) =>
+          p.user === (typeof user.id === 'string' ? parseInt(user.id, 10) : user.id)
       );
       
       if (matchingProfile && updateUser) {
-        // Update user with only the allowed profile properties
         await updateUser({
           ...user,
           patient_profile: {
-            unique_id: matchingProfile.unique_id // Only use unique_id as per User interface
+            unique_id: matchingProfile.unique_id
           }
         });
         
@@ -123,7 +123,6 @@ export const usePatientProfile = () => {
       setLoading(true);
       setError(null);
 
-      // Check auth silently without throwing
       if (!accessToken || !user?.patient_profile?.unique_id) {
         setError('Authentication required or patient profile not available');
         setLoading(false);
@@ -132,19 +131,13 @@ export const usePatientProfile = () => {
 
       const formData = new FormData();
 
-      // Append all fields from the updatedProfile to formData
       Object.entries(updatedProfile).forEach(([key, value]) => {
         if (value !== undefined) {
           if (key === 'profile_pic' && typeof value === 'string') {
-            // If profile_pic is a URL, append as is
             formData.append(key, value);
           } else if (key === 'emergency_contact' && typeof value === 'object' && value !== null) {
-            // Handle nested emergency_contact object
-            Object.entries(value).forEach(([ecKey, ecValue]) => {
-              if (ecValue !== undefined) {
-                formData.append(`emergency_contact.${ecKey}`, ecValue as string);
-              }
-            });
+            // Stringify emergency_contact as JSON
+            formData.append('emergency_contact', JSON.stringify(value));
           } else {
             formData.append(key, value as any);
           }
@@ -157,7 +150,7 @@ export const usePatientProfile = () => {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
-            // Do not specify Content-Type when sending FormData
+            // Do not set Content-Type when sending FormData
           },
           body: formData,
         }

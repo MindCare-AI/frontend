@@ -4,6 +4,35 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosResponse } from 'axios';
 import { API_URL } from '../config';
 
+// Add these interfaces at the top of your file
+
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: any;
+  config: any;
+}
+
+interface ProfileListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Array<{
+    unique_id: string;
+    user: number;
+    // other profile fields...
+  }>;
+}
+
+interface UserResponse {
+  id: number;
+  email: string;
+  username: string;
+  user_type: 'patient' | 'therapist' | '';
+  // other user fields...
+}
+
 // Define interfaces for API responses
 interface PatientProfileResponse {
   count: number;
@@ -98,26 +127,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authState.accessToken) return null;
     
     try {
-      console.log("Fetching user data with token:", authState.accessToken.substring(0, 10) + "...");
-      
-      const response: AxiosResponse<User> = await axios.get(`${API_URL}/users/me/`, {
+      // Properly type the user response
+      const response = await axios.get<UserResponse>(`${API_URL}/users/me/`, {
         headers: {
           Authorization: `Bearer ${authState.accessToken}`
         }
       });
       
-      const userData = {
+      const userData: User = {
         ...response.data,
+        id: response.data.id.toString(), // convert number to string
         user_type: response.data.user_type || '' // Preserve empty string for onboarding
       };
       
-      console.log("User data from API (with type):", userData);
-      
-      // Only fetch profile if user has a type (don't block onboarding)
-      if (userData.user_type === 'patient') {
+      // Only attempt to fetch profile if user has a type
+      if (userData.user_type) {
         try {
-          const profileResponse: AxiosResponse<PatientProfileResponse> = await axios.get(
-            `${API_URL}/patient/profiles/`,
+          // Properly type the profile response
+          const profileResponse = await axios.get<ProfileListResponse>(
+            `${API_URL}/${userData.user_type}/profiles/`,
             {
               headers: {
                 Authorization: `Bearer ${authState.accessToken}`
@@ -125,50 +153,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           );
           
-          console.log("Patient profiles response:", JSON.stringify(profileResponse.data));
-          
           if (profileResponse.data.results?.length > 0) {
-            // Use the correct unique_id from the profile
-            userData.patient_profile = {
-              unique_id: profileResponse.data.results[0].unique_id // Use unique_id instead of id
-            };
-            console.log("Added patient profile ID:", userData.patient_profile);
-          } else {
-            // Create new profile only if user has type but no profile
-            console.log("Creating new patient profile...");
-            try {
-              const profileData = {
-                first_name: userData.username || '',
-                last_name: '',
-                // ...other profile fields...
+            // Find the profile belonging to this user
+            const userProfile = profileResponse.data.results.find(
+              profile => profile.user.toString() === userData.id
+            );
+            
+            if (userProfile) {
+              userData[`${userData.user_type}_profile`] = {
+                unique_id: userProfile.unique_id
               };
-              
-              const newProfileResponse = await axios.post<NewPatientProfileResponse>(
-                `${API_URL}/patient/profiles/`,
-                profileData,
-                {
-                  headers: {
-                    Authorization: `Bearer ${authState.accessToken}`
-                }
-              });
-              
-              // Store the correct unique_id from the new profile
-              userData.patient_profile = {
-                unique_id: newProfileResponse.data.unique_id // Use unique_id from response
-              };
-            } catch (createError) {
-              console.error("Error creating patient profile:", createError);
             }
+          } else {
+            // Create a new profile if none exists
+            const newProfileResponse = await axios.post<NewPatientProfileResponse>(
+              `${API_URL}/patient/profiles/`,
+              {
+                // Provide the required payload for profile creation
+                user_name: userData.username || 'new-patient',
+                first_name: '',
+                last_name: ''
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${authState.accessToken}`
+                }
+              }
+            );
+
+            // Store the UUID correctly (not the numeric id)
+            userData.patient_profile = {
+              unique_id: newProfileResponse.data.unique_id
+            };
           }
         } catch (profileError) {
-          console.error("Error fetching patient profiles:", profileError);
+          console.error("Profile fetch error (non-critical):", profileError);
+          // Don't fail completely - allow onboarding to continue
         }
       }
       
-      // Save user data without modifying user_type
       setUser(userData);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
-      
       return userData;
     } catch (error) {
       console.error('Error fetching user data:', error);

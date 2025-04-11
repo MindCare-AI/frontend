@@ -1,0 +1,1412 @@
+1)# users/models/preferences.py
+from django.db import models
+from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class UserPreferences(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences"
+    )
+    dark_mode = models.BooleanField(default=False)
+    language = models.CharField(max_length=10, default="en")
+    # Structured notification preferences instead of a JSON field:
+    email_notifications = models.BooleanField(
+        default=True,  # changed code
+        help_text="Enable email notifications",
+    )
+    in_app_notifications = models.BooleanField(
+        default=True,  # changed code
+        help_text="Enable in-app notifications",
+    )
+    disabled_notification_types = models.ManyToManyField(
+        "notifications.NotificationType", blank=True
+    )
+
+    def get_notification_settings(self):
+        settings_list = [
+            f"Email: {'enabled' if self.email_notifications else 'disabled'}",
+            f"In-App: {'enabled' if self.in_app_notifications else 'disabled'}",
+        ]
+        disabled = list(
+            self.disabled_notification_types.all().values_list("name", flat=True)
+        )
+        if disabled:
+            settings_list.append("Disabled Types: " + ", ".join(disabled))
+        return "; ".join(settings_list)
+
+    get_notification_settings.short_description = "Notifications"
+
+    def is_notification_allowed(self, notification_type, channel):
+        """
+        Check if a specific notification is allowed.
+        :param notification_type: NotificationType instance.
+        :param channel: 'email' or 'in_app'
+        :return: bool
+        """
+        if channel == "email" and not self.email_notifications:
+            return False
+        if channel == "in_app" and not self.in_app_notifications:
+            return False
+
+        return not self.disabled_notification_types.filter(
+            pk=notification_type.pk
+        ).exists()
+
+    def get_notification_preferences(self):
+        """Structured format for API responses."""
+        return {
+            "email_enabled": self.email_notifications,
+            "in_app_enabled": self.in_app_notifications,
+            "disabled_types": list(
+                self.disabled_notification_types.all().values_list("name", flat=True)
+            ),
+        }
+
+    class Meta:
+        verbose_name_plural = "User preferences"
+        indexes = [
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username}'s Preferences"
+
+2)# users/models/profile.py
+from django.db import models
+from .user import CustomUser
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    bio = models.TextField(blank=True, null=True)
+    profile_pic = models.ImageField(upload_to="profile_pics/", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+3)# users/models/settings.py
+from django.db import models
+from django.conf import settings
+import pytz
+
+class UserSettings(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='settings'
+    )
+    timezone = models.CharField(
+        max_length=50,
+        default='UTC',
+        choices=[(tz, tz) for tz in pytz.common_timezones]
+    )
+    theme_preferences = models.JSONField(default=dict)
+    privacy_settings = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User Settings'
+        verbose_name_plural = 'User Settings'
+
+    def __str__(self):
+        return f"Settings for {self.user.username}"
+
+4)# users/models/user.py
+from django.db import models, transaction
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+import logging
+from model_utils import FieldTracker
+from django.apps import apps
+from therapist.models.appointment import Appointment
+
+logger = logging.getLogger(__name__)
+
+
+class CustomUser(AbstractUser):
+    USER_TYPE_CHOICES = [
+        ("patient", "Patient"),
+        ("therapist", "Therapist"),
+    ]
+
+    user_type = models.CharField(
+        max_length=10,
+        choices=USER_TYPE_CHOICES,
+        blank=True,
+        null=True,
+        default="patient",
+    )
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    crisis_alert_enabled = models.BooleanField(default=True)
+    passcode_enabled = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    tracker = FieldTracker(
+        ["user_type", "email", "phone_number", "crisis_alert_enabled"]
+    )
+
+    REQUIRED_FIELDS = ["email"]
+
+    class Meta:
+        db_table = "users_user"
+        verbose_name = "User"
+        verbose_name_plural = "Users"
+        ordering = ["-date_joined"]
+
+    def __str__(self):
+        return self.email
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        """Save user and create corresponding profile if needed"""
+        creating = self._state.adding
+        old_type = None
+
+        if not creating:
+            try:
+                old_type = type(self).objects.get(pk=self.pk).user_type
+            except type(self).DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
+        # Handle profile creation/updates
+        if creating and self.user_type:
+            self._create_profile()
+        elif not creating and old_type != self.user_type:
+            self._handle_user_type_change(old_type)
+
+    def get_profile_model(self, user_type):
+        """Get the appropriate profile model based on user type"""
+        if user_type == "patient":
+            return apps.get_model("patient", "PatientProfile")
+        elif user_type == "therapist":
+            return apps.get_model("therapist", "TherapistProfile")
+        return None
+
+    def _create_profile(self):
+        """Create corresponding profile based on user type"""
+        try:
+            ProfileModel = self.get_profile_model(self.user_type)
+            if ProfileModel:
+                ProfileModel.objects.create(user=self)
+        except Exception as e:
+            logger.error(f"Error creating profile for user {self.id}: {str(e)}")
+            raise
+
+    def _handle_user_type_change(self, old_type):
+        """Handle user type changes by updating profiles"""
+        try:
+            # Delete old profile and dependent appointments
+            OldProfileModel = self.get_profile_model(old_type)
+            if OldProfileModel:
+                if old_type == "therapist":
+                    # Delete appointments linked to the old therapist profile
+                    Appointment.objects.filter(
+                        therapist=self.therapist_profile
+                    ).delete()
+                elif old_type == "patient":
+                    # Delete appointments linked to the old patient profile
+                    Appointment.objects.filter(patient=self.patient_profile).delete()
+                OldProfileModel.objects.filter(user=self).delete()
+
+            # Create new profile if needed
+            if self.user_type:
+                self._create_profile()
+        except Exception as e:
+            logger.error(
+                f"Error handling user type change for user {self.id}: {str(e)}"
+            )
+            raise
+
+5)# users/permissions/user.py
+from rest_framework import permissions
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class IsSuperUserOrSelf(permissions.BasePermission):
+    """
+    Permission class to allow only superusers or the user themselves to access an object.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        # Superusers always have permission
+        if request.user.is_superuser:
+            return True
+
+        # Check if object has a user attribute or is a user object
+        if hasattr(obj, "user"):
+            is_self = obj.user == request.user
+        else:
+            is_self = obj == request.user
+
+        logger.debug(
+            f"Permission check: user={request.user.username}, is_self={is_self}"
+        )
+        return is_self
+
+6)# users/serializers/preferences.py
+from rest_framework import serializers
+from django.db.models import Q
+from users.models.preferences import UserPreferences
+from notifications.models import NotificationType  # Adjust import as needed
+
+
+class UserPreferencesSerializer(serializers.ModelSerializer):
+    dark_mode = serializers.BooleanField(
+        help_text="Enable or disable dark mode theme",
+        label="Dark Mode",
+        style={"base_template": "checkbox.html"},
+    )
+
+    language = serializers.ChoiceField(
+        choices=[
+            ("en", "English"),
+            ("fr", "French"),
+            ("es", "Spanish"),
+            ("ar", "Arabic"),
+        ],
+        help_text="Select your preferred language",
+        label="Language",
+        style={"base_template": "select.html"},
+    )
+
+    notification_preferences = serializers.JSONField(
+        help_text="Configure your notification settings (e.g., {'email': true, 'push': false})",
+        label="Notification Settings",
+        style={"base_template": "textarea.html", "rows": 4},
+        default=dict,
+    )
+
+    disabled_notification_types = serializers.SlugRelatedField(
+        many=True,
+        slug_field="name",
+        queryset=NotificationType.objects.all(),
+        help_text="Specific notification types to disable",
+    )
+
+    class Meta:
+        model = UserPreferences
+        fields = [
+            "dark_mode",
+            "language",
+            "email_notifications",
+            "in_app_notifications",
+            "disabled_notification_types",
+            "notification_preferences",  # add this line
+        ]
+        read_only_fields = ["user"]
+
+    def validate_notification_preferences(self, value):
+        """Validate notification preferences structure"""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError(
+                "Notification preferences must be an object"
+            )
+        return value
+
+    def validate(self, data):
+        # Ensure users can't disable notifications they don't have access to
+        if "disabled_notification_types" in data:
+            user = self.context["request"].user
+            valid_types = NotificationType.objects.filter(
+                Q(is_global=True) | Q(groups__in=user.groups.all())
+            ).distinct()
+            valid_set = set(valid_types)
+            provided_set = set(data["disabled_notification_types"])
+            invalid_types = provided_set - valid_set
+            if invalid_types:
+                invalid_names = ", ".join([nt.name for nt in invalid_types])
+                raise serializers.ValidationError(
+                    f"Invalid notification types: {invalid_names}"
+                )
+        return data
+
+7)# users/serializers/profile.py
+from rest_framework import serializers
+from patient.models.patient_profile import PatientProfile  # Updated import
+from therapist.models.therapist_profile import TherapistProfile
+from users.validators.user_validators import (
+    validate_profile_pic,
+    validate_emergency_contact,
+    validate_blood_type,
+)
+
+
+class PatientProfileSerializer(serializers.ModelSerializer):
+    GENDER_CHOICES = [
+        ("M", "Male"),
+        ("F", "Female"),
+        ("O", "Other"),
+        ("N", "Prefer not to say"),
+    ]
+
+    profile_pic = serializers.ImageField(
+        validators=[validate_profile_pic], required=False
+    )
+    emergency_contact = serializers.JSONField(
+        validators=[validate_emergency_contact], required=False
+    )
+    blood_type = serializers.CharField(validators=[validate_blood_type], required=False)
+    gender = serializers.ChoiceField(choices=GENDER_CHOICES, required=False)
+
+    class Meta:
+        model = PatientProfile
+        fields = [
+            "id",
+            "bio",
+            "profile_pic",
+            "emergency_contact",
+            "medical_history",
+            "current_medications",
+            "blood_type",
+            "treatment_plan",
+            "pain_level",
+            "gender",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class TherapistProfileSerializer(serializers.ModelSerializer):
+    AVAILABILITY_STATUS = [
+        ("ACTIVE", "Active"),
+        ("AWAY", "Away"),
+        ("BUSY", "Busy"),
+        ("OFFLINE", "Offline"),
+    ]
+
+    profile_pic = serializers.ImageField(
+        validators=[validate_profile_pic], required=False
+    )
+    profile_completion_percentage = serializers.IntegerField(read_only=True)
+    availability_status = serializers.ChoiceField(
+        choices=AVAILABILITY_STATUS, default="ACTIVE"
+    )
+
+    class Meta:
+        model = TherapistProfile
+        fields = [
+            "id",
+            "bio",
+            "profile_pic",
+            "specialization",
+            "license_number",
+            "years_of_experience",
+            "treatment_approaches",
+            "available_days",
+            "license_expiry",
+            "video_session_link",
+            "languages_spoken",
+            "availability_status",
+            "profile_completion_percentage",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "profile_completion_percentage",
+            "created_at",
+            "updated_at",
+        ]
+
+8)# users/serializers/settings.py
+from rest_framework import serializers
+from users.models.settings import UserSettings
+from django.conf import settings
+import pytz
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class UserSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSettings
+        fields = [
+            'id', 
+            'timezone', 
+            'theme_preferences', 
+            'privacy_settings',
+            'created_at',
+            'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_timezone(self, value):
+        try:
+            if value not in pytz.all_timezones:
+                raise serializers.ValidationError(
+                    f"Invalid timezone. Must be one of: {', '.join(pytz.common_timezones)}"
+                )
+            return value
+        except Exception as e:
+            logger.error(f"Timezone validation error: {str(e)}")
+            raise serializers.ValidationError("Invalid timezone format")
+
+    def validate_theme_preferences(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Theme preferences must be an object")
+        
+        mode = value.get('mode', '').upper()
+        valid_modes = ['LIGHT', 'DARK', 'SYSTEM']
+        if mode and mode not in valid_modes:
+            raise serializers.ValidationError(f"Theme mode must be one of: {', '.join(valid_modes)}")
+            
+        return value
+
+    def validate_privacy_settings(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Privacy settings must be an object")
+            
+        visibility = value.get('profile_visibility', '').upper()
+        valid_visibilities = ['PUBLIC', 'PRIVATE', 'CONTACTS_ONLY']
+        if visibility and visibility not in valid_visibilities:
+            raise serializers.ValidationError(f"Profile visibility must be one of: {', '.join(valid_visibilities)}")
+            
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        
+        if not data.get("theme_preferences"):
+            data["theme_preferences"] = getattr(settings, 'USER_SETTINGS', {}).get(
+                "DEFAULT_THEME", {"mode": "SYSTEM"}
+            )
+
+        if not data.get("privacy_settings"):
+            data["privacy_settings"] = getattr(settings, 'USER_SETTINGS', {}).get(
+                "DEFAULT_PRIVACY", {"profile_visibility": "PUBLIC"}
+            )
+
+        return data
+
+9)# users/serializers/user.py
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
+from .profile import PatientProfileSerializer, TherapistProfileSerializer
+from .preferences import UserPreferencesSerializer
+from .settings import UserSettingsSerializer
+
+import logging
+
+logger = logging.getLogger(__name__)
+CustomUser = get_user_model()
+
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    USER_STATUS_CHOICES = [
+        ("ACTIVE", "Active"),
+        ("INACTIVE", "Inactive"),
+        ("SUSPENDED", "Suspended"),
+        ("PENDING", "Pending Verification"),
+    ]
+
+    status = serializers.ChoiceField(
+        choices=USER_STATUS_CHOICES,
+        default="PENDING",
+        help_text="Current status of the user account",
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "created_at",
+            "date_joined",
+            "user_type",
+            "status",
+        ]
+        read_only_fields = ["user_type"]
+
+
+class UserTypeSerializer(serializers.ModelSerializer):
+    user_type = serializers.ChoiceField(
+        choices=CustomUser.USER_TYPE_CHOICES,
+        style={"base_template": "radio.html"},
+        help_text="Select your role in the system. This can only be set once.",
+        label="User Role",
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ["user_type"]
+        read_only_fields = ["id", "email"]  # Prevent other fields from being updated
+
+    def validate_user_type(self, value):
+        valid_types = [choice[0] for choice in CustomUser.USER_TYPE_CHOICES]
+        if value not in valid_types:
+            raise serializers.ValidationError(
+                f"Invalid user type. Must be one of: {', '.join(valid_types)}"
+            )
+        return value
+
+    def update(self, instance, validated_data):
+        instance.user_type = validated_data.get("user_type", instance.user_type)
+        instance.save()
+        return instance
+
+
+class UserSerializer(serializers.ModelSerializer):
+    patient_profile = PatientProfileSerializer(source="patientprofile", read_only=True)
+    therapist_profile = TherapistProfileSerializer(
+        source="therapistprofile", read_only=True
+    )
+    preferences = UserPreferencesSerializer(read_only=True)
+    settings = UserSettingsSerializer(read_only=True)
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id",
+            "username",
+            "email",
+            "user_type",
+            "phone_number",
+            "date_of_birth",
+            "preferences",
+            "settings",
+            "patient_profile",
+            "therapist_profile",
+        ]
+        read_only_fields = ["id", "date_joined", "last_login"]
+        extra_kwargs = {"password": {"write_only": True}}
+
+    def create(self, validated_data):
+        password = validated_data.pop("password", None)
+        user = CustomUser(**validated_data)
+        if password:
+            user.set_password(password)
+        user.save()
+        return user
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    ACCOUNT_TYPE_CHOICES = [
+        ("INDIVIDUAL", "Individual"),
+        ("ORGANIZATION", "Organization"),
+        ("PROFESSIONAL", "Professional"),
+    ]
+
+    password = serializers.CharField(
+        write_only=True,
+        style={
+            "input_type": "password",
+            "template": "rest_framework/vertical/password.html",
+            "placeholder": "********",
+        },
+        help_text="Enter a secure password with at least 8 characters",
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        style={
+            "input_type": "password",
+            "template": "rest_framework/vertical/password.html",
+            "placeholder": "********",
+        },
+        help_text="Re-enter your password for confirmation",
+    )
+    email = serializers.EmailField(
+        style={
+            "template": "rest_framework/vertical/input.html",
+            "placeholder": "user@example.com",
+            "autofocus": True,
+        },
+        help_text="Enter a valid email address. This will be used for login.",
+    )
+    user_type = serializers.ChoiceField(
+        choices=CustomUser.USER_TYPE_CHOICES,
+        style={
+            "base_template": "radio.html",
+            "template": "rest_framework/vertical/radio.html",
+            "inline": True,
+        },
+        help_text="Select your role in the system",
+        label="User Role",
+    )
+    account_type = serializers.ChoiceField(
+        choices=ACCOUNT_TYPE_CHOICES,
+        default="INDIVIDUAL",
+        style={
+            "base_template": "select.html",
+            "template": "rest_framework/vertical/select.html",
+        },
+        help_text="Select your account type",
+        required=False,
+    )
+    first_name = serializers.CharField(
+        required=False,
+        style={"template": "rest_framework/vertical/input.html", "placeholder": "John"},
+        help_text="Your first name",
+    )
+    last_name = serializers.CharField(
+        required=False,
+        style={"template": "rest_framework/vertical/input.html", "placeholder": "Doe"},
+        help_text="Your last name",
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = (
+            "email",
+            "username",
+            "password",
+            "confirm_password",
+            "first_name",
+            "last_name",
+            "user_type",
+            "account_type",
+        )
+        extra_kwargs = {
+            "password": {"write_only": True},
+            "email": {"required": True},
+            "user_type": {"required": True},
+            "username": {
+                "help_text": "Choose a unique username. If not provided, email will be used.",
+                "required": False,
+                "style": {
+                    "template": "rest_framework/vertical/input.html",
+                    "placeholder": "johndoe",
+                },
+            },
+        }
+
+    def validate(self, data):
+        if data["password"] != data.pop("confirm_password"):
+            raise serializers.ValidationError("Passwords do not match")
+        return data
+
+    def create(self, validated_data):
+        user = CustomUser.objects.create_user(
+            email=validated_data["email"],
+            username=validated_data.get("username", validated_data["email"]),
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            user_type=validated_data.get("user_type", "patient"),
+        )
+        return user
+
+10)# users/signals/user_signals.py
+import logging
+from django.db import transaction
+from users.models.user import CustomUser
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.contrib.auth import get_user_model
+from django.conf import settings
+from rest_framework_simplejwt.tokens import RefreshToken
+from users.models.preferences import UserPreferences
+from users.models.settings import UserSettings
+
+from django.apps import apps
+
+logger = logging.getLogger(__name__)
+
+User = get_user_model()
+
+
+@receiver(post_save, sender=CustomUser)
+def create_user_related_models(sender, instance, created, **kwargs):
+    """
+    Creates or updates all related models for a user:
+    - User preferences
+    - User settings
+    - User profile (patient/therapist)
+    """
+    try:
+        with transaction.atomic():
+            if created:
+                # Create preferences
+                preferences, _ = UserPreferences.objects.get_or_create(
+                    user=instance,
+                    defaults={
+                        "dark_mode": False,
+                        "language": settings.LANGUAGE_CODE,
+                        "notification_preferences": {},
+                        "email_notifications": True,  # changed code
+                        "in_app_notifications": True,  # changed code
+                    },
+                )
+
+                # Create settings
+                settings_obj, _ = UserSettings.objects.get_or_create(
+                    user=instance,
+                    defaults={
+                        "theme_preferences": settings.USER_SETTINGS.get(
+                            "DEFAULT_THEME", {"mode": "system"}
+                        ),
+                        "privacy_settings": settings.USER_SETTINGS.get(
+                            "DEFAULT_PRIVACY", {"profile_visibility": "public"}
+                        ),
+                    },
+                )
+
+            # Handle profile creation/updates based on user type
+            if instance.user_type:
+                if instance.user_type == "patient":
+                    PatientProfile = apps.get_model("patient", "PatientProfile")
+                    PatientProfile.objects.get_or_create(user=instance)
+                elif instance.user_type == "therapist":
+                    TherapistProfile = apps.get_model("therapist", "TherapistProfile")
+                    TherapistProfile.objects.get_or_create(user=instance)
+
+            # Handle JWT token refresh on user type change
+            if not created and instance.tracker.has_changed("user_type"):
+                RefreshToken.for_user(instance)
+
+    except Exception as e:
+        logger.error(
+            f"Error handling user related models for {instance.username}: {str(e)}"
+        )
+        raise
+
+
+@receiver(post_save, sender=User)
+def update_user_jwt_claims(sender, instance, created, **kwargs):
+    """Update JWT claims when user type changes"""
+    if not created and instance.tracker.has_changed("user_type"):
+        RefreshToken.for_user(instance)
+
+11)# users/validators/user_validators.py
+from rest_framework.exceptions import ValidationError
+
+
+def validate_emergency_contact(value):
+    required_fields = ["name", "relationship", "phone"]
+    if value and not all(field in value for field in required_fields):
+        raise ValidationError(
+            f"Emergency contact must include: {', '.join(required_fields)}"
+        )
+    if value and not value["phone"].replace("+", "").isdigit():
+        raise ValidationError("Phone number must contain only digits and optional +")
+    return value
+
+
+def validate_blood_type(value):
+    valid_types = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+    if value and value not in valid_types:
+        raise ValidationError(
+            f"Invalid blood type. Must be one of: {', '.join(valid_types)}"
+        )
+    return value
+
+
+def validate_profile_pic(value):
+    if value and value.size > 5 * 1024 * 1024:
+        raise ValidationError("Image file too large ( > 5MB )")
+    if value and not value.content_type.startswith("image/"):
+        raise ValidationError("File must be an image")
+    return value
+
+12)# users/views/preferences_views.py
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema_view, extend_schema
+from users.models.preferences import UserPreferences
+from users.serializers.preferences import UserPreferencesSerializer
+import logging
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    retrieve=extend_schema(
+        description="Get user preferences",
+        summary="Get User Preferences",
+        tags=["Preferences"],
+    ),
+    update=extend_schema(
+        description="Update user preferences",
+        summary="Update Preferences",
+        tags=["Preferences"],
+    ),
+    partial_update=extend_schema(
+        description="Partially update user preferences",
+        summary="Patch Preferences",
+        tags=["Preferences"],
+    ),
+)
+class UserPreferencesViewSet(viewsets.ModelViewSet):
+    serializer_class = UserPreferencesSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        preferences, created = UserPreferences.objects.get_or_create(
+            user=self.request.user
+        )
+        return preferences
+
+    def get_queryset(self):
+        return UserPreferences.objects.filter(user=self.request.user)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        try:
+            instance = serializer.save()
+            logger.info(f"Updated preferences for user {self.request.user.id}")
+            return instance
+        except Exception as e:
+            logger.error(f"Error updating preferences: {str(e)}")
+            raise
+
+13)# users/views/profile_views.py
+
+from rest_framework import viewsets, permissions
+from drf_spectacular.utils import extend_schema_view, extend_schema
+from patient.models.patient_profile import PatientProfile
+from patient.serializers.patient_profile import PatientProfileSerializer
+from therapist.serializers.therapist_profile import TherapistProfileSerializer
+from users.permissions.user import IsSuperUserOrSelf
+from django.apps import apps
+
+
+def get_therapist_profile():
+    return apps.get_model("therapist", "TherapistProfile")
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get base profile information",
+        summary="Get Profile",
+        tags=["Profile"],
+    ),
+)
+class BaseProfileViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [permissions.IsAuthenticated, IsSuperUserOrSelf]
+    http_method_names = ["get"]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return self.model.objects.select_related("user").all()
+        return self.model.objects.select_related("user").filter(user=self.request.user)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get patient profile information",
+        summary="Get Patient Profile",
+        tags=["Profile"],
+    ),
+    update=extend_schema(
+        description="Update patient profile information",
+        summary="Update Patient Profile",
+        tags=["Profile"],
+    ),
+    partial_update=extend_schema(
+        description="Partially update profile information",
+        summary="Patch Profile",
+        tags=["Profile"],
+    ),
+)
+class PatientProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = PatientProfileSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUserOrSelf]
+    http_method_names = ["get", "put", "patch", "delete"]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PatientProfile.objects.select_related("user").all()
+        return PatientProfile.objects.select_related("user").filter(
+            user=self.request.user
+        )
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get therapist profile information",
+        summary="Get Therapist Profile",
+        tags=["Profile"],
+    ),
+    update=extend_schema(
+        description="Update therapist profile information",
+        summary="Update Therapist Profile",
+        tags=["Profile"],
+    ),
+)
+class TherapistProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = TherapistProfileSerializer
+    permission_classes = [permissions.IsAuthenticated, IsSuperUserOrSelf]
+    http_method_names = ["get", "put", "patch", "delete"]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return get_therapist_profile().objects.select_related("user").all()
+        return (
+            get_therapist_profile()
+            .objects.select_related("user")
+            .filter(user=self.request.user)
+        )
+
+14)# users/views/settings_views.py
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from drf_spectacular.utils import extend_schema_view
+from users.models.settings import UserSettings
+from users.serializers.settings import UserSettingsSerializer
+from drf_spectacular.utils import extend_schema
+from rest_framework.response import Response
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get user settings including theme and notification configurations",
+        summary="Get User Settings",
+        tags=["Settings"],
+    ),
+    update=extend_schema(
+        description="Update user settings", summary="Update Settings", tags=["Settings"]
+    ),
+    partial_update=extend_schema(
+        description="Partially update user settings",
+        summary="Patch Settings",
+        tags=["Settings"],
+    ),
+)
+class UserSettingsViewSet(viewsets.ModelViewSet):
+    serializer_class = UserSettingsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return UserSettings.objects.all()
+        return UserSettings.objects.filter(user=self.request.user)
+
+    def get_object(self):
+        user = self.request.user
+        settings_obj, created = UserSettings.objects.get_or_create(user=user)
+        return settings_obj
+
+    def update(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(
+                instance, 
+                data=request.data, 
+                partial=kwargs.pop('partial', False)
+            )
+            if serializer.is_valid():
+                self.perform_update(serializer)
+                return Response(serializer.data)
+            logger.error(f"Validation errors: {serializer.errors}")
+            return Response(
+                {"error": "Invalid data", "details": serializer.errors}, 
+                status=400
+            )
+        except Exception as e:
+            logger.error(f"Error updating settings: {str(e)}")
+            return Response(
+                {"error": "Failed to update settings"}, 
+                status=500
+            )
+
+15)# users/views/user_views.py
+from rest_framework import viewsets, status
+from rest_framework.generics import ListAPIView
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view
+from django.apps import apps
+from users.models.user import CustomUser
+from users.models.settings import UserSettings
+
+from ..models.preferences import UserPreferences
+from ..permissions.user import IsSuperUserOrSelf
+from ..serializers.user import (
+    CustomUserSerializer,
+    UserPreferencesSerializer,
+    UserSettingsSerializer,
+    UserSerializer,
+    UserTypeSerializer,
+    UserRegistrationSerializer,
+)
+
+from rest_framework.decorators import api_view, permission_classes, renderer_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
+from django.db.models import Q
+from drf_spectacular.utils import OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def get_therapist_profile():
+    return apps.get_model("therapist", "TherapistProfile")
+
+
+TherapistProfile = apps.get_model("therapist", "TherapistProfile")
+
+
+class UserListPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+@extend_schema(
+    description="Get authenticated user's full profile with related data",
+    summary="Get User Details",
+    tags=["User"],
+    parameters=[
+        {
+            "name": "page_size",
+            "type": "integer",
+            "description": "Number of results per page",
+            "required": False,
+            "in": "query",
+        }
+    ],
+)
+class UserListView(ListAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = UserListPagination
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return CustomUser.objects.all()
+        return CustomUser.objects.filter(id=self.request.user.id)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        description="Get user information",
+        summary="Get Users",
+        tags=["User"],
+    ),
+    retrieve=extend_schema(
+        description="Get specific user details",
+        summary="Get User",
+        tags=["User"],
+    ),
+)
+class CustomUserViewSet(viewsets.ViewSet):
+    def list(self, request):
+        return Response({"message": "List of users"})
+
+    def retrieve(self, request, pk=None):
+        return Response({"message": f"Detail of user {pk}"})
+
+    def update_preferences(self, request, pk=None):
+        return Response({"message": f"Update preferences for user {pk}"})
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    serializer_class = UserSerializer
+    permission_classes = [IsSuperUserOrSelf]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return CustomUser.objects.all().prefetch_related("preferences", "settings")
+        return CustomUser.objects.filter(id=user.id).prefetch_related(
+            "preferences", "settings"
+        )
+
+    @action(detail=True, methods=["patch"])
+    def update_preferences(self, request, pk=None):
+        try:
+            user = self.get_object()
+            preferences, created = UserPreferences.objects.get_or_create(user=user)
+
+            serializer = UserPreferencesSerializer(
+                preferences, data=request.data, partial=True
+            )
+
+            if serializer.is_valid():
+                serializer.save()
+                return Response(
+                    {
+                        "message": "Preferences updated successfully",
+                        "preferences": serializer.data,
+                    }
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error updating preferences: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not update preferences"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["patch"])
+    def update_settings(self, request, pk=None):
+        try:
+            user = self.get_object()
+            settings, created = UserSettings.objects.get_or_create(user=user)
+
+            serializer = UserSettingsSerializer(
+                settings, data=request.data, partial=True
+            )
+
+            if serializer.is_valid():
+                serializer.save()
+                return Response(
+                    {
+                        "message": "Settings updated successfully",
+                        "settings": serializer.data,
+                    }
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error updating settings: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Could not update settings"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=["post"])
+    def set_user_type(self, request):
+        user = request.user
+        serializer = UserTypeSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "User type updated successfully"}, status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        summary="Search Users",
+        description="Search for users by username, email, first name, or last name",
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                description="Search query (username, email, first/last name)",
+                required=True,
+                type=OpenApiTypes.STR,
+            ),
+            OpenApiParameter(
+                name="user_type",
+                description="Filter by user type (patient, therapist)",
+                required=False,
+                type=OpenApiTypes.STR,
+                enum=["patient", "therapist"],
+            ),
+        ],
+        responses={
+            200: CustomUserSerializer(many=True)
+        },  # Change to simpler serializer
+    )
+    @action(detail=False, methods=["get"])
+    def search(self, request):
+        """
+        Search for users by name, email, or username.
+        """
+        try:
+            query = request.query_params.get("q", "")
+            user_type = request.query_params.get("user_type", None)
+
+            if not query:
+                return Response(
+                    {"error": "Search query is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            queryset = CustomUser.objects.filter(
+                Q(username__icontains=query)
+                | Q(email__icontains=query)
+                | Q(first_name__icontains=query)
+                | Q(last_name__icontains=query)
+            )
+
+            if user_type:
+                queryset = queryset.filter(user_type=user_type)
+
+            # Limit results for performance
+            queryset = queryset[:20]
+
+            # Use a simpler serializer to avoid potential relation issues
+            serializer = CustomUserSerializer(queryset, many=True)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Error in user search: {str(e)}", exc_info=True)
+            return Response(
+                {"error": f"An error occurred during search: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class SetUserTypeView(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]  # Changed from CanSetUserType
+
+    def list(self, request):
+        user_type_choices = {
+            choice[0]: choice[1] for choice in CustomUser.USER_TYPE_CHOICES
+        }
+        return Response(
+            {
+                "available_user_types": user_type_choices,
+                "current_user_type": request.user.user_type,
+                "message": "Use POST to set your user type",
+            }
+        )
+
+    def create(self, request):
+        user = request.user
+        # Add a check to prevent changing user_type if already set
+        if user.user_type and not user.is_superuser:
+            return Response(
+                {"error": "User type can only be set once"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = UserTypeSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "User type updated successfully"}, status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    description="Register a new user account",
+    summary="Register User",
+    tags=["Authentication"],
+    request=UserRegistrationSerializer,
+    responses={
+        201: {"description": "User successfully registered"},
+        400: {"description": "Invalid input data"},
+    },
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@renderer_classes([JSONRenderer, BrowsableAPIRenderer])  # Add format support
+def register_user(request, format=None):
+    """
+    Register a new user with email, password, and optional profile information.
+
+    Supported formats:
+    - JSON (default)
+    - Browsable API (HTML)
+    """
+    serializer = UserRegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        return Response(
+            {
+                "message": "User registered successfully",
+                "user": {"id": user.id, "email": user.email, "username": user.username},
+            },
+            status=status.HTTP_201_CREATED,
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(
+    summary="Get Current User Profile",
+    description=(
+        "Retrieve the full profile of the currently authenticated user. "
+        "This includes details such as the user's type, preferences, settings, "
+        "and associated profiles (patient/therapist)."
+    ),
+    responses={200: UserSerializer},
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def me(request):
+    """
+    Retrieve current user's full information including user type.
+    """
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
+
+16)# users\apps.py
+from django.apps import AppConfig
+
+
+class UsersConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "users"
+
+    def ready(self):
+        import users.signals  # noqa: F401
+
+17)# users\urls.py
+from django.urls import path
+from users.views.preferences_views import UserPreferencesViewSet
+from users.views.settings_views import UserSettingsViewSet
+from users.views.user_views import CustomUserViewSet, SetUserTypeView, me, UserViewSet
+
+urlpatterns = [
+    path("", CustomUserViewSet.as_view({"get": "list"}), name="user-list"),
+    path(
+        "<int:pk>/", CustomUserViewSet.as_view({"get": "retrieve"}), name="user-detail"
+    ),
+    path(
+        "<int:pk>/update_preferences/",
+        CustomUserViewSet.as_view({"patch": "update_preferences"}),
+        name="user-update-preferences",
+    ),
+    path(
+        "preferences/",
+        UserPreferencesViewSet.as_view({"get": "list"}),
+        name="preferences-list",
+    ),
+    path(
+        "preferences/<int:pk>/",
+        UserPreferencesViewSet.as_view({"get": "retrieve", "put": "update"}),
+        name="preferences-detail",
+    ),
+    path(
+        "settings/",
+        UserSettingsViewSet.as_view({
+            "get": "list",
+            "post": "create",
+            "put": "update",
+            "patch": "partial_update"
+        }),
+        name="settings-list",
+    ),
+    path(
+        "settings/<int:pk>/",
+        UserSettingsViewSet.as_view({
+            "get": "retrieve",
+            "put": "update",
+            "patch": "partial_update",
+            "delete": "destroy"
+        }),
+        name="settings-detail",
+    ),
+    path(
+        "set-user-type/",
+        SetUserTypeView.as_view({"post": "create", "get": "list"}),
+        name="set-user-type",
+    ),
+    path("search/", UserViewSet.as_view({"get": "search"}), name="user-search"),
+    path("me/", me, name="user-me"),
+]
+
