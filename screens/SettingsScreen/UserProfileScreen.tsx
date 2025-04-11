@@ -766,9 +766,11 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
                   <Text style={styles.cardTitle}>Emergency Contact</Text>
                   <Divider style={styles.divider} />
                   <PatientEmergencyContact
-                    emergencyContact={localProfile!.emergency_contact || { name: '', relationship: '', phone: '', email: '' }}
+                    emergencyContact={
+                      localProfile!.emergency_contact || { name: '', relationship: '', phone: '' }
+                    }
                     onEmergencyContactChange={(contact) => 
-                      setLocalProfile(prev => (prev ? { ...prev, emergency_contact: contact, id: prev.id } : prev))
+                      setLocalProfile(prev => (prev ? { ...prev, emergency_contact: contact } : prev))
                     }
                   />
                 </Surface>

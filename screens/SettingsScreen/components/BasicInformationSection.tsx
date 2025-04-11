@@ -1,3 +1,4 @@
+//screens/SettingsScreen/components/BasicInformationSection.tsx
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Surface, Text, TextInput, Divider } from 'react-native-paper';

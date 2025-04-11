@@ -1,0 +1,403 @@
+1)#media_handler/apps.py
+from django.apps import AppConfig
+
+
+class MediaHandlerConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "media_handler"
+
+2)#media_handler/errors.py
+class MediaNotAllowedException(Exception):
+    pass
+
+3)#media_handler/models.py
+import uuid
+
+import magic
+from django.conf import settings
+from django.core.validators import FileExtensionValidator
+from django.core.exceptions import ValidationError
+from django.db import models
+from cloudinary.models import CloudinaryField
+
+from media_handler.errors import MediaNotAllowedException
+from .storage import CloudinaryMediaStorage
+from media_handler.services import MediaService  # Import MediaService
+
+
+# Create your models here.
+def get_file_path(instance, filename):
+    """Genereate a UUID-based path for the file."""
+    ext = filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+
+    return f"{instance.file_type}/{filename}"
+
+
+def validate_file_type(file_field, file_type):
+    """
+    Validate that the uploaded file matches the allowed MIME types for the given file_type
+    """
+    if not file_field:
+        return
+
+    # Handle both UploadedFile and CloudinaryResource
+    if hasattr(file_field, 'read'):
+        # For UploadedFile during initial upload
+        file_mime = magic.from_buffer(file_field.read(2048), mime=True)
+        file_field.seek(0)  # Reset file pointer
+    else:
+        # For CloudinaryResource during model validation
+        # Use the stored mime_type if available
+        return
+
+    if file_mime not in settings.ALLOWED_FILE_TYPES[file_type]:
+        allowed_types = ", ".join(settings.ALLOWED_FILE_TYPES[file_type])
+        raise MediaNotAllowedException(
+            f"Invalid file type. For {file_type}, only {allowed_types} are allowed. Got {file_mime}"
+        )
+
+
+# Don't use this model directly. Use the create_user_file and create_job_attachment functions from utils.py
+class UserFile(models.Model):
+    FILE_TYPES = (
+        ("profile_picture", "Profile Picture"),
+        ("resume", "Resume"),
+        ("portfolio", "Portfolio"),
+        ("attachment", "Attachment"),
+        ("other", "Other Document"),
+    )
+
+    ALLOWED_EXTENSIONS = {
+        "profile_picture": ["jpg", "jpeg", "png"],
+        "resume": ["pdf", "doc", "docx"],
+        "portfolio": ["pdf"],
+        "attachment": ["pdf", "doc", "docx", "jpg", "jpeg", "png"],
+        "other": ["pdf", "doc", "docx"]
+    }
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    file_type = models.CharField(max_length=20, choices=FILE_TYPES)
+    file = CloudinaryField(
+        'file',
+        folder=lambda instance: instance.get_cloudinary_folder(),
+        resource_type='auto'  # Allow different file types
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    original_filename = models.CharField(max_length=255)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    file_size = models.PositiveIntegerField()
+    mime_type = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["file_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.file_type} - {self.original_filename}"
+
+    def clean(self) -> None:
+        super().clean()
+
+        if self.file and self.file_type:
+            # Validate file extension
+            if hasattr(self, 'original_filename'):
+                ext = self.original_filename.split('.')[-1].lower()
+                allowed_extensions = self.ALLOWED_EXTENSIONS.get(self.file_type, [])
+                if ext not in allowed_extensions:
+                    raise ValidationError({
+                        'file': f'File extension "{ext}" is not allowed for {self.file_type}. '
+                               f'Allowed extensions are: {", ".join(allowed_extensions)}'
+                    })
+
+            # Validate file type for new uploads
+            if hasattr(self.file, 'read'):
+                self._validate_mime_type()
+
+    def _validate_mime_type(self):
+        """Validate MIME type based on file_type"""
+        if not hasattr(self.file, 'read'):
+            return
+
+        mime = magic.Magic(mime=True)
+        file_mime = mime.from_buffer(self.file.read(2048))
+        self.file.seek(0)  # Reset file pointer
+        self.mime_type = file_mime
+
+        allowed_types = settings.ALLOWED_FILE_TYPES.get(self.file_type, [])
+        if file_mime not in allowed_types:
+            raise MediaNotAllowedException(
+                f"Invalid file type for {self.file_type}. Only {', '.join(allowed_types)} "
+                f"are allowed. Got {file_mime}"
+            )
+
+    def get_cloudinary_folder(self):
+        """Define the Cloudinary folder structure"""
+        if self.file_type == 'profile_picture':
+            return f"user_profile/{self.user.id}/{self.file_type}"
+        return f"{self.file_type}/{self.user.id}"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            try:
+                old_instance = UserFile.objects.get(pk=self.pk)
+            except UserFile.DoesNotExist:
+                old_instance = None
+            if old_instance and old_instance.file and old_instance.file != self.file:
+                MediaService.delete(old_instance.file.public_id)
+        
+        if not self.file_size and hasattr(self.file, 'size'):
+            self.file_size = self.file.size
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+4)#media_handler/serializers.py
+from rest_framework import serializers
+
+from .models import UserFile
+from .services import MediaService
+
+
+class UserFileSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True, required=True)
+    file_url = serializers.SerializerMethodField(read_only=True)
+    file_type = serializers.ChoiceField(choices=UserFile.FILE_TYPES)
+
+    class Meta:
+        model = UserFile
+        fields = [
+            "id",
+            "file",
+            "file_type",
+            "original_filename",
+            "uploaded_at",
+            "file_size",
+            "mime_type",
+            "file_url",
+        ]
+        read_only_fields = ["id", "original_filename", "file_size", "mime_type", "file_url", "uploaded_at"]
+
+    def get_file_url(self, obj):
+        return MediaService.get_url(obj.file)
+
+    def validate_file(self, value):
+        """
+        Validate file size and type
+        """
+        # 10MB = 10 * 1024 * 1024
+        max_size = 10 * 1024 * 1024
+        if value.size > max_size:
+            raise serializers.ValidationError("File size cannot exceed 10MB")
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        return UserFile.objects.create(
+            user=user,
+            **validated_data
+        )
+
+5)#media_handler/services.py
+import cloudinary
+import cloudinary.uploader
+from django.core.files.uploadedfile import UploadedFile
+from django.conf import settings
+
+class MediaService:
+    @staticmethod
+    def upload(file: UploadedFile, file_type: str, user_id: int, public_id: str, old_public_id: str = None) -> dict:
+        """
+        Upload file to Cloudinary and optionally delete old file
+
+        Args:
+            file: The file to upload
+            file_type: Type of file (profile_picture, resume, etc)
+            user_id: ID of the user uploading
+            public_id: Unique identifier for the file
+            old_public_id: Optional public_id of old file to delete
+
+        Returns:
+            dict: Cloudinary upload response
+        """
+        # Delete old file if exists
+        if old_public_id:
+            MediaService.delete(old_public_id)
+            
+        folder = f"{file_type}/{user_id}" if file_type != 'profile_picture' else f"user_profile/{user_id}/{file_type}"
+        
+        return cloudinary.uploader.upload(
+            file,
+            folder=folder,
+            public_id=public_id,
+            resource_type="auto"
+        )
+
+    @staticmethod
+    def delete(public_id: str) -> dict:
+        """
+        Delete file from Cloudinary
+        
+        Args:
+            public_id: Cloudinary public ID of the file
+            
+        Returns:
+            dict: Cloudinary delete response
+        """
+        return cloudinary.uploader.destroy(public_id)
+
+    @staticmethod
+    def get_url(file_field_or_public_id, transformations=None) -> str:
+        """
+        Get the Cloudinary URL for a file
+        
+        Args:
+            file_field_or_public_id: CloudinaryField instance or public_id string
+            transformations: Optional Cloudinary transformations
+            
+        Returns:
+            str: URL of the file in Cloudinary
+        """
+        if not file_field_or_public_id:
+            return None
+            
+        if hasattr(file_field_or_public_id, "url"):
+            return file_field_or_public_id.url
+        return cloudinary.uploader.url(file_field_or_public_id, transformation=transformations)
+6)#media_handler/storage.py
+from django.core.files.storage import Storage
+from cloudinary_storage.storage import MediaCloudinaryStorage
+from django.conf import settings
+
+class CloudinaryMediaStorage(MediaCloudinaryStorage):
+    def get_folder_name(self, instance, filename, file_type):
+        """
+        Generate folder structure: 
+        user_profile/<user_id>/<media_type>/ for profile files
+        Other files in their respective folders
+        """
+        if file_type == 'profile_picture':
+            return f"user_profile/{instance.user.id}/{file_type}"
+        return f"{file_type}/{instance.user.id}"
+
+    def _upload(self, name, content, **kwargs):
+        folder = self.get_folder_name(
+            instance=kwargs.get('instance'),
+            filename=name,
+            file_type=kwargs.get('file_type')
+        )
+        return super()._upload(name, content, folder=folder, **kwargs)
+7)#media_handler/urls.py
+from django.urls import path
+
+from .views import UserFileViewSet
+
+app_name = "media_handler"
+
+urlpatterns = [
+    path(
+        "files/",
+        UserFileViewSet.as_view({
+            'get': 'list',
+            'post': 'create',
+        }),
+        name="user_files",
+    ),
+]
+
+8)#media_handler/views.py
+from django.core.files.uploadedfile import UploadedFile
+from rest_framework import status
+from rest_framework.decorators import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import viewsets
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.core.exceptions import ValidationError
+
+from media_handler.utils import create_user_file, create_or_update_user_file
+
+from .models import UserFile
+from .serializers import UserFileSerializer
+
+
+class UserFileViewSet(viewsets.ModelViewSet):
+    serializer_class = UserFileSerializer
+    queryset = UserFile.objects.all()
+    parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def get_queryset(self):
+        return UserFile.objects.filter(user=self.request.user, is_active=True)
+
+    def list(self, request):
+        file_type = request.query_params.get("type")
+        if not file_type:
+            return Response(
+                {"error": "File type parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset().filter(file_type=file_type)
+        serializer = UserFileSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request):
+        file_obj: UploadedFile | None = request.FILES.get("file")
+
+        if not file_obj:
+            return Response(
+                {"error": "No file was uploaded"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        file_type = request.data.get("file_type")
+
+        if not file_type:
+            return Response(
+                {"error": "File type is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate file extension
+        ext = file_obj.name.split('.')[-1].lower()
+        allowed_extensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png"]
+        if ext not in allowed_extensions:
+            return Response(
+                {"error": f'File extension "{ext}" is not allowed. Allowed extensions are: {", ".join(allowed_extensions)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user_file = create_user_file(request.user, file_type, file_obj)
+            user_file.save()
+            serializer = UserFileSerializer(user_file)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        file_obj = request.FILES.get("file")
+        file_type = request.data.get("file_type", instance.file_type)
+
+        if file_obj:
+            try:
+                user_file = create_or_update_user_file(
+                    request.user, 
+                    file_type, 
+                    file_obj, 
+                    existing_file=instance
+                )
+                serializer = UserFileSerializer(user_file)
+                return Response(serializer.data)
+            except ValidationError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return super().update(request, *args, **kwargs)
+
+9)

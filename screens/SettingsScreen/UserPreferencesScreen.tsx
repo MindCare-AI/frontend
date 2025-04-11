@@ -1,3 +1,4 @@
+//screens/SettingsScreen/UserPreferencesScreen.tsx
 import React, { useRef } from 'react';
 import { ScrollView, View, StyleSheet } from 'react-native';
 import { Button, Text, Switch, IconButton, ActivityIndicator } from 'react-native-paper';

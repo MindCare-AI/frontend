@@ -55,7 +55,7 @@ export const useTherapistProfile = () => {
       if (!response.ok) {
         throw new Error(`Failed to fetch profile: ${response.statusText}`);
       }
-
+      
       const data = await response.json();
       setProfile(data);
       setError(null);
