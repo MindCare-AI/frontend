@@ -1,15 +1,37 @@
 //screens/ChatScreen/components/TypingIndicator.tsx
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Easing } from 'react-native';
+import { useAuth } from '../../../contexts/AuthContext';
+import { API_URL } from '../../../config';
 
 interface TypingIndicatorProps {
   visible: boolean;
+  conversationId: string;
 }
 
-const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible }) => {
+const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible, conversationId }) => {
   const dot1Opacity = useRef(new Animated.Value(0.3)).current;
   const dot2Opacity = useRef(new Animated.Value(0.3)).current;
   const dot3Opacity = useRef(new Animated.Value(0.3)).current;
+  const { accessToken } = useAuth();
+
+  useEffect(() => {
+    if (visible && conversationId) {
+      const ws = new WebSocket(`${API_URL.replace('http', 'ws')}/ws/messaging/${conversationId}/`);
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'typing', is_typing: true }));
+      };
+
+      ws.onclose = () => {
+        ws.send(JSON.stringify({ type: 'typing', is_typing: false }));
+      };
+
+      return () => {
+        ws.close();
+      };
+    }
+  }, [visible, conversationId]);
 
   useEffect(() => {
     if (visible) {
@@ -29,24 +51,6 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible }) => {
           }),
           Animated.timing(dot3Opacity, {
             toValue: 1,
-            duration: 400,
-            easing: Easing.ease,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot1Opacity, {
-            toValue: 0.3,
-            duration: 400,
-            easing: Easing.ease,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot2Opacity, {
-            toValue: 0.3,
-            duration: 400,
-            easing: Easing.ease,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot3Opacity, {
-            toValue: 0.3,
             duration: 400,
             easing: Easing.ease,
             useNativeDriver: true,

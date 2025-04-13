@@ -34,10 +34,10 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
 
     // Get the right endpoint based on conversation type
     const endpoint = conversationType === 'group' ? 'groups' : 'one_to_one';
-    
+
     // The API structure differs between endpoints
     let requestBody = {};
-    
+
     if (conversationType === 'group') {
       requestBody = {
         conversation: parseInt(conversationId, 10),
@@ -49,8 +49,9 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
         [reaction]: userId
       };
     }
-    
-    const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/reactions/`, {
+
+    const url = `${API_BASE_URL}/messaging/${endpoint}/messages/${messageId}/reactions/`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
       },
       body: JSON.stringify(requestBody),
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Failed to add reaction: ${errorText}`);
@@ -90,28 +91,28 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
 
   const removeReaction = async (messageId: string, reaction: string): Promise<void> => {
     if (!accessToken || !user) return;
-    
+
     if (conversationType === 'chatbot') {
       console.warn('Reactions not supported for chatbot messages');
       return;
     }
-    
+
     try {
       // Get the right endpoint based on conversation type
       const endpoint = conversationType === 'group' ? 'groups' : 'one_to_one';
-      
-      // Updated URL: no reaction query parameter since the API doesn't require it.
-      const url = `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/reactions/`;
-      
+
+      // Updated URL with API_BASE_URL without '/api/v1'
+      const url = `${API_BASE_URL}/messaging/${endpoint}/messages/${messageId}/reactions/`;
+
       const options: RequestInit = {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         }
       };
-      
+
       const response = await fetch(url, options);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to remove reaction: ${errorText}`);

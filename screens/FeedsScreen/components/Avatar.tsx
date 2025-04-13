@@ -1,53 +1,74 @@
-import React from 'react';
-import { cn } from '../../../lib/utils';
+import React, { useState } from 'react';
+import { View, Image, Text, StyleSheet } from 'react-native';
 
 interface AvatarProps {
   src: string;
   alt: string;
   size?: 'sm' | 'md' | 'lg';
-  className?: string;
+  border?: boolean;
 }
 
-const Avatar = ({ src, alt, size = 'md', className }: AvatarProps) => {
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-12 h-12',
+const Avatar = ({ src, alt, size = 'md', border = false }: AvatarProps) => {
+  const [hasError, setHasError] = useState(false);
+  
+  const sizeValues = {
+    sm: 32,
+    md: 40,
+    lg: 48,
   };
+  
+  const avatarSize = sizeValues[size];
+  const borderWidth = border ? 2 : 0;
+  
+  const styles = StyleSheet.create({
+    container: {
+      width: avatarSize,
+      height: avatarSize,
+      borderRadius: avatarSize / 2,
+      backgroundColor: '#D8B4FE', // mindcare-lavender
+      overflow: 'hidden',
+      borderWidth: borderWidth,
+      borderColor: 'white',
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    fallbackContainer: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: '#8B5CF6', // mindcare-purple
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fallbackText: {
+      color: 'white',
+      fontWeight: 'bold',
+      fontSize: size === 'sm' ? 16 : size === 'md' ? 20 : 24,
+    }
+  });
+  
+  // Create a fallback avatar with first letter of alt text
+  const renderFallback = () => (
+    <View style={styles.fallbackContainer}>
+      <Text style={styles.fallbackText}>
+        {alt.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
 
   return (
-    <div className={cn(
-      'rounded-full overflow-hidden bg-mindcare-lavender flex-shrink-0',
-      sizeClasses[size],
-      className
-    )}>
-      <img 
-        src={src} 
-        alt={alt} 
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          // Fallback to first letter of name if image fails to load
-          const target = e.target as HTMLImageElement;
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          
-          canvas.width = 100;
-          canvas.height = 100;
-          
-          if (context) {
-            context.fillStyle = '#8B5CF6';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            context.fillStyle = '#FFFFFF';
-            context.font = 'bold 50px sans-serif';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(alt.charAt(0).toUpperCase(), 50, 50);
-            
-            target.src = canvas.toDataURL();
-          }
-        }}
-      />
-    </div>
+    <View style={styles.container}>
+      {hasError ? (
+        renderFallback()
+      ) : (
+        <Image
+          source={{ uri: src }}
+          style={styles.image}
+          onError={() => setHasError(true)}
+        />
+      )}
+    </View>
   );
 };
 

@@ -4,10 +4,10 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Message, Conversation } from '../../../types/chat';
 import { API_BASE_URL } from '../../../config';
-import { getAuthToken } from "../../../utils/auth";
+import { getAuthToken } from '../../../lib/utils';
 import { connectWebSocket } from '../../../services/websocket';
-
-// Remove the useDebounce import since we don't need it anymore
+import { API_URL } from '../../../config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface EditMessageParams {
   message: Message;
@@ -53,8 +53,7 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
   const endpoint = getEndpoint(conversationType);
 
   const fetchMessages = async (conversationId: string, accessToken: string): Promise<{ messages: Message[]; conversation: Conversation; cursor?: string }> => {
-    // Removed chatbot branch; using default endpoint for all conversation types
-    const url = `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/?conversation=${conversationId}&page_size=20`;
+    const url = `${API_URL}/messaging/${endpoint}/messages/?conversation=${conversationId}&page_size=20`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -88,34 +87,39 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
   };
 
   const sendMessage = async (conversationId: string, content: string, accessToken: string): Promise<Message> => {
-    const payload = {
-      conversation: parseInt(conversationId, 10),
-      content,
-      message_type: 'text'
-    };
-    
-    const url = `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to send message: ${errorText}`);
+    if (!user || !user.id) {
+        throw new Error('Cannot send message: no sender user data available');
     }
-    
-    const message = await response.json();
-    return message;
+
+    const payload = {
+        conversation: parseInt(conversationId, 10),
+        content,
+        message_type: 'text',
+        sender: user.id // Ensure the sender field is correctly populated with the user's ID
+    };
+
+    const url = `${API_URL}/messaging/${endpoint}/messages/`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to send message: ${errorText}`);
+    }
+
+    return await response.json();
   };
 
   const deleteMessageAPI = async (messageId: string, accessToken: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/`, {
+    const url = `${API_URL}/messaging/${endpoint}/messages/${messageId}/`;
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${accessToken}`
@@ -127,15 +131,16 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
   };
 
   const editMessageAPI = async (messageId: string, newContent: string, conversationId: string, accessToken: string): Promise<void> => {
-    // Match API payload structure based on docs
     const payload = {
       conversation: parseInt(conversationId, 10),
       content: newContent,
       message_type: 'text'
     };
     
-    const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/${messageId}/`, {
-      method: 'PATCH', // Using PATCH instead of PUT for partial updates
+    const url = `${API_URL}/messaging/${endpoint}/messages/${messageId}/`;
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -182,8 +187,7 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
     
     try {
       setLoading(true);
-      // Removed chatbot branch; always use the default URL.
-      let url = `${API_BASE_URL}/api/v1/messaging/${endpoint}/messages/?conversation=${conversationId}&cursor=${lastCursor}`;
+      let url = `${API_BASE_URL}/messaging/${endpoint}/messages/?conversation=${conversationId}&cursor=${lastCursor}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -269,29 +273,45 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
       const filtered = prev.filter(msg =>
         msg.id !== `temp-${newMessage.id}` && msg.id !== newMessage.id
       );
-      return [newMessage, ...filtered];
+
+      // Add a flag to distinguish between sent and received messages
+      const isSentByCurrentUser = newMessage.sender.id === user?.id;
+
+      return [
+        { ...newMessage, isSentByCurrentUser }, // Add the flag
+        ...filtered
+      ];
     });
-  }, []);
+  }, [user]);
 
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const token = getAuthToken();
+  const getToken = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
     if (!token) {
       console.error('No token available for WebSocket');
-      return;
+      return null;
     }
+    return token;
+  };
 
-    // Simplify this by removing typing-related functionality
-    ws.current = connectWebSocket(
-      conversationId,
-      token,
-      handleNewMessage
-      // Remove typing callback parameter
-    );
+  useEffect(() => {
+    const initializeWebSocket = async () => {
+      const token = await getToken();
+      if (!token) return;
+
+      ws.current = connectWebSocket(
+        conversationId,
+        token,
+        handleNewMessage
+      );
+    };
+
+    initializeWebSocket();
 
     return () => {
-      if (ws.current) ws.current.close(1000, 'Component unmounted');
+      if (ws.current) {
+        ws.current.close(1000, 'Component unmounted');
+        ws.current = null;
+      }
     };
   }, [conversationId, handleNewMessage]);
 

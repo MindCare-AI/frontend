@@ -51,7 +51,7 @@ export interface Conversation {
   name?: string;
   title?: string; // For displaying conversation title
   // API returns snake_case fields
-  last_message?: string;     // Matches Django's field name for last message
+  last_message?: string;     // Matches Django's field name for last message    
   unread_count?: number;     // Matches Django's field name for unread count
   // Optional camelCase aliases for internal usage
   lastMessage?: string;
@@ -60,6 +60,7 @@ export interface Conversation {
   otherParticipant?: Participant; // For one-to-one chats
   timestamp?: string;
   conversation_type: 'direct' | 'group' | 'one_to_one' | 'chatbot';
+  isTyping?: boolean; // Added optional property
 }
 
 export interface RouteProps {

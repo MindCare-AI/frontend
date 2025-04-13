@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Animated } from 'react-native';
 import { Comment } from '../../../types/feed';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, SendHorizontal } from 'lucide-react';
-import { Input } from '../../../components/ui/Input';
+import { Heart, Send, MoreHorizontal, Smile } from 'lucide-react';
+import { getShadowStyles } from '../../../styles/global';
 
 interface CommentSectionProps {
   postId: string;
@@ -12,19 +13,25 @@ interface CommentSectionProps {
 
 const CommentSection = ({ postId, comments }: CommentSectionProps) => {
   const [newComment, setNewComment] = useState('');
-  const [commentsList, setCommentsList] = useState<Comment[]>(comments);
+  const [commentsList, setCommentsList] = useState<Comment[]>(comments || []);
+  const [likedComments, setLikedComments] = useState<Record<string, boolean>>({});
+  const inputRef = useRef<TextInput>(null);
   
-  const handleSubmitComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const handleSubmitComment = () => {
     if (!newComment.trim()) return;
-    
+
     const currentUser = {
       id: 'currentUser',
       name: 'You',
-      avatar: '/placeholder.svg',
+      avatar: 'https://via.placeholder.com/100',
     };
-    
+
     const comment: Comment = {
       id: `comment-${Date.now()}`,
       user: currentUser,
@@ -32,61 +39,262 @@ const CommentSection = ({ postId, comments }: CommentSectionProps) => {
       timestamp: new Date().toISOString(),
       likes: 0,
     };
-    
-    setCommentsList(prev => [comment, ...prev]);
+
+    setCommentsList((prev) => [comment, ...prev]);
     setNewComment('');
+  };
+  
+  const handleLikeComment = (commentId: string) => {
+    setLikedComments(prev => {
+      const newState = { ...prev, [commentId]: !prev[commentId] };
+      return newState;
+    });
+    
+    setCommentsList(prev => prev.map(comment => {
+      if (comment.id === commentId) {
+        return {
+          ...comment,
+          likes: likedComments[commentId] ? comment.likes - 1 : comment.likes + 1
+        };
+      }
+      return comment;
+    }));
+  };
+
+  const renderCommentItem = ({ item }: { item: Comment }) => {
+    const isLiked = likedComments[item.id];
+    const scaleAnim = useRef(new Animated.Value(0)).current;
+    
+    useEffect(() => {
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 7,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    }, []);
+
+    return (
+      <Animated.View style={[
+        styles.commentContainer,
+        { opacity: scaleAnim, transform: [{ scale: scaleAnim }] }
+      ]}>
+        <Avatar src={item.user.avatar} alt={item.user.name} size="sm" />
+        <View style={styles.commentContent}>
+          <View style={[styles.commentBubble, getShadowStyles(1)]}>
+            <View style={styles.commentHeader}>
+              <Text style={styles.commentUserName}>{item.user.name}</Text>
+              <TouchableOpacity style={styles.moreButton}>
+                <MoreHorizontal width={12} height={12} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.commentText}>{item.content}</Text>
+          </View>
+          <View style={styles.commentActions}>
+            <TouchableOpacity 
+              style={styles.likeButton} 
+              onPress={() => handleLikeComment(item.id)}
+            >
+              <Heart 
+                width={12} 
+                height={12} 
+                color={isLiked ? "#8B5CF6" : "#6B7280"} 
+                fill={isLiked ? "#8B5CF6" : "transparent"} 
+              />
+              {item.likes > 0 && (
+                <Text style={[styles.likeCount, isLiked && styles.likedText]}>
+                  {item.likes}
+                </Text>
+              )}
+              <Text style={[styles.likeText, isLiked && styles.likedText]}>Like</Text>
+            </TouchableOpacity>
+            <Text style={styles.timestamp}>
+              {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
   };
 
   return (
-    <div className="bg-gray-50 p-4 rounded-b-xl">
-      <Separator className="mb-3" />
-      
+    <View style={styles.container}>
+      {/* Divider */}
+      <View style={styles.divider} />
+
       {/* Add Comment Form */}
-      <form 
-        className="flex items-center gap-2 mb-4" 
-        onSubmit={handleSubmitComment}
-      >
-        <Avatar src="/placeholder.svg" alt="You" size="sm" />
-        <div className="flex-1 relative">
-          <Input
+      <View style={styles.commentForm}>
+        <Avatar src="https://via.placeholder.com/100" alt="You" size="sm" />
+        <View style={styles.inputContainer}>
+          <TextInput
+            ref={inputRef}
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            onChangeText={setNewComment}
             placeholder="Write a comment..."
-            className="pr-10 bg-white rounded-full border-gray-200"
+            style={styles.input}
+            multiline={false}
+            returnKeyType="send"
+            onSubmitEditing={handleSubmitComment}
           />
-          <button 
-            type="submit" 
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-mindcare-purple hover:text-mindcare-indigo p-1"
-          >
-            <SendHorizontal className="h-5 w-5" />
-          </button>
-        </div>
-      </form>
-      
+          <View style={styles.inputActions}>
+            <TouchableOpacity style={styles.inputActionButton}>
+              <Smile width={20} height={20} color="#9CA3AF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.sendButton,
+                !newComment.trim() && styles.disabledButton
+              ]}
+              disabled={!newComment.trim()}
+              onPress={handleSubmitComment}
+            >
+              <Send width={20} height={20} color="#8B5CF6" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
       {/* Comments List */}
-      <div className="space-y-3 max-h-[300px] overflow-y-auto">
-        {commentsList.map((comment) => (
-          <div key={comment.id} className="flex gap-2">
-            <Avatar src={comment.user.avatar} alt={comment.user.name} size="sm" />
-            <div className="flex-1">
-              <div className="bg-white p-2.5 rounded-xl">
-                <p className="text-sm font-medium">{comment.user.name}</p>
-                <p className="text-sm text-gray-700">{comment.content}</p>
-              </div>
-              <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                <button className="hover:text-mindcare-purple flex items-center gap-1">
-                  <Heart className="h-3 w-3" /> 
-                  {comment.likes > 0 && <span>{comment.likes}</span>}
-                  Like
-                </button>
-                <span>{formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      <FlatList
+        data={commentsList}
+        keyExtractor={item => item.id}
+        renderItem={renderCommentItem}
+        contentContainerStyle={styles.commentsList}
+        ItemSeparatorComponent={() => <View style={styles.commentSeparator} />}
+        ListFooterComponent={
+          commentsList.length > 3 ? (
+            <TouchableOpacity style={styles.viewMoreButton}>
+              <Text style={styles.viewMoreText}>View more comments</Text>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#F9FAFB', // gray-50
+    padding: 16,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB', // gray-200
+    marginBottom: 16,
+  },
+  commentForm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  inputContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  input: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingRight: 80,
+    borderWidth: 1,
+    borderColor: '#E5E7EB', // gray-200
+  },
+  inputActions: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  inputActionButton: {
+    padding: 4,
+  },
+  sendButton: {
+    padding: 4,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  commentsList: {
+    paddingBottom: 8,
+  },
+  commentSeparator: {
+    height: 12,
+  },
+  commentContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentBubble: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 10,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  commentUserName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937', // gray-800
+  },
+  moreButton: {
+    padding: 2,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#374151', // gray-700
+    marginTop: 2,
+  },
+  commentActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 4,
+    paddingLeft: 2,
+  },
+  likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  likeCount: {
+    fontSize: 12,
+    color: '#6B7280', // gray-500
+  },
+  likeText: {
+    fontSize: 12,
+    color: '#6B7280', // gray-500
+  },
+  likedText: {
+    color: '#8B5CF6', // mindcare-purple
+    fontWeight: '500',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#6B7280', // gray-500
+  },
+  viewMoreButton: {
+    alignItems: 'center',
+    padding: 8,
+    marginTop: 8,
+  },
+  viewMoreText: {
+    color: '#8B5CF6', // mindcare-purple
+    fontSize: 14,
+    fontWeight: '500',
+  },
+});
 
 export default CommentSection;

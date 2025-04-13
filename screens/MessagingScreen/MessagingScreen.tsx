@@ -1,6 +1,6 @@
 //screens/MessagingScreen/MessagingScreen.tsx
 import React from 'react';
-import { View, StyleSheet, SectionList, Text, Alert } from 'react-native';
+import { View, StyleSheet, SectionList, Text, Alert, StatusBar } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MessagingStackParamList } from '../../navigation/MessagingNavigator'; // Adjust path as needed
 import useConversations from './hooks/useConversations';
@@ -10,6 +10,7 @@ import NewChatButton from './components/NewChatButton';
 import { LoadingIndicator, ErrorMessage } from '../../components/ui';
 import { API_URL } from '../../config'; // Ensure correct API_URL
 import { useAuth } from '../../contexts/AuthContext';
+import TypingIndicator from '../ChatScreen/components/TypingIndicator';
 
 type MessagingScreenNavigationProp = StackNavigationProp<MessagingStackParamList, 'Messaging'>;
 
@@ -17,13 +18,18 @@ interface Props {
   navigation: MessagingScreenNavigationProp;
 }
 
+interface TypingIndicatorProps {
+  visible: boolean;
+  conversationId: string;
+}
+
 const MessagingScreen: React.FC<Props> = ({ navigation }) => {
   const { accessToken } = useAuth();
-  const { conversations, loading, error, searchQuery, handleSearch, loadMore, refresh } = useConversations();
+  const { conversations, loading, error, searchQuery, handleSearch, loadMore, refresh, typingIndicators } = useConversations();
 
-  const createNewConversation = async (): Promise<string | null> => {
+  const createNewConversation = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/messaging/one_to_one/`, {
+      const response = await fetch(`${API_URL}/messaging/one_to_one/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -44,23 +50,32 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor="#007BFF" barStyle="light-content" />
       <SearchBar value={searchQuery} onChangeText={handleSearch} />
+      
       {error && <ErrorMessage message="Failed to load conversations" onRetry={refresh} />}
+      
       {loading && conversations.length === 0 ? (
         <LoadingIndicator />
       ) : (
         <SectionList
           sections={[
-            { title: 'Direct Messages', data: conversations.filter(c => c.conversation_type === 'one_to_one') },
-            { title: 'Group Chats', data: conversations.filter(c => c.conversation_type === 'group') }
+            { 
+              title: 'Direct Messages', 
+              data: conversations.filter(c => c.conversation_type === 'one_to_one') 
+            },
+            { 
+              title: 'Group Chats', 
+              data: conversations.filter(c => c.conversation_type === 'group') 
+            }
           ]}
           renderItem={({ item }) => (
             <ConversationItem 
               conversation={{
                 ...item,
-                lastMessage: item.lastMessage || '', // now guaranteed to be string
-                timestamp: item.timestamp || '',     // default to empty string if undefined
-                unreadCount: item.unreadCount ?? 0,      // default if needed
+                lastMessage: item.lastMessage || '',
+                timestamp: item.timestamp || '',
+                unreadCount: item.unreadCount ?? 0,
               }}
               onPress={() => navigation.navigate('Chat', {
                 conversationId: String(item.id),
@@ -81,8 +96,23 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
           onRefresh={refresh}
           refreshing={loading}
           contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={true}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No conversations yet</Text>
+              <Text style={styles.emptySubtitle}>Start a new chat to begin messaging</Text>
+            </View>
+          }
         />
       )}
+      
+      {typingIndicators && (
+        <TypingIndicator 
+          visible={typingIndicators.length > 0} 
+          conversationId={conversations[0]?.id || ''} 
+        />
+      )}
+      
       <NewChatButton
         onPress={async () => {
           const newId = await createNewConversation();
@@ -102,20 +132,45 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F4F8',
+    backgroundColor: '#F5F7FA', // Lighter, modern background color
   },
   listContent: {
-    padding: 16,
+    padding: 12,
+    paddingBottom: 80, // Extra padding at bottom for FAB
   },
   sectionHeader: {
-    backgroundColor: '#f4f4f4',
-    paddingVertical: 8,
+    backgroundColor: 'rgba(245, 247, 250, 0.95)', // Semi-transparent background
+    paddingVertical: 10,
     paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9EEF6',
+    marginTop: 4,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667892', // More subdued color for section headers
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginTop: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#3A4B66',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#667892',
+    textAlign: 'center',
+    lineHeight: 20,
+  }
 });
 
 export default MessagingScreen;

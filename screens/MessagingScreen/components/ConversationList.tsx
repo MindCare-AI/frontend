@@ -2,6 +2,7 @@
 import React, { useCallback, memo } from 'react';
 import { FlatList, StyleSheet, View, Text } from 'react-native';
 import ConversationItem from './ConversationItem';
+import throttle from 'lodash.throttle'; // Import throttle from lodash
 
 // Define interface for conversation
 interface Participant {
@@ -17,8 +18,7 @@ interface Conversation {
   timestamp: string;
   unreadCount: number;
 }
-
-// Define props interface for the component
+  
 interface ConversationListProps {
   conversations: Conversation[];
   onConversationPress: (conversation: Conversation) => void;
@@ -58,7 +58,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       contentContainerStyle={styles.listContent}
-      onEndReached={onEndReached}
+      onEndReached={throttle(onEndReached, 1000)} // Add 1 second throttle
       onEndReachedThreshold={0.5}
       refreshing={refreshing}
       onRefresh={onRefresh}

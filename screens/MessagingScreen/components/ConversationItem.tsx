@@ -24,21 +24,19 @@ interface ConversationItemProps {
   onPress: () => void;
 }
 
+// Enhanced avatar handling and improved styling
 const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPress }) => {
-  // Handle both group chats and individual chats
   const displayName = conversation.name || (conversation.otherParticipant?.name) || "Chat";
   const avatarInitial = (displayName.charAt(0) || "").toUpperCase();
-  
-  // Determine if this is a group conversation
+
   const isGroup = conversation.isGroup === true;
-  
+
   return (
     <TouchableOpacity 
       style={styles.container}
       onPress={onPress}
-      activeOpacity={0.7} // Add visual feedback on press
+      activeOpacity={0.8} // Improved visual feedback
     >
-      {/* Use conditional rendering to completely avoid the reference error */}
       <Avatar 
         nativeSource={
           !isGroup && conversation.otherParticipant?.avatar 
@@ -76,6 +74,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ECECEC',
     backgroundColor: 'white',
+    borderRadius: 8, // Added rounded corners
+    marginVertical: 4, // Added spacing between items
   },
   avatar: {
     width: 50,
@@ -91,6 +91,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    color: '#333', // Improved text color
   },
   lastMessage: {
     fontSize: 14,
