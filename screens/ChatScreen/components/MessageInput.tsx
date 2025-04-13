@@ -61,23 +61,17 @@ const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [editMessage]);
 
-  const handleSend = () => {
-    onSend();
-    // Focus the input again after sending
-    inputRef.current?.focus();
-  };
-
   return (
     <View style={styles.containerWrapper}>
       {editMessage && (
         <View style={styles.editHeader}>
-          <Text style={styles.editHeaderText}>Editing message</Text>
+          <Text style={styles.editHeaderText}>Editing Message</Text>
           <TouchableOpacity onPress={onEditCancel} style={styles.editCancelButton}>
-            <Icon name="close" size={20} color="#666" />
+            <Icon name="close" size={20} color="#007AFF" />
           </TouchableOpacity>
         </View>
       )}
-      
+
       <View style={styles.container}>
         {!editMessage && (
           <TouchableOpacity 
@@ -110,7 +104,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         {value ? (
           <TouchableOpacity 
             style={[styles.sendButton, editMessage && styles.editSendButton]} 
-            onPress={handleSend}
+            onPress={onSend}
           >
             <Icon name={editMessage ? "checkmark" : "send"} size={24} color="white" />
           </TouchableOpacity>
@@ -122,6 +116,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
           )
         )}
       </View>
+
+      <Text style={styles.characterCounter}>{value.length}/500</Text>
 
       {/* Attachment Picker */}
       <AttachmentPicker
@@ -203,6 +199,13 @@ const styles = StyleSheet.create({
   },
   editSendButton: {
     backgroundColor: '#4CD964', // Green color for save/confirm
+  },
+  characterCounter: {
+    textAlign: 'right',
+    fontSize: 12,
+    color: '#666',
+    marginRight: 16,
+    marginTop: 4,
   },
 });
 

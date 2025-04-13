@@ -1,14 +1,13 @@
-//screens/MessagingScreen/hooks/useConversationActions.ts
 import { useState } from 'react';
 import { Conversation } from '../../../types/chat';
 import { API_BASE_URL } from '../../../config';
 import { useAuth } from '../../../contexts/AuthContext';
 
 const deleteConversation = async (conversation: Conversation, accessToken: string): Promise<void> => {
-  // Use proper pluralization: "groups" for group conversations, "one_to_one" for others.
   const endpoint = conversation.conversation_type === 'group' ? 'groups' : 'one_to_one';
-  
-  const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/${conversation.id}/`, {
+  const url = `${API_BASE_URL}/messaging/${endpoint}/${conversation.id}/`;
+
+  const response = await fetch(url, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -22,10 +21,10 @@ const deleteConversation = async (conversation: Conversation, accessToken: strin
 };
 
 const markAsRead = async (conversation: Conversation, accessToken: string): Promise<void> => {
-  // Use proper pluralization: "groups" for group conversations, "one_to_one" for others.
   const endpoint = conversation.conversation_type === 'group' ? 'groups' : 'one_to_one';
-  
-  const response = await fetch(`${API_BASE_URL}/api/v1/messaging/${endpoint}/${conversation.id}/`, {
+  const url = `${API_BASE_URL}/messaging/${endpoint}/${conversation.id}/`;
+
+  const response = await fetch(url, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

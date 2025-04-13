@@ -1,9 +1,10 @@
 //screens/ChatScreen/components/ChatHeader.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../../contexts/AuthContext';
+import TypingIndicator from './TypingIndicator';
 import { Conversation, Participant } from '../../../types/chat';
 
 interface ChatHeaderProps {
@@ -14,7 +15,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const currentUser = user || { id: '', username: '', email: '' };
-  
+
   const getHeaderTitle = (): string => {
     if (!conversation) return 'Chat';
 
@@ -36,73 +37,68 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
     return conversation.title || conversation.name || 'Group Chat';
   };
 
-  const getHeaderAvatar = (): ImageSourcePropType | null => {
+  const getHeaderAvatar = (): string | null => {
     if (!conversation) return null;
 
     try {
       if (conversation.conversation_type === 'chatbot') {
-        // Fallback to a default icon if asset is missing
-        return { uri: 'https://via.placeholder.com/36' };
+        return 'https://via.placeholder.com/36';
       }
 
       if (conversation.conversation_type === 'one_to_one' || conversation.conversation_type === 'direct') {
         if (conversation.otherParticipant?.avatar) {
-          return { uri: conversation.otherParticipant.avatar };
+          return conversation.otherParticipant.avatar;
         }
 
         const otherParticipant = conversation.participants?.find(
           p => p.id !== currentUser.id
         );
-        
+
         if (otherParticipant?.avatar) {
-          return { uri: otherParticipant.avatar };
+          return otherParticipant.avatar;
         }
-        
-        // Fallback to a default icon if asset is missing
-        return { uri: 'https://via.placeholder.com/36' };
+
+        return 'https://via.placeholder.com/36';
       }
 
       return null;
     } catch (error) {
       console.warn('Failed to load avatar:', error);
-      return { uri: 'https://via.placeholder.com/36' };
+      return 'https://via.placeholder.com/36';
     }
-  };
-
-  const getParticipantCount = (): number => {
-    if (!conversation || conversation.conversation_type === 'chatbot') {
-      return 0;
-    }
-    
-    return conversation.participants?.length || 0;
   };
 
   const avatar = getHeaderAvatar();
+  const isTyping = conversation?.isTyping || false;
 
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Icon name="arrow-back" size={24} color="#333" />
       </TouchableOpacity>
-      
+
       {avatar && (
-        <Image source={avatar} style={styles.avatar} />
+        <Image source={{ uri: avatar }} style={styles.avatar} />
       )}
-      
+
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{getHeaderTitle()}</Text>
 
-        {conversation?.conversation_type !== 'chatbot' && getParticipantCount() > 0 && (
-          <Text style={styles.subtitle}>{getParticipantCount()} participants</Text>
+        {isTyping ? (
+          <TypingIndicator visible={true} conversationId={conversation?.id || ''} />
+        ) : (
+          conversation?.conversation_type !== 'chatbot' && (
+            <Text style={styles.subtitle}>{conversation?.participants?.length || 0} participants</Text>
+          )
         )}
       </View>
-      
+
       {conversation?.conversation_type !== 'chatbot' && (
         <TouchableOpacity style={styles.actionButton}>
           <Icon name="call-outline" size={24} color="#333" />
         </TouchableOpacity>
       )}
-      
+
       <TouchableOpacity style={styles.actionButton}>
         <Icon name="ellipsis-vertical" size={24} color="#333" />
       </TouchableOpacity>

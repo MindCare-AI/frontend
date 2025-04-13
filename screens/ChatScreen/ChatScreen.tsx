@@ -14,7 +14,6 @@ import LoadingIndicator from '../../components/ui/LoadingIndicator';
 import ErrorMessage from '../../components/ui/ErrorMessage';
 import { Message } from '../../types/chat';
 import { useAuth } from '../../contexts/AuthContext';
-import { connectWebSocket } from '../../services/websocket';
 import { useWebSocket } from '../../services/websocket';
 
 type ChatRouteProp = RouteProp<MessagingStackParamList, 'Chat'>;

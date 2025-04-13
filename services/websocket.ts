@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { WS_BASE_URL } from '../config';
-import { getAuthToken } from '../utils/auth';
+import { getAuthToken } from '../lib/utils';
 import * as NetInfo from "@react-native-community/netinfo";
 import type { NetInfoState } from "@react-native-community/netinfo";
 
@@ -13,8 +13,9 @@ interface WebSocketHook {
   sendMessage: (message: WebSocketMessage) => void;
   connectionStatus: 'connecting' | 'connected' | 'disconnected';
 }
+ 
+const baseUrl = WS_BASE_URL.replace('127.0.0.1','10.0.2.2');
 
-// This is your dedicated connectWebSocket utility.
 export const connectWebSocket = (
   conversationId: string,
   token: string,
@@ -22,14 +23,18 @@ export const connectWebSocket = (
   onTypingIndicator?: (data: any) => void,
   onReadReceipt?: (data: any) => void
 ): WebSocket => {
-  const socket = new WebSocket(`${WS_BASE_URL}/ws/messaging/${conversationId}/?token=${token}`);
+  // Ensure token is included in the WebSocket URL
+  const socket = new WebSocket(`${baseUrl}/ws/messaging/${conversationId}/?token=${token}`);
 
   socket.onopen = () => {
     console.log('[WS] Connection established for conversation', conversationId);
-    // Send join message to ensure we're connected to the room
+    // Send join message with user information
     socket.send(JSON.stringify({ 
       type: 'join', 
-      data: { conversation_id: conversationId } 
+      data: { 
+        conversation_id: conversationId,
+        token // Include token in join message
+      } 
     }));
   };
 
@@ -115,13 +120,13 @@ export const useWebSocket = (
     onMessageReceivedRef.current = onMessageReceived;
   }, [onMessageReceived]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => { // changed: add async
     if (!conversationId) {
       console.warn('Missing conversation ID');
       return;
     }
 
-    const token = getAuthToken();
+    const token = await getAuthToken(); // changed: await getAuthToken()
     if (!token) {
       console.error('No authentication token available');
       return; 
@@ -131,7 +136,7 @@ export const useWebSocket = (
 
     ws.current = connectWebSocket(
       conversationId,
-      token,
+      token, // now token is resolved string
       (msg) => {
         console.log('[WS Hook] onMessageReceived invoked with:', msg);
         onMessageReceivedRef.current(msg);
@@ -156,10 +161,12 @@ export const useWebSocket = (
           console.error('Max reconnection attempts reached');
         }
       }
+      ws.current = null; // changed: reset ws.current to allow future reconnections
     };
 
     ws.current.onerror = (error) => {
       console.error('WebSocket error (hook):', error);
+      ws.current = null; // changed: reset ws.current to allow reconnections via NetInfo
     };
 
     ws.current.onopen = () => {

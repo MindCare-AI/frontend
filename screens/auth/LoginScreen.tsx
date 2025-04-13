@@ -24,9 +24,9 @@ import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
-import { resetOnboardingStatus } from '../../utils/onboarding';
-import { setCachedToken } from '../../utils/auth';
-import { getShadowStyles } from '../../utils/styles';
+import { resetOnboardingStatus } from '../../lib/onboarding';
+import { setCachedToken } from '../../lib/utils';
+import { getShadowStyles } from '../../styles/global';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;

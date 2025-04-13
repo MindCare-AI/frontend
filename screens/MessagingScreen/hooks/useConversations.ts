@@ -1,7 +1,7 @@
 //screens/MessagingScreen/hooks/useConversations.ts
 import { useState, useEffect, useCallback } from 'react';
 import { Conversation } from '../../../types/chat';
-import { API_BASE_URL } from '../../../config';
+import { API_URL } from '../../../config'; // Updated to use API_URL
 import { useAuth } from '../../../contexts/AuthContext';
 
 const useConversations = () => {
@@ -27,14 +27,12 @@ const useConversations = () => {
       // When refreshing, reset to page 1
       const newPage = refresh ? 1 : page;
       
-      // Build query params using only the page param (per API docs)
       const queryParams = new URLSearchParams({
         page: newPage.toString(),
       });
       
-      // Build endpoints: one_to_one and groups
-      const oneToOneEndpoint = `${API_BASE_URL}/api/v1/messaging/one_to_one/?${queryParams.toString()}`;
-      const groupsEndpoint = `${API_BASE_URL}/api/v1/messaging/groups/?${queryParams.toString()}`;
+      const oneToOneEndpoint = `${API_URL}/messaging/one_to_one/?${queryParams.toString()}`;
+      const groupsEndpoint = `${API_URL}/messaging/groups/?${queryParams.toString()}`;
       
       // Fetch both endpoints in parallel
       const [oneToOneResponse, groupsResponse] = await Promise.all([
@@ -113,7 +111,7 @@ const useConversations = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, accessToken]);
+  }, [page, accessToken]);
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
@@ -122,6 +120,13 @@ const useConversations = () => {
     setConversations([]);
     loadConversations(true);
   }, [loadConversations]);
+
+  const loadMore = useCallback(() => {
+    // Add conditions to prevent rapid reloading
+    if (hasMore && !loading) {
+      loadConversations();
+    }
+  }, [hasMore, loading, loadConversations]);
 
   useEffect(() => {
     loadConversations();
@@ -133,8 +138,9 @@ const useConversations = () => {
     error,
     searchQuery,
     handleSearch,
-    loadMore: () => hasMore && !loading && loadConversations(),
+    loadMore,
     refresh: () => loadConversations(true),
+    typingIndicators: [] // Added default value for typing indicators
   };
 };
 

@@ -7,10 +7,15 @@ interface NewChatButtonProps {
   onPress: () => void;
 }
 
+// Modernized button design with better shadows and animations
 const NewChatButton = ({ onPress }: NewChatButtonProps) => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={onPress}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={onPress}
+        activeOpacity={0.8} // Improved feedback
+      >
         <Icon name="create-outline" size={24} color="white" />
       </TouchableOpacity>
     </View>
@@ -30,7 +35,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 6, // Enhanced shadow for a modern look
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });
 
