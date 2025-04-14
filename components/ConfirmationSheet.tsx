@@ -1,204 +1,261 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { Calendar as CalendarIcon, Clock, User } from 'lucide-react-native';
-import { format } from 'date-fns';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 interface ConfirmationSheetProps {
-  isOpen: boolean;
-  onClose: () => void;
-  therapist: any;
-  date: Date | undefined;
-  time: string | null;
-  onConfirm: () => void;
-  isLoading: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => Promise<void>;
+  onCancel: () => void;
+  variant?: 'danger' | 'default';
+  isVisible: boolean;
 }
 
-const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
-  isOpen,
-  onClose,
-  therapist,
-  date,
-  time,
+export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   onConfirm,
-  isLoading
+  onCancel,
+  variant = 'default',
+  isVisible,
 }) => {
-  if (!therapist || !date || !time) return null;
+  const [isLoading, setIsLoading] = useState(false);
+  const translateY = React.useRef(new Animated.Value(300)).current;
+  const opacity = React.useRef(new Animated.Value(0)).current;
+  const scale = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    if (isVisible) {
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+    } else {
+      Animated.parallel([
+        Animated.spring(translateY, {
+          toValue: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isVisible]);
+
+  const handleConfirm = async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    Animated.sequence([
+      Animated.spring(scale, {
+        toValue: 0.95,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(
+        variant === 'danger'
+          ? Haptics.NotificationFeedbackType.Warning
+          : Haptics.NotificationFeedbackType.Success
+      );
+    }
+
+    try {
+      await onConfirm();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (isLoading) return;
+    
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    onCancel();
+  };
+
+  if (!isVisible) return null;
 
   return (
-    <Modal
-      visible={isOpen}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
+    <Animated.View
+      style={[
+        styles.overlay,
+        {
+          opacity,
+        },
+      ]}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Confirm Appointment</Text>
-          </View>
-          
-          <View style={styles.content}>
-            {/* Therapist Info */}
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <User size={18} color="#6B7280" />
-                <Text style={styles.infoTitle}>Therapist</Text>
-              </View>
-              <View style={styles.therapistInfo}>
-                <Image 
-                  source={{ uri: therapist.image }}
-                  style={styles.therapistImage}
-                />
-                <View>
-                  <Text style={styles.therapistName}>{therapist.name}</Text>
-                  <Text style={styles.therapistSpecialty}>{therapist.specialty}</Text>
-                </View>
-              </View>
-            </View>
-            
-            {/* Date Info */}
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <CalendarIcon size={18} color="#6B7280" />
-                <Text style={styles.infoTitle}>Date</Text>
-              </View>
-              <Text style={styles.infoText}>
-                {format(date, 'EEEE, MMMM d, yyyy')}
+      <TouchableOpacity
+        style={styles.backdrop}
+        onPress={handleCancel}
+        activeOpacity={1}
+      />
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            transform: [
+              { translateY },
+              { scale },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.handle} />
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.message}>{message}</Text>
+        
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            onPress={handleCancel}
+            style={[styles.button, styles.cancelButton]}
+            disabled={isLoading}
+          >
+            <Text style={styles.cancelButtonText}>
+              {cancelText}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleConfirm}
+            style={[
+              styles.button,
+              styles.confirmButton,
+              variant === 'danger' && styles.dangerButton,
+              isLoading && styles.loadingButton,
+            ]}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text
+                style={[
+                  styles.confirmButtonText,
+                  variant === 'danger' && styles.dangerButtonText,
+                ]}
+              >
+                {confirmText}
               </Text>
-            </View>
-            
-            {/* Time Info */}
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <Clock size={18} color="#6B7280" />
-                <Text style={styles.infoTitle}>Time</Text>
-              </View>
-              <Text style={styles.infoText}>{time}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.footer}>
-            <TouchableOpacity 
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-              disabled={isLoading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.button, styles.confirmButton]}
-              onPress={onConfirm}
-              disabled={isLoading}
-            >
-              <Text style={styles.confirmButtonText}>
-                {isLoading ? 'Processing...' : 'Confirm Booking'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            )}
+          </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
+      </Animated.View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sheet: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 16,
-    maxHeight: '80%',
+    padding: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',
+      },
+    }),
   },
-  header: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingBottom: 12,
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
     marginBottom: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1F2937',
+    marginBottom: 8,
   },
-  content: {
-    flex: 1,
-  },
-  infoCard: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoTitle: {
-    marginLeft: 8,
+  message: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#374151',
+    color: '#4B5563',
+    marginBottom: 24,
+    lineHeight: 24,
   },
-  therapistInfo: {
+  buttonContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  therapistImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-  },
-  therapistName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-  },
-  therapistSpecialty: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  infoText: {
-    fontSize: 16,
-    color: '#111827',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    gap: 12,
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
-    marginHorizontal: 6,
+    justifyContent: 'center',
   },
   cancelButton: {
     backgroundColor: '#F3F4F6',
   },
   confirmButton: {
-    backgroundColor: 'black',
+    backgroundColor: '#002D62',
+  },
+  dangerButton: {
+    backgroundColor: '#DC2626',
+  },
+  loadingButton: {
+    opacity: 0.7,
   },
   cancelButtonText: {
-    color: '#374151',
     fontSize: 16,
     fontWeight: '500',
+    color: '#6B7280',
   },
   confirmButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  dangerButtonText: {
+    color: '#FFFFFF',
   },
 });
-
-export default ConfirmationSheet;

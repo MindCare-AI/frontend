@@ -1,6 +1,6 @@
 //screens/SettingsScreen/UserProfileScreen.tsx
 import React, { useRef, useEffect, useState } from 'react';
-import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, SafeAreaView, Animated, Easing } from 'react-native';
 import { Button, Text, IconButton, Surface, Divider, TextInput } from 'react-native-paper';
 import { NavigationProp } from '@react-navigation/native';
 import { SettingsStackParamList } from '../../types/navigation';
@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
 import { gsap } from 'gsap';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { 
   EmergencyContact, 
   PatientProfile, 
@@ -51,6 +52,42 @@ interface TherapistProfessionalInfo {
   verification_status?: 'pending' | 'verified' | 'rejected';
 }
 
+const LoadingSkeleton = () => {
+  const animatedValue = new Animated.Value(0);
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <View style={styles.skeletonContainer}>
+      <Animated.View style={[styles.skeletonItem, { opacity }]} />
+      <Animated.View style={[styles.skeletonItem, { opacity }]} />
+      <Animated.View style={[styles.skeletonItem, { opacity }]} />
+    </View>
+  );
+};
+
 export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => {
   const { user, signOut, fetchUserData, accessToken, updateUser } = useAuth();
   const {
@@ -75,6 +112,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
 
   const MAX_RETRIES = 3;
   const [retryCount, setRetryCount] = useState(0);
+  const saveButtonScale = new Animated.Value(1);
 
   useEffect(() => {
     if (!user || !accessToken) return;
@@ -320,6 +358,19 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
       repeat: 1
     });
     
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    Animated.sequence([
+      Animated.spring(saveButtonScale, {
+        toValue: 0.95,
+        useNativeDriver: true,
+      }),
+      Animated.spring(saveButtonScale, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     setIsSaving(true);
     try {
       const endpoint = user.user_type === 'patient'
@@ -580,8 +631,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
       <SafeAreaView style={styles.safeAreaContainer}>
         <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={styles.gradientContainer}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#002D62" />
-            <Text style={styles.loadingText}>Loading profile...</Text>
+            <LoadingSkeleton />
           </View>
         </LinearGradient>
       </SafeAreaView>
@@ -784,7 +834,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
             )}
           </View>
 
-          <View ref={buttonRef} style={styles.buttonContainer}>
+          <Animated.View style={[
+            styles.saveButtonContainer,
+            { transform: [{ scale: saveButtonScale }] }
+          ]}>
             <Button 
               mode="contained" 
               onPress={handleSave}
@@ -794,9 +847,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
               labelStyle={styles.saveButtonLabel}
               disabled={isSaving}
             >
-              Save Changes
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
-          </View>
+          </Animated.View>
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -872,17 +925,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 8,
   },
-  buttonContainer: {
-    marginVertical: 24, 
+  saveButtonContainer: {
+    marginTop: 24,
+    marginBottom: 32,
   },
   saveButton: {
     backgroundColor: '#002D62',
-    borderRadius: 10,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveButtonContent: {
     paddingVertical: 8,
@@ -890,14 +940,12 @@ const styles = StyleSheet.create({
   },
   saveButtonLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 16,
@@ -966,5 +1014,14 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     fontSize: 14,
+  },
+  skeletonContainer: {
+    padding: 20,
+    gap: 16,
+  },
+  skeletonItem: {
+    height: 60,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 12,
   },
 });

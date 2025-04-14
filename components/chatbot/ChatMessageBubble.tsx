@@ -1,74 +1,108 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import Markdown from 'react-native-markdown-display';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import Animated, {
+  FadeIn,
+  SlideInRight,
+  SlideInLeft,
+  Layout,
+} from 'react-native-reanimated';
 
 interface ChatMessageBubbleProps {
   message: string;
-  isBot: boolean;
-  timestamp: string;
-  status?: 'sending' | 'sent' | 'failed';
-  onRetry?: () => void;
+  isBot?: boolean;
+  timestamp?: Date;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
-const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
+export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   message,
-  isBot,
+  isBot = false,
   timestamp,
   status = 'sent',
-  onRetry,
 }) => {
-  const isFailed = status === 'failed';
-  const isSending = status === 'sending';
+  const entering = isBot ? SlideInLeft : SlideInRight;
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'sending':
+        return '●●●';
+      case 'sent':
+        return '✓';
+      case 'delivered':
+        return '✓✓';
+      case 'read':
+        return '✓✓';
+      default:
+        return '';
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (status) {
+      case 'sending':
+        return '#9CA3AF';
+      case 'read':
+        return '#3B82F6';
+      default:
+        return '#6B7280';
+    }
+  };
 
   return (
-    <View style={[
-      styles.container,
-      isBot ? styles.botContainer : styles.userContainer,
-      isFailed && styles.failedContainer
-    ]}>
-      <View style={[
-        styles.bubble,
-        isBot ? styles.botBubble : styles.userBubble,
-        isFailed && styles.failedBubble
-      ]}>
-        <Markdown style={isBot ? botMarkdownStyles : userMarkdownStyles}>
+    <Animated.View
+      entering={entering.duration(300)}
+      layout={Layout.springify()}
+      style={[
+        styles.container,
+        isBot ? styles.botContainer : styles.userContainer,
+      ]}
+    >
+      <View
+        style={[
+          styles.bubble,
+          isBot ? styles.botBubble : styles.userBubble,
+        ]}
+      >
+        <Animated.Text
+          entering={FadeIn.duration(200)}
+          style={[
+            styles.message,
+            isBot ? styles.botMessage : styles.userMessage,
+          ]}
+        >
           {message}
-        </Markdown>
-        
-        <View style={styles.footer}>
-          <Text style={[
-            styles.timestamp,
-            isBot ? styles.botTimestamp : styles.userTimestamp
-          ]}>
-            {format(new Date(timestamp), 'HH:mm')}
-          </Text>
+        </Animated.Text>
+
+        <View style={styles.metadata}>
+          {timestamp && (
+            <Text style={styles.timestamp}>
+              {timestamp.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          )}
           
           {!isBot && (
-            <View style={styles.statusContainer}>
-              {isSending && (
-                <Ionicons name="time-outline" size={14} color="#666" />
-              )}
-              {isFailed && (
-                <TouchableOpacity onPress={onRetry}>
-                  <Ionicons name="refresh-circle" size={20} color="#FF3B30" />
-                </TouchableOpacity>
-              )}
-              {status === 'sent' && (
-                <Ionicons name="checkmark-circle" size={14} color="#4CD964" />
-              )}
-            </View>
+            <Text
+              style={[
+                styles.status,
+                { color: getStatusColor() },
+              ]}
+            >
+              {getStatusText()}
+            </Text>
           )}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     marginVertical: 4,
+    marginHorizontal: 16,
     maxWidth: '80%',
   },
   botContainer: {
@@ -77,68 +111,56 @@ const styles = StyleSheet.create({
   userContainer: {
     alignSelf: 'flex-end',
   },
-  failedContainer: {
-    opacity: 0.8,
-  },
   bubble: {
-    padding: 12,
-    borderRadius: 16,
-    borderBottomLeftRadius: 4,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+      },
+    }),
   },
   botBubble: {
-    backgroundColor: '#E8E8E8',
+    backgroundColor: '#F3F4F6',
     borderBottomLeftRadius: 4,
   },
   userBubble: {
     backgroundColor: '#002D62',
     borderBottomRightRadius: 4,
   },
-  failedBubble: {
-    backgroundColor: '#FFE5E5',
+  message: {
+    fontSize: 16,
+    lineHeight: 24,
   },
-  footer: {
+  botMessage: {
+    color: '#1F2937',
+  },
+  userMessage: {
+    color: '#FFFFFF',
+  },
+  metadata: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     marginTop: 4,
+    gap: 4,
   },
   timestamp: {
     fontSize: 12,
-    opacity: 0.7,
+    color: '#9CA3AF',
   },
-  botTimestamp: {
-    color: '#666',
-  },
-  userTimestamp: {
-    color: '#FFF',
-  },
-  statusContainer: {
-    marginLeft: 8,
+  status: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
-
-const botMarkdownStyles = {
-  body: {
-    color: '#333',
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  paragraph: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
-
-const userMarkdownStyles = {
-  body: {
-    color: '#FFF',
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  paragraph: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-};
-
-export default ChatMessageBubble;

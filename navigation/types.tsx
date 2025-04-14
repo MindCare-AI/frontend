@@ -3,7 +3,9 @@ export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
   Auth: { screen?: string; params?: object };
-  App: { screen?: string; params?: object };
+  App: { screen?: keyof AppStackParamList; params?: object };
+  Appointments: { screen: keyof AppointmentStackParamList; params?: undefined }; // Simplified to align with expected structure
+  BookAppointment: undefined;
 };
 
 export type AppStackParamList = {
@@ -28,4 +30,9 @@ export type SettingsStackParamList = {
   TherapistAvailability: undefined;
   HealthMetrics: undefined; // Add this
   MedicalHistory: undefined; // Add this
+};
+
+export type AppointmentStackParamList = {
+  AppointmentManagement: undefined;
+  BookAppointment: undefined;
 };

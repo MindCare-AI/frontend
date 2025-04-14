@@ -1,6 +1,6 @@
 //screens/SettingsScreen/components/BasicInformationSection.tsx
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Surface, Text, TextInput, Divider } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -20,6 +20,22 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
   userInfo,
   onUpdate,
 }) => {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [date, setDate] = useState(new Date(userInfo.date_of_birth || Date.now()));
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(selectedDate);
+      onUpdate('date_of_birth', selectedDate.toISOString().split('T')[0]);
+    }
+  };
+
+  const validatePhoneNumber = (number: string) => {
+    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+    return number === '' || phoneRegex.test(number);
+  };
+
   return (
     <Surface style={styles.card}>
       <Text style={styles.cardTitle}>Basic Information</Text>
@@ -31,6 +47,7 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
         value={userInfo.first_name}
         onChangeText={(text) => onUpdate('first_name', text)}
         style={styles.inputField}
+        autoCapitalize="words"
       />
       
       <TextInput
@@ -39,24 +56,43 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
         value={userInfo.last_name}
         onChangeText={(text) => onUpdate('last_name', text)}
         style={styles.inputField}
+        autoCapitalize="words"
       />
       
       <TextInput
         label="Phone Number"
         mode="outlined"
         value={userInfo.phone_number}
-        onChangeText={(text) => onUpdate('phone_number', text)}
+        onChangeText={(text) => {
+          if (validatePhoneNumber(text)) {
+            onUpdate('phone_number', text);
+          }
+        }}
         style={styles.inputField}
         keyboardType="phone-pad"
+        placeholder="+1 234 567 8900"
       />
       
-      <TextInput
-        label="Date of Birth"
-        mode="outlined"
-        value={userInfo.date_of_birth}
-        onChangeText={(text) => onUpdate('date_of_birth', text)}
-        style={styles.inputField}
-      />
+      <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+        <TextInput
+          label="Date of Birth"
+          mode="outlined"
+          value={userInfo.date_of_birth}
+          editable={false}
+          style={styles.inputField}
+          right={<TextInput.Icon icon="calendar" />}
+        />
+      </TouchableOpacity>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={date}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          maximumDate={new Date()}
+        />
+      )}
     </Surface>
   );
 };

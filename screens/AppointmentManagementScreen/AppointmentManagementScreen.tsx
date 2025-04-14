@@ -1,44 +1,66 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Calendar, CalendarCheck, Plus } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '@/types/navigation';
+import { RootStackParamList } from '../../navigation/types';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AppointmentManagement'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteProps = {
+  params?: {
+    therapistId?: string;
+  };
+};
 
-// Mock data for appointments
-const APPOINTMENTS = [
-  {
-    id: 'a1',
-    therapist: 'Dr. Sarah Johnson',
-    date: '2023-06-15',
-    time: '10:00',
-    status: 'upcoming',
-  },
-  {
-    id: 'a2',
-    therapist: 'Dr. Michael Chen',
-    date: '2023-06-22',
-    time: '14:00',
-    status: 'upcoming',
-  },
-  {
-    id: 'a3',
-    therapist: 'Dr. Lisa Patel',
-    date: '2023-05-30',
-    time: '11:00',
-    status: 'completed',
-  },
-];
+type Appointment = {
+  id: string;
+  therapist: {
+    full_name: string;
+  };
+  appointment_date: string;
+  status: 'upcoming' | 'completed';
+};
 
 const AppointmentManagementScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute();
+  const { params } = route as RouteProps;
+  const { accessToken } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatDate = (dateString: string) => {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const url = params?.therapistId 
+          ? `${API_URL}/therapist/appointments/?therapist_id=${params.therapistId}`
+          : `${API_URL}/therapist/appointments/`;
+
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch appointments');
+        }
+
+        const data = await response.json();
+        setAppointments(data.results);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (accessToken) {
+      fetchAppointments();
+    }
+  }, [accessToken, params?.therapistId]);
 
   return (
     <ScrollView style={styles.container}>
@@ -47,7 +69,7 @@ const AppointmentManagementScreen: React.FC = () => {
         <Text style={styles.headerTitle}>Your Appointments</Text>
         <TouchableOpacity
           style={styles.bookButton}
-          onPress={() => navigation.navigate('BookAppointment')} // Replace with the correct screen name
+          onPress={() => navigation.navigate('BookAppointment')}
         >
           <Plus size={18} color="white" />
           <Text style={styles.bookButtonText}>Book Appointment</Text>
@@ -55,43 +77,41 @@ const AppointmentManagementScreen: React.FC = () => {
       </View>
 
       {/* Appointments List */}
-      <View style={styles.appointmentsContainer}>
-        {APPOINTMENTS.length > 0 ? (
-          APPOINTMENTS.map((appointment) => (
-            <View key={appointment.id} style={styles.card}>
-              <View style={styles.cardContent}>
-                <View>
-                  <Text style={styles.therapistName}>{appointment.therapist}</Text>
-                  <View style={styles.infoRow}>
-                    <Calendar size={16} color="#666" />
-                    <Text style={styles.infoText}>{formatDate(appointment.date)}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <Calendar size={16} color="#666" />
-                    <Text style={styles.infoText}>{appointment.time}</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    appointment.status === 'upcoming' ? styles.upcomingBadge : styles.completedBadge,
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {appointment.status === 'upcoming' ? 'Upcoming' : 'Completed'}
-                  </Text>
+      {loading ? (
+        <Text>Loading...</Text>
+      ) : appointments.length > 0 ? (
+        appointments.map((appointment) => (
+          <View key={appointment.id} style={styles.card}>
+            <View style={styles.cardContent}>
+              <View>
+                <Text style={styles.therapistName}>{appointment.therapist.full_name}</Text>
+                <View style={styles.infoRow}>
+                  <Calendar size={16} color="#666" />
+                  <Text style={styles.infoText}>{new Date(appointment.appointment_date).toLocaleString()}</Text>
                 </View>
               </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  appointment.status === 'upcoming' ? styles.upcomingBadge : styles.completedBadge,
+                ]}
+              >
+                <Text style={styles.statusText}>{appointment.status}</Text>
+              </View>
             </View>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <CalendarCheck size={48} color="#CCC" />
-            <Text style={styles.emptyStateTitle}>No appointments yet</Text>
-            <Text style={styles.emptyStateText}>Book your first appointment to get started</Text>
           </View>
-        )}
-      </View>
+        ))
+      ) : (
+        <View style={styles.emptyState}>
+          <CalendarCheck size={48} color="#CCC" />
+          <Text style={styles.emptyStateTitle}>No appointments yet</Text>
+          <Text style={styles.emptyStateText}>
+            {params?.therapistId 
+              ? "Schedule your first appointment with this therapist"
+              : "Book your first appointment to get started"}
+          </Text>
+        </View>
+      )}
     </ScrollView>
   );
 };

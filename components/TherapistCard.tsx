@@ -1,160 +1,236 @@
-import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Star } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Avatar } from './ui/avatar';
 
 interface TherapistCardProps {
-  therapist: {
-    id: string;
-    name: string;
-    specialty: string;
-    rating: number;
-    image: string;
-  };
-  isSelected: boolean;
-  onSelect: () => void;
+  name: string;
+  specialty: string;
+  experience: string;
+  rating: number;
+  imageUrl?: string;
+  onPress?: () => void;
+  style?: any;
 }
 
-const TherapistCard: React.FC<TherapistCardProps> = ({
-  therapist,
-  isSelected,
-  onSelect
+export const TherapistCard: React.FC<TherapistCardProps> = ({
+  name,
+  specialty,
+  experience,
+  rating,
+  imageUrl,
+  onPress,
+  style,
 }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const pressAnim = React.useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (isLoading) return;
+
+    Animated.spring(pressAnim, {
+      toValue: 0.98,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handlePressOut = () => {
+    if (isLoading) return;
+
+    Animated.spring(pressAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
+
+  const handlePress = async () => {
+    if (isLoading || !onPress) return;
+
+    setIsLoading(true);
+    
+    // Animate scale down
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+
+    try {
+      await onPress();
+    } finally {
+      setIsLoading(false);
+      // Animate scale back up
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+    }
+  };
+
+  const getRatingColor = () => {
+    if (rating >= 4.5) return '#059669';
+    if (rating >= 4.0) return '#0D9488';
+    if (rating >= 3.5) return '#D97706';
+    return '#DC2626';
+  };
+
   return (
-    <TouchableOpacity
-      onPress={onSelect}
+    <Animated.View
       style={[
         styles.container,
-        isSelected ? styles.selectedContainer : styles.unselectedContainer
+        {
+          transform: [
+            { scale: Animated.multiply(scaleAnim, pressAnim) },
+          ],
+        },
+        style,
       ]}
     >
-      <View style={styles.content}>
-        <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: therapist.image }}
-            style={styles.image}
+      <TouchableOpacity
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isLoading}
+        style={styles.touchable}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${name}'s profile`}
+        accessibilityHint={`${specialty} with ${experience} experience`}
+      >
+        <View style={styles.content}>
+          <Avatar
+            src={imageUrl}
+            alt={name}
+            size="lg"
+            style={styles.avatar}
           />
-        </View>
-        
-        <View style={styles.infoContainer}>
-          <Text style={[
-            styles.name,
-            isSelected && styles.selectedText
-          ]}>
-            {therapist.name}
-          </Text>
           
-          <Text style={[
-            styles.specialty,
-            isSelected && styles.selectedSpecialty
-          ]}>
-            {therapist.specialty}
-          </Text>
-          
-          <View style={styles.ratingContainer}>
-            <Star 
-              size={14} 
-              color={isSelected ? "#FCD34D" : "#F59E0B"} 
-              fill="currentColor" 
-            />
-            <Text style={[
-              styles.rating,
-              isSelected && styles.selectedText
-            ]}>
-              {therapist.rating}
+          <View style={styles.info}>
+            <Text style={styles.name} numberOfLines={1}>
+              {name}
+            </Text>
+            <Text style={styles.specialty} numberOfLines={1}>
+              {specialty}
+            </Text>
+            <Text style={styles.experience} numberOfLines={1}>
+              {experience}
             </Text>
           </View>
+
+          <View style={styles.ratingContainer}>
+            <Text
+              style={[
+                styles.rating,
+                { color: getRatingColor() },
+              ]}
+            >
+              {rating.toFixed(1)}
+            </Text>
+            <View style={styles.starsContainer}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Text
+                  key={index}
+                  style={[
+                    styles.star,
+                    { color: index < Math.floor(rating) ? '#FBBF24' : '#E5E7EB' },
+                  ]}
+                >
+                  ★
+                </Text>
+              ))}
+            </View>
+          </View>
         </View>
-        
-        <View style={[
-          styles.checkmark,
-          isSelected ? styles.selectedCheckmark : styles.unselectedCheckmark
-        ]}>
-          {isSelected && (
-            <View style={styles.checkIcon} />
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
+
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator color="#002D62" />
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      },
+    }),
   },
-  selectedContainer: {
-    backgroundColor: 'black',
-  },
-  unselectedContainer: {
-    backgroundColor: '#F3F4F6',
+  touchable: {
+    flex: 1,
   },
   content: {
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  imageContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
+  avatar: {
     marginRight: 16,
-    borderWidth: 2,
-    borderColor: 'white',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  infoContainer: {
+  info: {
     flex: 1,
+    marginRight: 12,
   },
   name: {
     fontSize: 18,
-    fontWeight: '500',
-    color: '#111827',
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
   },
   specialty: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  experience: {
     fontSize: 14,
     color: '#6B7280',
   },
   ratingContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
   },
   rating: {
-    marginLeft: 4,
-    fontSize: 14,
-    color: '#111827',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  selectedText: {
-    color: 'white',
+  starsContainer: {
+    flexDirection: 'row',
   },
-  selectedSpecialty: {
-    color: '#E5E7EB',
+  star: {
+    fontSize: 16,
+    marginHorizontal: 1,
   },
-  checkmark: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     alignItems: 'center',
-  },
-  selectedCheckmark: {
-    backgroundColor: 'white',
-  },
-  unselectedCheckmark: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  checkIcon: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'black',
+    justifyContent: 'center',
   },
 });
-
-export default TherapistCard;

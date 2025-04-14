@@ -8,7 +8,7 @@ export type RootStackParamList = {
   Chatbot: undefined;
   MessagingTab: undefined;
   Profile: undefined;
-  AppointmentManagement: undefined;
+  AppointmentManagement: { therapistId?: string };
   Notifications: undefined; // Add this
   NotificationDetail: { id: string }; // And this
   Settings: undefined;

@@ -1,5 +1,5 @@
 //screens/SettingsScreen/components/patient/PatientEmergencyContact.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
@@ -15,11 +15,26 @@ export const PatientEmergencyContact: React.FC<PatientEmergencyContactProps> = (
   emergencyContact,
   onEmergencyContactChange,
 }) => {
+  const [phoneError, setPhoneError] = useState('');
+
   const handleChange = (field: keyof EmergencyContact, value: string) => {
     onEmergencyContactChange({
       ...emergencyContact,
       [field]: value,
     });
+  };
+
+  const validatePhone = (phone: string) => {
+    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const handlePhoneChange = (text: string) => {
+    setPhoneError('');
+    if (text && !validatePhone(text)) {
+      setPhoneError('Please enter a valid phone number');
+    }
+    handleChange('phone', text);
   };
 
   return (
@@ -52,11 +67,14 @@ export const PatientEmergencyContact: React.FC<PatientEmergencyContactProps> = (
       <TextInput
         label="Phone Number"
         value={emergencyContact.phone || ''}
-        onChangeText={(text) => handleChange('phone', text)}
+        onChangeText={handlePhoneChange}
         keyboardType="phone-pad"
-        style={styles.input}
+        style={[styles.input, phoneError ? styles.inputError : null]}
         mode="outlined"
+        error={!!phoneError}
+        helperText={phoneError}
       />
+      {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
     </View>
   );
 };
@@ -86,5 +104,14 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
+  },
+  inputError: {
+    borderColor: '#ff0000',
+  },
+  errorText: {
+    color: '#ff0000',
+    fontSize: 12,
+    marginTop: -12,
+    marginBottom: 8,
   },
 });
