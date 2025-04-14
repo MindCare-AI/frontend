@@ -1,7 +1,7 @@
 //screens/SettingsScreen/components/therapist/TherapistProfessionalInfo.tsx
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { TextInput, Text } from 'react-native-paper';
+import { TextInput, Text, HelperText } from 'react-native-paper';
 
 export interface TherapistProfile {
   specialization: string;
@@ -14,38 +14,62 @@ interface TherapistProfessionalInfoProps {
   setProfile: (profile: TherapistProfile) => void;
 }
 
-export const TherapistProfessionalInfo: React.FC<TherapistProfessionalInfoProps> = ({ profile, setProfile }) => (
-  <View style={styles.container}>
-    <Text variant="titleMedium" style={styles.sectionTitle}>
-      Professional Information
-    </Text>
-    <TextInput
-      label="Specialization"
-      value={profile.specialization}
-      onChangeText={text => setProfile({ ...profile, specialization: text })}
-      style={styles.input}
-    />
-    <TextInput
-      label="License Number"
-      value={profile.license_number}
-      onChangeText={text => {
-        // Only update if the text is empty or matches the format AA-123456
-        if (/^[A-Z]{2}-\d{6}$/.test(text) || text === '') {
-          setProfile({ ...profile, license_number: text });
-        }
-      }}
-      error={!!profile.license_number && !/^[A-Z]{2}-\d{6}$/.test(profile.license_number)}
-      style={styles.input}
-    />
-    <TextInput
-      label="Years of Experience"
-      value={String(profile.years_of_experience)}
-      onChangeText={text => setProfile({ ...profile, years_of_experience: parseInt(text) || 0 })}
-      keyboardType="numeric"
-      style={styles.input}
-    />
-  </View>
-);
+export const TherapistProfessionalInfo: React.FC<TherapistProfessionalInfoProps> = ({ profile, setProfile }) => {
+  const isLicenseNumberValid = (number: string) => /^[A-Z]{2}-\d{6}$/.test(number);
+  const hasLicenseError = !!profile.license_number && !isLicenseNumberValid(profile.license_number);
+
+  return (
+    <View style={styles.container}>
+      <Text variant="titleMedium" style={styles.sectionTitle}>
+        Professional Information
+      </Text>
+      
+      <TextInput
+        label="Specialization"
+        value={profile.specialization}
+        onChangeText={text => setProfile({ ...profile, specialization: text })}
+        style={styles.input}
+        mode="outlined"
+      />
+      
+      <View>
+        <TextInput
+          label="License Number"
+          value={profile.license_number || ''}
+          onChangeText={text => {
+            // Allow any input but uppercase letters automatically
+            const formattedText = text.toUpperCase();
+            setProfile({ ...profile, license_number: formattedText });
+          }}
+          error={hasLicenseError}
+          style={styles.input}
+          mode="outlined"
+          placeholder="XX-123456"
+        />
+        <HelperText type={hasLicenseError ? "error" : "info"} visible={true}>
+          {hasLicenseError 
+            ? "Format should be: XX-123456 (e.g., AB-123456)" 
+            : "Enter your license number in format: XX-123456"}
+        </HelperText>
+      </View>
+      
+      <TextInput
+        label="Years of Experience"
+        value={String(profile.years_of_experience)}
+        onChangeText={text => {
+          const years = parseInt(text) || 0;
+          if (years >= 0 && years <= 100) {
+            setProfile({ ...profile, years_of_experience: years });
+          }
+        }}
+        keyboardType="numeric"
+        style={styles.input}
+        mode="outlined"
+        placeholder="Enter years of experience"
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -55,8 +79,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 18,
     fontWeight: '600',
+    color: '#002D62',
   },
   input: {
-    marginBottom: 12,
+    marginBottom: 8,
+    backgroundColor: 'white',
   },
 });

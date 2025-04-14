@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Text } from 'react-native';
 import { TextInput, HelperText } from 'react-native-paper';
 import type { PatientProfile as MedicalProfile } from '../../../../types/profile';
 
@@ -13,16 +13,33 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
   setProfile 
 }) => {
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const [bloodTypeError, setBloodTypeError] = useState(false);
+  
+  const validateBloodType = (value: string) => {
+    if (!value) return true;
+    return bloodTypes.includes(value.toUpperCase());
+  };
+
+  const handleBloodTypeChange = (text: string) => {
+    const isValid = validateBloodType(text);
+    setBloodTypeError(!isValid);
+    if (isValid) {
+      setProfile({ ...profile, blood_type: text.toUpperCase() });
+    }
+  };
 
   return (
     <View style={styles.container}>
+      <Text style={styles.sectionTitle}>Medical Information</Text>
+      
       <TextInput
         label="Medical History"
         value={profile.medical_history || ''}
         onChangeText={(text) => setProfile({ ...profile, medical_history: text })}
         multiline
         numberOfLines={4}
-        style={styles.input}
+        style={[styles.input, styles.textArea]}
+        placeholder="Enter any relevant medical history..."
       />
 
       <TextInput
@@ -30,7 +47,8 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
         value={profile.current_medications || ''}
         onChangeText={(text) => setProfile({ ...profile, current_medications: text })}
         multiline
-        style={styles.input}
+        style={[styles.input, styles.textArea]}
+        placeholder="List your current medications..."
       />
 
       <View style={styles.row}>
@@ -38,28 +56,32 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
           <TextInput
             label="Blood Type"
             value={profile.blood_type || ''}
-            onChangeText={(text) => setProfile({ ...profile, blood_type: text })}
+            onChangeText={handleBloodTypeChange}
             style={[styles.input, styles.bloodTypeInput]}
-            keyboardType="default"
+            error={bloodTypeError}
+            autoCapitalize="characters"
+            placeholder="e.g., A+"
           />
-          <HelperText type="info" visible>
+          <HelperText type="info" visible={true} style={styles.helperText}>
             Valid types: {bloodTypes.join(', ')}
           </HelperText>
         </View>
 
         <TextInput
-          label="Pain Level (0-10)"
+          label="Pain Level"
           value={profile.pain_level?.toString() ?? ''}
           onChangeText={(text) => {
             const num = parseInt(text, 10);
-            if (!isNaN(num)) {
-              setProfile({ ...profile, pain_level: Math.min(Math.max(num, 0), 10) });
+            if (!isNaN(num) && num >= 0 && num <= 10) {
+              setProfile({ ...profile, pain_level: num });
             } else if (text === '') {
               setProfile({ ...profile, pain_level: undefined });
             }
           }}
           keyboardType="numeric"
           style={[styles.input, styles.painLevelInput]}
+          placeholder="0-10"
+          maxLength={2}
         />
       </View>
 
@@ -69,7 +91,8 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
         onChangeText={(text) => setProfile({ ...profile, treatment_plan: text })}
         multiline
         numberOfLines={4}
-        style={styles.input}
+        style={[styles.input, styles.textArea]}
+        placeholder="Describe your current treatment plan..."
       />
     </View>
   );
@@ -77,23 +100,48 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 8,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 16,
   },
   input: {
     marginVertical: 8,
-    backgroundColor: 'white',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    paddingTop: 12,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   bloodTypeContainer: {
     flex: 0.6,
   },
   bloodTypeInput: {
-    marginRight: 8,
+    marginRight: 12,
   },
   painLevelInput: {
     flex: 0.35,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: -4,
   },
 });

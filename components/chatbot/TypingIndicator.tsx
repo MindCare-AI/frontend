@@ -1,19 +1,70 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  withDelay,
+  FadeIn,
+  FadeOut,
+} from 'react-native-reanimated';
 
-interface TypingIndicatorProps {
-  visible: boolean;
-}
+export const TypingIndicator: React.FC = () => {
+  const dots = Array(3).fill(0);
+  const opacityValues = dots.map(() => useSharedValue(0.3));
 
-const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible }) => {
-  if (!visible) return null;
+  useEffect(() => {
+    dots.forEach((_, index) => {
+      opacityValues[index].value = withRepeat(
+        withSequence(
+          withDelay(
+            index * 200,
+            withTiming(1, { duration: 300 })
+          ),
+          withTiming(0.3, { duration: 300 })
+        ),
+        -1,
+        true
+      );
+    });
+  }, []);
+
+  const dotStyles = dots.map((_, index) => 
+    useAnimatedStyle(() => ({
+      opacity: opacityValues[index].value,
+      transform: [
+        {
+          translateY: withRepeat(
+            withSequence(
+              withDelay(
+                index * 200,
+                withTiming(-4, { duration: 300 })
+              ),
+              withTiming(0, { duration: 300 })
+            ),
+            -1,
+            true
+          ),
+        },
+      ],
+    }))
+  );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.dot} />
-      <View style={[styles.dot, styles.secondDot]} />
-      <View style={[styles.dot, styles.thirdDot]} />
-    </View>
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(200)}
+      style={styles.container}
+    >
+      {dots.map((_, index) => (
+        <Animated.View
+          key={index}
+          style={[styles.dot, dotStyles[index]]}
+        />
+      ))}
+    </Animated.View>
   );
 };
 
@@ -21,23 +72,19 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    marginVertical: 8,
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    width: 52,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#002D62',
-    marginHorizontal: 2,
-  },
-  secondDot: {
-    opacity: 0.7,
-    transform: [{ scale: 0.9 }],
-  },
-  thirdDot: {
-    opacity: 0.4,
-    transform: [{ scale: 0.8 }],
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6B7280',
   },
 });
 

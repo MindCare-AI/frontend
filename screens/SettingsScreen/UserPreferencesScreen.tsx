@@ -1,7 +1,7 @@
 //screens/SettingsScreen/UserPreferencesScreen.tsx
 import React, { useRef } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
-import { Button, Text, Switch, IconButton, ActivityIndicator } from 'react-native-paper';
+import { ScrollView, View, StyleSheet, Alert } from 'react-native';
+import { Button, Text, Switch, ActivityIndicator, Appbar } from 'react-native-paper';
 import { NavigationProp } from '@react-navigation/native';
 import { usePreferences } from './hooks/common/usePreferences';
 import { NotificationPreferenceItem } from './components/common/NotificationPreferenceItem';
@@ -25,13 +25,20 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
   const { preferences, savePreferences, loading } = usePreferences();
   const [localPrefs, setLocalPrefs] = React.useState<Preferences | null>(preferences);
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
+  const [hasChanges, setHasChanges] = React.useState<boolean>(false);
 
-  // Create ref for GSAP animation
+  // Create refs for GSAP animations
   const containerRef = useRef(null);
+  const formRef = useRef(null);
 
   // Using useGSAP to animate the container on mount
   useGSAP(() => {
-    gsap.from(containerRef.current, { duration: 1, opacity: 0, y: -50 });
+    gsap.from(containerRef.current, { 
+      duration: 0.5, 
+      opacity: 0, 
+      y: -20,
+      ease: "power2.out" 
+    });
   }, { scope: containerRef });
 
   React.useEffect(() => {
@@ -40,12 +47,53 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
     }
   }, [preferences]);
 
+  // Check for unsaved changes
+  React.useEffect(() => {
+    if (preferences && localPrefs) {
+      setHasChanges(JSON.stringify(preferences) !== JSON.stringify(localPrefs));
+    }
+  }, [preferences, localPrefs]);
+
+  // Handle navigation prevention when there are unsaved changes
+  React.useEffect(() => {
+    const handleBeforeRemove = (e: any) => {
+      if (!hasChanges) return;
+      
+      e.preventDefault();
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. Do you want to discard them?',
+        [
+          { text: "Keep Editing", style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ]
+      );
+    };
+
+    navigation.addListener('beforeRemove', handleBeforeRemove);
+    return () => navigation.removeListener('beforeRemove', handleBeforeRemove);
+  }, [hasChanges, navigation]);
+
   const handleSave = async () => {
     if (!localPrefs) return;
     setIsSaving(true);
     try {
       await savePreferences(localPrefs);
+      gsap.to(formRef.current, {
+        scale: 1.02,
+        duration: 0.2,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1,
+      });
+      setHasChanges(false);
       navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save preferences. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -54,7 +102,8 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator animating={true} size="large" />
+        <ActivityIndicator size="large" color="#002D62" />
+        <Text style={styles.loadingText}>Loading preferences...</Text>
       </View>
     );
   }
@@ -62,27 +111,33 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
   if (!localPrefs) return null;
 
   return (
-    <View ref={containerRef} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.headerContainer}>
-          <IconButton
-            icon="arrow-left"
-            onPress={() => navigation.goBack()}
+    <View ref={containerRef} style={styles.mainContainer}>
+      <Appbar.Header style={styles.header}>
+        <Appbar.BackAction onPress={() => navigation.goBack()} />
+        <Appbar.Content title="Preferences" />
+        {hasChanges && (
+          <Appbar.Action 
+            icon="check" 
+            onPress={handleSave} 
+            disabled={isSaving}
           />
-          <Text variant="headlineMedium">Preferences</Text>
-        </View>
+        )}
+      </Appbar.Header>
 
+      <ScrollView 
+        ref={formRef}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
-            Display
+            Theme Settings
           </Text>
           <View style={styles.row}>
             <Text>Dark Mode</Text>
             <Switch
               value={localPrefs.dark_mode}
-              onValueChange={(v: boolean) =>
-                setLocalPrefs({ ...localPrefs, dark_mode: v })
-              }
+              onValueChange={v => setLocalPrefs({ ...localPrefs, dark_mode: v })}
             />
           </View>
         </View>
@@ -95,7 +150,7 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
             <Text>Email Notifications</Text>
             <Switch
               value={localPrefs.email_notifications}
-              onValueChange={(v: boolean) =>
+              onValueChange={v => 
                 setLocalPrefs({ ...localPrefs, email_notifications: v })
               }
             />
@@ -104,13 +159,17 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
             <Text>In-App Notifications</Text>
             <Switch
               value={localPrefs.in_app_notifications}
-              onValueChange={(v: boolean) =>
+              onValueChange={v => 
                 setLocalPrefs({ ...localPrefs, in_app_notifications: v })
               }
             />
           </View>
+        </View>
 
-          <Text style={styles.subHeader}>Notification Types</Text>
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Notification Types
+          </Text>
           {['reminders', 'messages', 'appointments', 'updates'].map((type) => (
             <NotificationPreferenceItem
               key={type}
@@ -127,39 +186,62 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
           ))}
         </View>
 
-        <Button 
-          mode="contained" 
-          onPress={handleSave}
-          loading={isSaving}
-          style={styles.saveButton}
-        >
-          Save Preferences
-        </Button>
+        {hasChanges && (
+          <Button 
+            mode="contained" 
+            onPress={handleSave}
+            loading={isSaving}
+            style={styles.saveButton}
+          >
+            Save Changes
+          </Button>
+        )}
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    marginBottom: 16
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  section: { marginBottom: 24 },
-  sectionTitle: { marginBottom: 8 },
+  header: {
+    elevation: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  container: {
+    padding: 16,
+  },
+  section: {
+    marginBottom: 24,
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+  },
+  sectionTitle: {
+    marginBottom: 16,
+    color: '#1A1A1A',
+    fontWeight: '600',
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16
+    paddingVertical: 8,
   },
-  subHeader: { 
-    marginTop: 16,
-    marginBottom: 8,
-    fontWeight: '500'
+  saveButton: {
+    marginTop: 24,
+    marginBottom: 32,
   },
-  saveButton: { marginTop: 24 }
 });

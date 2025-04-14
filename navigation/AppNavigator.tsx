@@ -18,7 +18,7 @@ import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
 const SettingsStack = createStackNavigator();
-const AppointmentStack = createStackNavigator();
+const AppointmentStack = createStackNavigator<RootStackParamList>();
 
 interface NotificationBadgeProps {
   navigation: NavigationProp<RootStackParamList>;

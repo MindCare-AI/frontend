@@ -131,31 +131,35 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#E4F0F6', // Match app's background color theme
   },
   header: {
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#2c3e50',
+    color: '#002D62', // Match app's primary color
   },
   subtitle: {
     fontSize: 16,
-    color: '#7f8c8d',
+    color: '#666',
     marginBottom: 24,
+    lineHeight: 22,
   },
   cardsContainer: {
     marginTop: 16,
+    gap: 12, // Add consistent spacing between cards
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#E4F0F6',
   },
   error: {
-    color: 'red',
+    color: '#D32F2F', // Standard error color
     textAlign: 'center',
     padding: 20,
+    fontSize: 16,
   },
 });
 

@@ -151,6 +151,70 @@ export const UserSettingsScreen: React.FC = () => {
     }
   }, [localSettings, saveSettings, navigation]);
 
+  // Style enhancements for user friendliness
+  const styles = StyleSheet.create({
+    safeAreaContainer: {
+      flex: 1,
+      backgroundColor: '#FFFFFF',
+    },
+    container: {
+      flex: 1,
+      backgroundColor: '#FFFFFF',
+    },
+    scrollContainer: {
+      flexGrow: 1,
+      padding: 16,
+    },
+    scrollContent: {
+      padding: 16,
+    },
+    card: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#1A1A1A',
+      marginBottom: 16,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: '#E5E5E5',
+      marginVertical: 16,
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+    },
+    optionText: {
+      fontSize: 16,
+      color: '#1A1A1A',
+    },
+    saveButton: {
+      backgroundColor: '#002D62',
+      marginHorizontal: 16,
+      marginVertical: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    saveButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+  });
+
   return (
     <SafeAreaView style={styles.safeAreaContainer}>
       <View ref={containerRef} style={styles.container}>
@@ -213,11 +277,5 @@ export const UserSettingsScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeAreaContainer: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#E4F0F6', padding: 16 },
-  scrollContainer: { paddingBottom: 32 },
-});
 
 export default UserSettingsScreen;

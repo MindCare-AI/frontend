@@ -117,13 +117,16 @@ interface ProfileHookReturn {
   userType: UserType | undefined;
 }
 
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 1000;
+const POLL_INTERVAL = 2000; // Add polling interval constant
+
 export const useProfile = (): ProfileHookReturn => {
-  const { user, accessToken, updateUser } = useAuth();
+  const { user, accessToken } = useAuth();
   const [profile, setProfile] = useState<ProfileType | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [fetchCount, setFetchCount] = useState(0);
+  const [pollingCount, setPollingCount] = useState(0);
   
   const patientProfileData = usePatientProfile();
   const therapistProfileData = useTherapistProfile();
@@ -132,11 +135,8 @@ export const useProfile = (): ProfileHookReturn => {
     () => ((user?.user_type || '') as UserType).toLowerCase(),
     [user?.user_type]
   );
-  
-  const MAX_RETRIES = 5;
-  const RETRY_DELAY = 1000;
-  
-  const fetchWithRetry = async (retries = 0): Promise<any> => {
+
+  const fetchWithRetry = useCallback(async (retries = 0): Promise<any> => {
     if (!user || !accessToken) throw new Error('User or token missing');
     try {
       const response = await fetch(
@@ -166,39 +166,51 @@ export const useProfile = (): ProfileHookReturn => {
       }
       throw error;
     }
-  };
+  }, [user, accessToken]);
   
   const fetchProfile = useCallback(async () => {
     if (!user?.user_type) {
-      console.log('No user type - allowing onboarding');
-      return; // Preserve onboarding flow
+      setLoading(false);
+      return;
     }
-  
+
     try {
+      setLoading(true);
       const profileData = await fetchWithRetry();
       setProfile(profileData);
       setError(null);
+      setPollingCount(0); // Reset polling count on success
     } catch (error) {
       console.error('Profile fetch error:', error);
       setError('Profile setup incomplete - finish onboarding');
+      
+      // Start polling if profile is not ready
+      if (pollingCount < MAX_RETRIES) {
+        setTimeout(() => {
+          setPollingCount(prev => prev + 1);
+          fetchProfile();
+        }, POLL_INTERVAL);
+      }
+    } finally {
+      setLoading(false);
     }
-  }, [accessToken]);
-  
-  // Single initialization effect
+  }, [user?.user_type, fetchWithRetry, pollingCount]);
+
+  // Reset states when user changes
   useEffect(() => {
-    if (isInitialized && user?.id) {
-      fetchProfile();
-    }
-  }, []);
-  
-  // Reset state when user changes
-  useEffect(() => {
-    setFetchCount(0);
-    setIsInitialized(false);
+    setPollingCount(0);
     setProfile(null);
     setError(null);
+    setLoading(true);
   }, [user?.id]);
-  
+
+  // Initial fetch effect
+  useEffect(() => {
+    if (user?.id) {
+      fetchProfile();
+    }
+  }, [user?.id, fetchProfile]);
+
   if (normalizedUserType === 'patient' || (normalizedUserType === '' && user?.patient_profile)) {
     return {
       ...patientProfileData,

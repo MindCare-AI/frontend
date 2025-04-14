@@ -1,7 +1,7 @@
 //screens/SettingsScreen/components/common/NotificationPreferenceItem.tsx
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Switch, Text } from 'react-native-paper';
+import { View, Text, StyleSheet, Switch, Animated } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 interface NotificationPreferenceItemProps {
   label: string;
@@ -14,20 +14,43 @@ export const NotificationPreferenceItem: React.FC<NotificationPreferenceItemProp
   isEnabled,
   onToggle,
 }) => {
-  const formattedLabel = label
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  const fadeAnim = new Animated.Value(1);
+
+  const handleToggle = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 0.5,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onToggle();
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>{formattedLabel}</Text>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.labelContainer}>
+        <Text style={styles.label}>
+          {label.charAt(0).toUpperCase() + label.slice(1)}
+        </Text>
+        <Text style={styles.description}>
+          {`Receive ${label.toLowerCase()} notifications`}
+        </Text>
+      </View>
       <Switch
         value={isEnabled}
-        onValueChange={onToggle}
-        color="#4CAF50"
+        onValueChange={handleToggle}
+        trackColor={{ false: '#E5E7EB', true: '#BAD4EA' }}
+        thumbColor={isEnabled ? '#002D62' : '#9CA3AF'}
+        ios_backgroundColor="#E5E7EB"
       />
-    </View>
+    </Animated.View>
   );
 };
 
@@ -37,12 +60,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F3F4F6',
+  },
+  labelContainer: {
+    flex: 1,
+    marginRight: 16,
   },
   label: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  description: {
+    fontSize: 13,
+    color: '#6B7280',
   },
 });
