@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Avatar } from './ui/avatar';
-import { TherapistProfile } from '../types/profile';
+import { Avatar } from '../ui/avatar';
+import { TherapistProfile } from '../../types/profile';
 
 export interface TherapistCardProps {
   therapist: TherapistProfile;
@@ -67,9 +67,9 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({ therapist, isSelec
   };
 
   const getRatingColor = () => {
-    if (therapist.rating >= 4.5) return '#059669';
-    if (therapist.rating >= 4.0) return '#0D9488';
-    if (therapist.rating >= 3.5) return '#D97706';
+    if (therapist.profile_completion_percentage / 20 >= 4.5) return '#059669';
+    if (therapist.profile_completion_percentage / 20 >= 4.0) return '#0D9488';
+    if (therapist.profile_completion_percentage / 20 >= 3.5) return '#D97706';
     return '#DC2626';
   };
 
@@ -92,26 +92,26 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({ therapist, isSelec
         style={styles.touchable}
         activeOpacity={0.9}
         accessibilityRole="button"
-        accessibilityLabel={`View ${therapist.name}'s profile`}
-        accessibilityHint={`${therapist.specialty} with ${therapist.experience} experience`}
+        accessibilityLabel={`View ${therapist.first_name} ${therapist.last_name}'s profile`}
+        accessibilityHint={`${therapist.specialization} with ${therapist.years_of_experience} years of experience`}
       >
         <View style={styles.content}>
           <Avatar
-            src={therapist.imageUrl}
-            alt={therapist.name}
+            src={therapist.profile_pic ?? undefined}
+            alt={`${therapist.first_name} ${therapist.last_name}`}
             size="lg"
             style={styles.avatar}
           />
           
           <View style={styles.info}>
             <Text style={styles.name} numberOfLines={1}>
-              {therapist.name}
+              {`${therapist.first_name} ${therapist.last_name}`}
             </Text>
             <Text style={styles.specialty} numberOfLines={1}>
-              {therapist.specialty}
+              {therapist.specialization}
             </Text>
             <Text style={styles.experience} numberOfLines={1}>
-              {therapist.experience}
+              {`${therapist.years_of_experience} years of experience`}
             </Text>
           </View>
 
@@ -122,7 +122,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({ therapist, isSelec
                 { color: getRatingColor() },
               ]}
             >
-              {therapist.rating.toFixed(1)}
+              {(therapist.profile_completion_percentage / 20).toFixed(1)}
             </Text>
             <View style={styles.starsContainer}>
               {Array.from({ length: 5 }).map((_, index) => (
@@ -130,7 +130,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({ therapist, isSelec
                   key={index}
                   style={[
                     styles.star,
-                    { color: index < Math.floor(therapist.rating) ? '#FBBF24' : '#E5E7EB' },
+                    { color: index < Math.floor(therapist.profile_completion_percentage / 20) ? '#FBBF24' : '#E5E7EB' },
                   ]}
                 >
                   ★
