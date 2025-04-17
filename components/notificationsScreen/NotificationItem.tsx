@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Badge, useTheme } from 'react-native-paper';
-import { Notification } from '../../../types/notifications';
+import { Notification } from '../../types/notifications';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Notification type and priority should match backend API

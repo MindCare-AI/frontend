@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Animated } from 'react-native';
-import { Comment } from '../../../types/feed';
+import { Comment } from '../../types/feed';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, Send, MoreHorizontal, Smile } from 'lucide-react';
-import { getShadowStyles } from '../../../styles/global';
+import { getShadowStyles } from '../../styles/global';
 
 interface CommentSectionProps {
   postId: string;

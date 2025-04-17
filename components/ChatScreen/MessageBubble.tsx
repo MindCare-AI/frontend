@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { formatTime } from '../../../utils/helpers';
+import { formatTime } from '../../utils/helpers';
 import ReactionPicker from './ReactionPicker';
-import { useAuth } from '../../../contexts/AuthContext'; 
-import { Message } from '../../../types/chat';
-import EditHistoryModal from './EditHistoryModal';
-import ReadReceipts from './ReadReceipts';
+import { useAuth } from '../../contexts/AuthContext'; 
+import { Message } from '../../types/chat';
+
 
 interface MessageBubbleProps {
   message: Message;

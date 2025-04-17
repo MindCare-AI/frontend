@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { mockPosts } from '../../constants/mockFeeds';
-import PostCard from './components/PostCard';
-import CreatePostCard from './components/CreatePostCard';
+import PostCard from '../../components/FeedsScreen/PostCard';
+import CreatePostCard from '../../components/FeedsScreen/CreatePostCard';
 import { Bell, Search, Filter, User, Plus } from 'lucide-react';
 import { getShadowStyles } from '../../styles/global';
 

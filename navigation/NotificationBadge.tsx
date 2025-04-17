@@ -3,7 +3,7 @@ import { TouchableOpacity, View, Text, StyleSheet, Animated, Platform } from 're
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
-import { useNotificationCount } from '../screens/notificationsScreen/hooks/useNotificationCount';
+import { useNotificationCount } from '../hooks/notificationsScreen/useNotificationCount';
 
 interface NotificationBadgeProps {
   navigation: NavigationProp<RootStackParamList>;

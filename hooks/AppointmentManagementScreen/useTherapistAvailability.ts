@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
-import type { TherapistProfile } from '../../../types/profile'; // <-- Import the shared type
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
+import type { TherapistProfile } from '../../types/profile'; // <-- Import the shared type
 
 interface TimeSlot {
   start: string;

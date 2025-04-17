@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScrollView, View, StyleSheet } from 'react-native';
 import { Text, Appbar, Button, ActivityIndicator, useTheme, Switch, Divider } from 'react-native-paper';
-import { NotificationPreferenceItem } from './components/NotificationPreferenceItem';
-import { useNotificationPreferences } from './hooks/useNotificationPreferences';
+import { NotificationPreferenceItem } from '../../components/notificationsScreen/NotificationPreferenceItem';
+import { useNotificationPreferences } from '../../hooks/notificationsScreen/useNotificationPreferences';
 import { NavigationProp } from '@react-navigation/native';
 
 interface NotificationPreferencesScreenProps {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 // This hook fetches the unread notification count for the authenticated user.
 // Endpoint: GET /notifications/count/ (see PRD/Backend docs)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Conversation } from '../../../types/chat';
-import { API_BASE_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
+import { Conversation } from '../../types/chat';
+import { API_BASE_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 const deleteConversation = async (conversation: Conversation, accessToken: string): Promise<void> => {
   const endpoint = conversation.conversation_type === 'group' ? 'groups' : 'one_to_one';

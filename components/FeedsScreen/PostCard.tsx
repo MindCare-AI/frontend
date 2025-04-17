@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
-import { Post } from '../../../types/feed';
+import { Post } from '../../types/feed';
 import Avatar from './Avatar';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, MessageSquare, Share, MoreHorizontal, Bookmark } from 'lucide-react';
 import CommentSection from './CommentSection';
-import { getShadowStyles } from '../../../styles/global';
-import { useToast } from '../../../components/ui/use-toast';
+import { getShadowStyles } from '../../styles/global';
+import { useToast } from '../ui/use-toast';
 
 interface PostCardProps {
   post: Post;

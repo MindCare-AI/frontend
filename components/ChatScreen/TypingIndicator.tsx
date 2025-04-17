@@ -1,8 +1,8 @@
 //screens/ChatScreen/components/TypingIndicator.tsx
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet, Easing } from 'react-native';
-import { useAuth } from '../../../contexts/AuthContext';
-import { API_URL } from '../../../config';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../config';
 
 interface TypingIndicatorProps {
   visible: boolean;
