@@ -1,6 +1,5 @@
-//// filepath: /home/siaziz/Desktop/frontend/screens/ChatbotScreen/AnimatedBotMessage.tsx
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Image, Platform } from 'react-native';
+import { StyleSheet, View, Image, Platform, Text } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -10,13 +9,15 @@ import Animated, {
 } from 'react-native-reanimated';
 
 interface AnimatedBotMessageProps {
-  children: React.ReactNode;
+  children?: React.ReactNode; // children is now optional
   isTyping?: boolean;
+  message: string; // added property to receive message text
 }
 
 export const AnimatedBotMessage: React.FC<AnimatedBotMessageProps> = ({
   children,
   isTyping = false,
+  message,
 }) => {
   const scale = useSharedValue(0.95);
   const opacity = useSharedValue(0);
@@ -40,7 +41,7 @@ export const AnimatedBotMessage: React.FC<AnimatedBotMessageProps> = ({
         style={[styles.avatarContainer, avatarStyle]}
       >
         <Image
-          source={require('../../assets/images/bot-avatar.png')}
+          source={{ uri: 'https://i.imgur.com/7kQEsHU.png' }} // Common bot avatar image
           style={styles.avatar}
         />
       </Animated.View>
@@ -49,6 +50,7 @@ export const AnimatedBotMessage: React.FC<AnimatedBotMessageProps> = ({
         entering={SlideInLeft.springify().damping(15)}
         style={styles.messageContainer}
       >
+        <Text>{message}</Text>
         {children}
       </Animated.View>
     </View>

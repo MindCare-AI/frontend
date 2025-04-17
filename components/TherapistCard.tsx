@@ -2,26 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from './ui/avatar';
+import { TherapistProfile } from '../types/profile';
 
-interface TherapistCardProps {
-  name: string;
-  specialty: string;
-  experience: string;
-  rating: number;
-  imageUrl?: string;
-  onPress?: () => void;
-  style?: any;
+export interface TherapistCardProps {
+  therapist: TherapistProfile;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
-export const TherapistCard: React.FC<TherapistCardProps> = ({
-  name,
-  specialty,
-  experience,
-  rating,
-  imageUrl,
-  onPress,
-  style,
-}) => {
+export const TherapistCard: React.FC<TherapistCardProps> = ({ therapist, isSelected, onSelect }) => {
   const [isLoading, setIsLoading] = useState(false);
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const pressAnim = React.useRef(new Animated.Value(1)).current;
@@ -53,7 +42,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
   };
 
   const handlePress = async () => {
-    if (isLoading || !onPress) return;
+    if (isLoading || !onSelect) return;
 
     setIsLoading(true);
     
@@ -64,7 +53,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
     }).start();
 
     try {
-      await onPress();
+      await onSelect();
     } finally {
       setIsLoading(false);
       // Animate scale back up
@@ -78,9 +67,9 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
   };
 
   const getRatingColor = () => {
-    if (rating >= 4.5) return '#059669';
-    if (rating >= 4.0) return '#0D9488';
-    if (rating >= 3.5) return '#D97706';
+    if (therapist.rating >= 4.5) return '#059669';
+    if (therapist.rating >= 4.0) return '#0D9488';
+    if (therapist.rating >= 3.5) return '#D97706';
     return '#DC2626';
   };
 
@@ -93,7 +82,6 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
             { scale: Animated.multiply(scaleAnim, pressAnim) },
           ],
         },
-        style,
       ]}
     >
       <TouchableOpacity
@@ -104,26 +92,26 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
         style={styles.touchable}
         activeOpacity={0.9}
         accessibilityRole="button"
-        accessibilityLabel={`View ${name}'s profile`}
-        accessibilityHint={`${specialty} with ${experience} experience`}
+        accessibilityLabel={`View ${therapist.name}'s profile`}
+        accessibilityHint={`${therapist.specialty} with ${therapist.experience} experience`}
       >
         <View style={styles.content}>
           <Avatar
-            src={imageUrl}
-            alt={name}
+            src={therapist.imageUrl}
+            alt={therapist.name}
             size="lg"
             style={styles.avatar}
           />
           
           <View style={styles.info}>
             <Text style={styles.name} numberOfLines={1}>
-              {name}
+              {therapist.name}
             </Text>
             <Text style={styles.specialty} numberOfLines={1}>
-              {specialty}
+              {therapist.specialty}
             </Text>
             <Text style={styles.experience} numberOfLines={1}>
-              {experience}
+              {therapist.experience}
             </Text>
           </View>
 
@@ -134,7 +122,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
                 { color: getRatingColor() },
               ]}
             >
-              {rating.toFixed(1)}
+              {therapist.rating.toFixed(1)}
             </Text>
             <View style={styles.starsContainer}>
               {Array.from({ length: 5 }).map((_, index) => (
@@ -142,7 +130,7 @@ export const TherapistCard: React.FC<TherapistCardProps> = ({
                   key={index}
                   style={[
                     styles.star,
-                    { color: index < Math.floor(rating) ? '#FBBF24' : '#E5E7EB' },
+                    { color: index < Math.floor(therapist.rating) ? '#FBBF24' : '#E5E7EB' },
                   ]}
                 >
                   ★

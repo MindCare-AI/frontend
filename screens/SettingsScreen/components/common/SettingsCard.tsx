@@ -21,14 +21,14 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
       toValue: 0.98,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
   const handlePressOut = () => {
     Animated.spring(scaleValue, {
       toValue: 1,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 

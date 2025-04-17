@@ -14,8 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_URL } from '../../config'; // Ensure this is properly defined in your config
 import { useAuth } from '../../contexts/AuthContext';
-import AnimatedBotMessage from '../../components/chatbot/AnimatedBotMessage';
-import TypingIndicator from '../../components/chatbot/TypingIndicator';
+import { AnimatedBotMessage } from './components/AnimatedBotMessage'; // updated import
+import TypingIndicator from './components/TypingIndicator';
 
 interface Message {
   id: string;
@@ -44,6 +44,7 @@ export default function ChatbotScreen() {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ initial_message: "Hello, I need help." }) // added required field
       });
 
       if (!response.ok) throw new Error('Failed to initialize chatbot conversation');
@@ -127,7 +128,7 @@ export default function ChatbotScreen() {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content: input.trim() }),
+        body: JSON.stringify({ message: input.trim() }) // updated field key
       });
 
       if (!response.ok) {
@@ -213,7 +214,7 @@ export default function ChatbotScreen() {
             <View key={index} style={[styles.messageRow, msg.is_chatbot ? styles.botMessageRow : styles.userMessageRow]}>
               <View style={[styles.messageBubble, msg.is_chatbot ? styles.botBubble : styles.userBubble]}>
                 {msg.is_chatbot ? (
-                  <AnimatedBotMessage text={msg.content} />
+                  <AnimatedBotMessage message={msg.content} />
                 ) : (
                   <Text style={msg.is_chatbot ? styles.botText : styles.userText}>{msg.content}</Text>
                 )}

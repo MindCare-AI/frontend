@@ -5,18 +5,31 @@ import { useAuth } from '../../../../contexts/AuthContext';
 export const useUpload = () => {
   const { accessToken, user } = useAuth();
 
+  /**
+   * Uploads a file (image or document) to the backend and associates it with a patient or therapist profile.
+   * @param uri - The local URI of the file to upload.
+   * @param profileType - 'patient' or 'therapist'.
+   * @param type - Optional: 'verification' for verification docs, otherwise profile image.
+   * @param description - Optional: description for the media file.
+   * @param mediaType - Optional: media type, e.g., 'image', 'document'.
+   * @returns The uploaded file's URL.
+   */
   const uploadImage = async (
     uri: string,
     profileType: 'patient' | 'therapist',
-    type?: string
+    type?: string,
+    description?: string,
+    mediaType?: string
   ) => {
     const formData = new FormData();
     // Use a different filename if uploading a verification document
     const fileName = type === 'verification' ? 'verification.jpg' : 'profile.jpg';
+    // Default to image/jpeg, but allow override if needed
+    const mimeType = mediaType === 'document' ? 'application/pdf' : 'image/jpeg';
     formData.append('file', {
       uri,
       name: fileName,
-      type: 'image/jpeg',
+      type: mimeType,
     } as any);
 
     // Append extra fields for associating the media with a profile
@@ -25,20 +38,27 @@ export const useUpload = () => {
       profileType === 'patient' ? 'patient_profile' : 'therapist_profile'
     );
 
-    // Assume that the user's profile unique ID is stored in patient_profile or therapist_profile
-    const profileUniqueId =
+    // Use numeric id instead of unique_id
+    const profileId =
       profileType === 'therapist'
-        ? user?.therapist_profile?.unique_id
-        : user?.patient_profile?.unique_id;
+        ? user?.therapist_profile?.id
+        : user?.patient_profile?.id;
 
-    if (profileUniqueId) {
-      formData.append('object_id', profileUniqueId);
+    if (profileId !== undefined && profileId !== null) {
+      formData.append('object_id', profileId.toString());
     } else {
-      throw new Error('Profile unique ID not found');
+      throw new Error('Profile ID not found');
+    }
+
+    if (description) {
+      formData.append('description', description);
+    }
+    if (mediaType) {
+      formData.append('media_type', mediaType);
     }
 
     try {
-      // Backend media upload endpoint: POST /api/v1/media/upload/
+      // Backend media upload endpoint: POST /media/upload/
       const response = await fetch(`${API_URL}/media/upload/`, {
         method: 'POST',
         headers: {
@@ -48,7 +68,14 @@ export const useUpload = () => {
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Upload failed');
+      if (!response.ok) {
+        let errorMsg = 'Upload failed';
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData?.detail || errorMsg;
+        } catch {}
+        throw new Error(errorMsg);
+      }
 
       const { url } = await response.json();
       return url;

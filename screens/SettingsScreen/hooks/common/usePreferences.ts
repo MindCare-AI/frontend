@@ -9,6 +9,7 @@ export interface Preferences {
   email_notifications: boolean;
   in_app_notifications: boolean;
   disabled_notification_types: string[];
+  notification_preferences: Record<string, any>;
 }
 
 export const usePreferences = () => {
@@ -29,7 +30,6 @@ export const usePreferences = () => {
           'Accept': 'application/json',
         },
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
@@ -38,8 +38,12 @@ export const usePreferences = () => {
       }
       const data = await response.json();
       setPreferences({
-        ...data,
+        dark_mode: data.dark_mode,
+        language: data.language,
+        email_notifications: data.email_notifications,
+        in_app_notifications: data.in_app_notifications,
         disabled_notification_types: data.disabled_notification_types || [],
+        notification_preferences: data.notification_preferences || {},
       } as Preferences);
       setError(null);
     } catch (error) {
@@ -66,14 +70,12 @@ export const usePreferences = () => {
         },
         body: JSON.stringify(updatedPreferences),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
           errorData.message || `Failed to save preferences: ${response.statusText}`
         );
       }
-
       const data = await response.json();
       setPreferences(data as Preferences);
       setError(null);
@@ -87,7 +89,6 @@ export const usePreferences = () => {
     }
   };
 
-  // Fetch notification types from the new endpoint
   const fetchNotificationTypes = async () => {
     try {
       const response = await fetch(`${API_URL}/notifications/types/`, {

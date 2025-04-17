@@ -4,54 +4,70 @@ import { Text, Badge, useTheme } from 'react-native-paper';
 import { Notification } from '../../../types/notifications';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
+// Notification type and priority should match backend API
+// id, type, title, message, timestamp, priority, read
+
 interface NotificationItemProps {
   notification: Notification;
   onPress: () => void;
 }
 
-export const NotificationItem: React.FC<NotificationItemProps> = ({ 
-  notification, 
-  onPress 
+export const NotificationItem: React.FC<NotificationItemProps> = ({
+  notification,
+  onPress,
 }) => {
   const theme = useTheme();
-  
+
+  // Priority colors as per backend: "low", "medium", "high", "critical"
   const priorityColors: Record<'low' | 'medium' | 'high' | 'critical', string> = {
-    low: '#4CAF50', // green
-    medium: theme.colors.primary, // existing color
-    high: '#FF9800', // orange
-    critical: theme.colors.error, // existing color
+    low: '#4CAF50',
+    medium: theme.colors.primary,
+    high: '#FF9800',
+    critical: theme.colors.error,
   };
 
+  // Use timestamp field from backend, fallback to created_at for backward compatibility
+  const timestamp = notification.timestamp || notification.created_at;
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
         styles.container,
-        { backgroundColor: notification.read ? theme.colors.background : theme.colors.surfaceVariant }
+        {
+          backgroundColor: notification.read
+            ? theme.colors.background
+            : theme.colors.surfaceVariant,
+        },
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Notification: ${notification.title}`}
     >
       <View style={styles.content}>
         <View style={styles.header}>
           <Text variant="titleSmall" style={styles.title}>
             {notification.title}
           </Text>
-          <Badge 
-            size={8} 
-            style={[styles.priorityDot, { backgroundColor: priorityColors[notification.priority] }]} 
+          <Badge
+            size={8}
+            style={[
+              styles.priorityDot,
+              { backgroundColor: priorityColors[notification.priority] },
+            ]}
           />
         </View>
         <Text variant="bodyMedium" style={styles.message}>
           {notification.message}
         </Text>
         <Text variant="labelSmall" style={styles.time}>
-          {new Date(notification.created_at).toLocaleString()}
+          {timestamp ? new Date(timestamp).toLocaleString() : ''}
         </Text>
       </View>
       {!notification.read && (
-        <Icon 
-          name="fiber-manual-record" 
-          size={16} 
-          color={theme.colors.primary} 
+        <Icon
+          name="fiber-manual-record"
+          size={16}
+          color={theme.colors.primary}
           style={styles.unreadIndicator}
         />
       )}

@@ -40,11 +40,9 @@ interface UserData {
   settings: UserSettings;
   patient_profile?: {
     id: number;
-    unique_id: string;
   };
   therapist_profile?: {
     id: number;
-    unique_id: string;
   };
 }
 
@@ -91,23 +89,11 @@ interface ProfileResponse {
   count: number;
   next: string | null;
   previous: string | null;
-  results: Array<ProfileType & { unique_id: string }>;
-}
-
-interface ProfileDetailResponse {
-  id: number;
-  unique_id: string;
-  user: number;
-  // other profile fields...
+  results: ProfileType[];
 }
 
 type ProfileType = PatientProfile | TherapistProfile;
 
-const normalizeId = (id: string | number): number => {
-  return typeof id === 'string' ? parseInt(id, 10) : id;
-};
-
-// First, let's define the return type interface
 interface ProfileHookReturn {
   profile: ProfileType | null;
   loading: boolean;
@@ -117,16 +103,11 @@ interface ProfileHookReturn {
   userType: UserType | undefined;
 }
 
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 1000;
-const POLL_INTERVAL = 2000; // Add polling interval constant
-
 export const useProfile = (): ProfileHookReturn => {
   const { user, accessToken } = useAuth();
   const [profile, setProfile] = useState<ProfileType | null>(null);
-  const [loading, setLoading] = useState(true); // Start with loading true
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pollingCount, setPollingCount] = useState(0);
   
   const patientProfileData = usePatientProfile();
   const therapistProfileData = useTherapistProfile();
@@ -136,38 +117,32 @@ export const useProfile = (): ProfileHookReturn => {
     [user?.user_type]
   );
 
-  const fetchWithRetry = useCallback(async (retries = 0): Promise<any> => {
+  // Single fetch attempt without retry logic
+  const fetchProfileData = useCallback(async (): Promise<any> => {
     if (!user || !accessToken) throw new Error('User or token missing');
-    try {
-      const response = await fetch(
-        `${API_URL}/${user.user_type}/profiles/?user=${user.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            Accept: 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error('Profile not ready');
+    const response = await fetch(
+      `${API_URL}/${user.user_type}/profiles/?user=${user.id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
       }
-      
-      const data = await response.json();
-      if (!data.results || data.results.length === 0) {
-        throw new Error('Profile not ready');
-      }
-      
-      return data.results[0];
-    } catch (error) {
-      if (retries < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-        return fetchWithRetry(retries + 1);
-      }
-      throw error;
+    );
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`Profile fetch error ${response.status}: ${errorBody}`);
+      throw new Error('Profile fetch failed');
     }
+    
+    const data: ProfileResponse = await response.json();
+    if (!data.results || data.results.length === 0) {
+      throw new Error('Profile not found');
+    }
+    
+    return data.results[0];
   }, [user, accessToken]);
-  
+
   const fetchProfile = useCallback(async () => {
     if (!user?.user_type) {
       setLoading(false);
@@ -176,29 +151,19 @@ export const useProfile = (): ProfileHookReturn => {
 
     try {
       setLoading(true);
-      const profileData = await fetchWithRetry();
+      const profileData = await fetchProfileData();
       setProfile(profileData);
       setError(null);
-      setPollingCount(0); // Reset polling count on success
-    } catch (error) {
-      console.error('Profile fetch error:', error);
+    } catch (error: any) {
+      console.error('Error fetching profile:', error);
       setError('Profile setup incomplete - finish onboarding');
-      
-      // Start polling if profile is not ready
-      if (pollingCount < MAX_RETRIES) {
-        setTimeout(() => {
-          setPollingCount(prev => prev + 1);
-          fetchProfile();
-        }, POLL_INTERVAL);
-      }
     } finally {
       setLoading(false);
     }
-  }, [user?.user_type, fetchWithRetry, pollingCount]);
+  }, [user?.user_type, fetchProfileData]);
 
   // Reset states when user changes
   useEffect(() => {
-    setPollingCount(0);
     setProfile(null);
     setError(null);
     setLoading(true);
@@ -219,9 +184,26 @@ export const useProfile = (): ProfileHookReturn => {
       error,
       refetch: fetchProfile,
       userType: 'patient' as UserType,
+      saveProfile: async (data: Partial<ProfileType>) => {
+        if (!profile) throw new Error('No profile loaded');
+        const response = await axios.patch<PatientProfile>(
+          `${API_URL}/patient/profiles/${profile.id}/`,
+          data as Partial<PatientProfile>,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        const updated = response.data;
+        setProfile(updated as ProfileType);
+        setError(null);
+        return updated as ProfileType;
+      },
     };
   }
-  
+
   if (normalizedUserType === 'therapist' || (normalizedUserType === '' && user?.therapist_profile)) {
     return {
       ...therapistProfileData,
@@ -230,6 +212,23 @@ export const useProfile = (): ProfileHookReturn => {
       error,
       refetch: fetchProfile,
       userType: 'therapist' as UserType,
+      saveProfile: async (data: Partial<ProfileType>): Promise<ProfileType | null> => {
+        if (!profile) throw new Error('No profile loaded');
+        const response = await axios.patch<TherapistProfile>(
+          `${API_URL}/therapist/profiles/${profile.id}/`,
+          data as Partial<TherapistProfile>,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        const updated = response.data;
+        setProfile(updated as ProfileType);
+        setError(null);
+        return updated as ProfileType;
+      },
     };
   }
   

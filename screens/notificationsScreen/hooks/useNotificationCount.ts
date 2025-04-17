@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../../../config';
 import { useAuth } from '../../../contexts/AuthContext';
 
+// This hook fetches the unread notification count for the authenticated user.
+// Endpoint: GET /notifications/count/ (see PRD/Backend docs)
+
 export const useNotificationCount = () => {
   const { accessToken } = useAuth();
   const [count, setCount] = useState<number>(0);
@@ -14,7 +17,7 @@ export const useNotificationCount = () => {
       const response = await fetch(`${API_URL}/notifications/count/`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
       if (!response.ok) {

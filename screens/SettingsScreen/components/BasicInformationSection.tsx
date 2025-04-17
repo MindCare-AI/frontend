@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 export interface BasicUserInfo {
   first_name: string;
   last_name: string;
+  email: string;
   phone_number: string;
   date_of_birth: string;
 }
@@ -57,6 +58,17 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
         onChangeText={(text) => onUpdate('last_name', text)}
         style={styles.inputField}
         autoCapitalize="words"
+      />
+      
+      <TextInput
+        label="Email"
+        mode="outlined"
+        value={userInfo.email}
+        onChangeText={(text) => onUpdate('email', text)}
+        style={styles.inputField}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        placeholder="example@example.com"
       />
       
       <TextInput

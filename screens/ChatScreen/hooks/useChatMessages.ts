@@ -239,7 +239,7 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
       id: tempId,
       content: inputText,
       sender: {
-        id: user?.id || 'user',
+        id: user?.id ? String(user.id) : 'user',
         name: user?.username || 'User', // Changed from user?.name to user?.username
       },
       timestamp: new Date().toISOString(),
@@ -275,7 +275,7 @@ const useChatMessages = ({ conversationId, conversationType }: UseChatMessagesPr
       );
 
       // Add a flag to distinguish between sent and received messages
-      const isSentByCurrentUser = newMessage.sender.id === user?.id;
+      const isSentByCurrentUser = String(newMessage.sender.id) === String(user?.id);
 
       return [
         { ...newMessage, isSentByCurrentUser }, // Add the flag

@@ -24,16 +24,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
     }
 
     if (conversation.conversation_type === 'one_to_one' || conversation.conversation_type === 'direct') {
-      if (conversation.otherParticipant?.name) {
-        return conversation.otherParticipant.name;
+      if (conversation.other_user_name) {
+        return conversation.other_user_name;
       }
-
       const otherParticipant = conversation.participants?.find(
         p => p.id !== currentUser.id
       );
       return otherParticipant?.name || conversation.title || conversation.name || 'Chat';
     }
 
+    // For group or other conversation types
     return conversation.title || conversation.name || 'Group Chat';
   };
 
@@ -49,16 +49,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
         if (conversation.otherParticipant?.avatar) {
           return conversation.otherParticipant.avatar;
         }
-
         const otherParticipant = conversation.participants?.find(
           p => p.id !== currentUser.id
         );
-
-        if (otherParticipant?.avatar) {
-          return otherParticipant.avatar;
-        }
-
-        return 'https://via.placeholder.com/36';
+        return otherParticipant?.avatar || 'https://via.placeholder.com/36';
       }
 
       return null;
@@ -66,6 +60,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
       console.warn('Failed to load avatar:', error);
       return 'https://via.placeholder.com/36';
     }
+  };
+
+  const getSubtitle = (): string => {
+    if (!conversation) return '';
+    if (conversation.conversation_type === 'group') {
+      return `${conversation.participants?.length || 0} participants`;
+    }
+    return '';
   };
 
   const avatar = getHeaderAvatar();
@@ -83,13 +85,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
 
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{getHeaderTitle()}</Text>
-
         {isTyping ? (
           <TypingIndicator visible={true} conversationId={conversation?.id || ''} />
         ) : (
-          conversation?.conversation_type !== 'chatbot' && (
-            <Text style={styles.subtitle}>{conversation?.participants?.length || 0} participants</Text>
-          )
+          getSubtitle() !== '' && <Text style={styles.subtitle}>{getSubtitle()}</Text>
         )}
       </View>
 

@@ -11,15 +11,18 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
+import PatientProfileForm from '../../components/PatientProfileForm'
+import TherapistProfileForm from '../../components/TherapistProfileForm'
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export interface OnboardingSlideProps {
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   isActive: boolean;
   onNext?: () => void;
+  children?: React.ReactNode;
 }
 
 const OnboardingScreen = () => {
@@ -28,23 +31,18 @@ const OnboardingScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { toast } = useToast();
   const { user, accessToken, isLoading, fetchUserData } = useAuth();
-  const totalSteps = 4;
+  const totalSteps = userType === 'patient' || userType === 'therapist' ? 5 : 4;
 
   useEffect(() => {
     if (!isLoading) {
-      console.log('Initial check - Auth loading complete');
       checkUserRole();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
 
-  // Monitor user_type changes to handle navigation
   useEffect(() => {
     if (!isLoading && user) {
-      console.log('User_type changed effect - current user_type:', user?.user_type);
-      
-      // Using typeof to avoid TypeScript errors
       if (typeof user.user_type === 'string' && user.user_type !== '') {
-        console.log('User already has a type, navigating to App:', user.user_type);
         navigation.reset({
           index: 0,
           routes: [{ name: 'App' }],
@@ -55,20 +53,13 @@ const OnboardingScreen = () => {
 
   const checkUserRole = async () => {
     try {
-      console.log('Checking user role - current user:', user);
-      
-      // Using typeof for better type safety
       if (user && typeof user.user_type === 'string' && user.user_type !== '') {
-        console.log('User has a role, skipping onboarding:', user.user_type);
         navigation.reset({
           index: 0,
           routes: [{ name: 'App' }],
         });
-      } else {
-        console.log('User needs onboarding, current user_type:', user?.user_type || 'undefined');
       }
     } catch (error) {
-      console.error('Error checking user role:', error);
       toast({
         title: 'Error',
         description: 'Failed to check user role',
@@ -77,19 +68,11 @@ const OnboardingScreen = () => {
     }
   };
 
-  // Direct API call to set user type without modifying auth context
   const setUserTypeInBackend = async (selectedType: 'patient' | 'therapist') => {
-    if (!accessToken) {
-      console.error('No access token available');
-      return;
-    }
-
+    if (!accessToken) return;
     try {
-      // Make sure this matches your API's expected payload structure
       const payload = { user_type: selectedType };
-      
-      console.log('Setting user type in backend:', selectedType);
-      const response = await axios.post(
+      await axios.post(
         `${API_URL}/users/set-user-type/`, 
         payload,
         {
@@ -99,26 +82,69 @@ const OnboardingScreen = () => {
           }
         }
       );
-      
-      console.log('User type set successfully, response:', response.status);
-      
-      // Refresh user data to get updated user_type
       await fetchUserData();
-      
       return true;
     } catch (error) {
-      console.error('Error setting user type:', error);
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as { response?: { status: number, data: any } };
-        console.error('API error details:', axiosError.response?.data);
-      }
       throw error;
+    }
+  };
+
+  const createPatientProfile = async (data: any) => {
+    if (!accessToken) return;
+    try {
+      await axios.post(
+        `${API_URL}/patient/profiles/`,
+        data,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      await fetchUserData();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'App' }],
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create patient profile',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const createTherapistProfile = async (data: any) => {
+    if (!accessToken) return;
+    try {
+      await axios.post(
+        `${API_URL}/therapist/profiles/`,
+        data,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      await fetchUserData();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'App' }],
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create therapist profile',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleComplete = async () => {
     if (!userType) {
-      console.error('No user type selected');
       toast({
         title: 'Error',
         description: 'Please select your role to continue',
@@ -126,18 +152,10 @@ const OnboardingScreen = () => {
       });
       return;
     }
-
     try {
-      console.log('Completing onboarding, setting user type to:', userType);
-      
-      // Set user type directly via API
       await setUserTypeInBackend(userType);
-      
-      // The navigation will be handled by the useEffect that watches user.user_type
-      // after fetchUserData() updates the user state
-      
+      setStep(4); // Move to profile setup step
     } catch (error) {
-      console.error('Error completing onboarding:', error);
       toast({
         title: 'Error',
         description: 'Failed to complete onboarding. Please try again.',
@@ -146,64 +164,20 @@ const OnboardingScreen = () => {
     }
   };
 
-  // Fix the handleUserTypeSelect function
   const handleUserTypeSelect = (type: 'patient' | 'therapist') => {
-    // Set the user type first
     setUserType(type);
-    console.log('User type selected:', type);
-    
-    // Then move to the next step (or complete if it's the last step)
     setTimeout(() => {
-      if (step < totalSteps - 1) {
+      if (step < 3) {
         setStep(step + 1);
       } else {
-        // Directly use the selected type instead of relying on state
-        handleCompleteWithType(type);
+        handleComplete();
       }
-    }, 100); // Small timeout to ensure state updates
+    }, 100);
   };
 
-  // Add this helper function to use the type directly
-  const handleCompleteWithType = async (selectedType: 'patient' | 'therapist') => {
-    try {
-      console.log('Completing onboarding with type:', selectedType);
-      
-      // Set user type directly via API using the passed-in type
-      await setUserTypeInBackend(selectedType);
-      
-      // Optional: Force navigation if the useEffect doesn't trigger fast enough
-      setTimeout(() => {
-        console.log('Forcing navigation to App screen after role update');
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'App' }],
-        });
-      }, 500);
-      
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to complete onboarding. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Update the handleNext function to handle the final step differently
   const handleNext = () => {
     if (step < totalSteps - 1) {
       setStep(step + 1);
-    } else if (userType) {
-      // Only call handleComplete if userType is set
-      handleComplete();
-    } else {
-      // Show an error if we're on the last step but no user type is selected
-      toast({
-        title: 'Error',
-        description: 'Please select your role to continue',
-        variant: 'destructive',
-      });
     }
   };
 
@@ -211,6 +185,24 @@ const OnboardingScreen = () => {
     if (step > 0) {
       setStep(step - 1);
     }
+  };
+
+  // Patient profile form submit
+  const handlePatientProfileSubmit = async (data: any) => {
+    await createPatientProfile(data);
+  };
+
+  // Therapist profile form submit (skip verification for now)
+  const handleTherapistProfileSubmit = async (data: any) => {
+    await createTherapistProfile({ ...data, verification_status: 'pending' });
+  };
+
+  // Skip profile setup
+  const handleSkipProfile = () => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'App' }],
+    });
   };
 
   return (
@@ -257,6 +249,33 @@ const OnboardingScreen = () => {
           isActive={true}
         >
           <UserTypeSelection onSelect={handleUserTypeSelect} />
+        </OnboardingSlide>
+      )}
+
+      {step === 4 && userType === 'patient' && (
+        <OnboardingSlide
+          title="Set Up Your Patient Profile"
+          description="Complete your profile to get the best experience. You can skip this step if you want."
+          isActive={true}
+        >
+          <PatientProfileForm
+            onSubmit={handlePatientProfileSubmit}
+            onSkip={handleSkipProfile}
+          />
+        </OnboardingSlide>
+      )}
+
+      {step === 4 && userType === 'therapist' && (
+        <OnboardingSlide
+          title="Set Up Your Therapist Profile"
+          description="Complete your profile to connect with patients. You can skip this step or verification for now."
+          isActive={true}
+        >
+          <TherapistProfileForm
+            onSubmit={handleTherapistProfileSubmit}
+            onSkip={handleSkipProfile}
+            allowSkipVerification={true}
+          />
         </OnboardingSlide>
       )}
     </OnboardingLayout>

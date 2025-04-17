@@ -10,11 +10,21 @@ import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import MessagingNavigator from './MessagingNavigator';
 import AppointmentManagementScreen from '../screens/AppointmentManagementScreen/AppointmentManagementScreen';
 import BookAppointmentScreen from '../screens/AppointmentManagementScreen/BookAppointment';
-import { RootStackParamList } from '../types/navigation';
 import { SettingsHomeScreen } from '../screens/SettingsScreen/SettingsHomeScreen';
 import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
 import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
 import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
+import { RootStackParamList } from '../types/navigation';
+
+export type RootStackParamList = {
+  Home: undefined;
+  Chatbot: undefined;
+  MessagingTab: undefined;
+  Settings: { screen?: string };
+  Appointments: undefined;
+  AppointmentManagement: undefined;
+  BookAppointment: undefined;
+};
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
 const SettingsStack = createStackNavigator();
@@ -130,6 +140,10 @@ const AppNavigator = () => {
             // If the nested stack has routes beyond the initial one, navigate back to the initial screen.
             if (route.state && route.state.index > 0) {
               navigation.navigate('Settings', { screen: 'SettingsHome' });
+            } else {
+              navigation.navigate('Settings', { 
+                screen: route.params?.screen || 'SettingsHome'
+              });
             }
           },
         })}

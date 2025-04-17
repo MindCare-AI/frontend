@@ -8,9 +8,9 @@ export type RootStackParamList = {
   Chatbot: undefined;
   MessagingTab: undefined;
   Profile: undefined;
-  AppointmentManagement: { therapistId?: string };
+  AppointmentManagement: { therapistId?: number }; // Changed from string to number
   Notifications: undefined; // Add this
-  NotificationDetail: { id: string }; // And this
+  NotificationDetail: { id: number }; // Changed from string to number
   Settings: undefined;
   Appointments: undefined;
 };
@@ -34,18 +34,18 @@ export type AuthStackParamList = {
   Onboarding: undefined;
 };
 
-// New MessagingStackParamList to specify nested messaging routes
+// Update MessagingStackParamList
 export type MessagingStackParamList = {
   Messaging: undefined;
   Chat: {
-    conversationId: string | number;
+    conversationId: number; // Changed to only number
     conversationType: 'one_to_one' | 'group';
     title: string;
     otherParticipantId?: number;
   };
   NewConversation: undefined;
   GroupDetails?: {
-    groupId: string | number;
+    groupId: number; // Changed to only number
   };
 };
 
@@ -64,13 +64,36 @@ export type AppointmentStackParamList = {
   BookAppointment: undefined;
 };
 
-// Add the Appointment interface export:
+// Update Appointment interface
 export interface Appointment {
-  id: string;
-  date: string;
-  time?: string;
-  patientName?: string;
-  status?: string;
+  id: number; // Changed from string to number
+  patient: number;
+  therapist: number;
+  appointment_date: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  notes?: string;
+  duration: number;
+}
+
+// Add new interfaces
+export interface Message {
+  id: number;
+  conversation: number;
+  content: string;
+  message_type: 'text' | 'image' | 'file';
+  sender: number;
+  sender_name: string;
+  timestamp: string;
+}
+
+export interface Conversation {
+  id: number;
+  participants: number[];
+  created_at: string;
+  unread_count: number;
+  last_message?: Message;
+  other_participant?: number;
+  other_user_name?: string;
 }
 
 declare global {

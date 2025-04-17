@@ -12,7 +12,7 @@ import { Upload } from 'lucide-react-native';
 type VerificationStatus = 'pending' | 'verified' | 'rejected' | 'in_progress';
 
 export interface TherapistVerificationProfile {
-  unique_id: string; // Use unique_id for endpoint
+  id: number;
   verification_status: VerificationStatus;
   verification_notes?: string;
 }
@@ -75,7 +75,7 @@ export const TherapistVerificationStatus: React.FC<TherapistVerificationStatusPr
           }
         });
 
-        const response = await fetch(`${API_URL}/therapist/profiles/${profile.unique_id}/verify/`, {
+        const response = await fetch(`${API_URL}/therapist/profiles/${profile.id}/verify/`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,

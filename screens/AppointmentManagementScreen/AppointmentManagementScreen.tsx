@@ -10,17 +10,29 @@ import { useAuth } from '../../contexts/AuthContext';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteProps = {
   params?: {
-    therapistId?: string;
+    therapistId?: number;
   };
 };
 
 type Appointment = {
-  id: string;
+  id: number;
+  patient: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    user_name: string;
+  };
   therapist: {
-    full_name: string;
+    id: number;
+    first_name: string;
+    last_name: string;
+    username: string;
+    full_name?: string;
   };
   appointment_date: string;
-  status: 'upcoming' | 'completed';
+  status: string;
+  notes: string | null;
+  duration: number;
 };
 
 const AppointmentManagementScreen: React.FC = () => {
@@ -34,13 +46,14 @@ const AppointmentManagementScreen: React.FC = () => {
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
-        const url = params?.therapistId 
-          ? `${API_URL}/therapist/appointments/?therapist_id=${params.therapistId}`
-          : `${API_URL}/therapist/appointments/`;
-
+        let url = `${API_URL}/therapist/appointments/`;
+        if (params?.therapistId) {
+          url = `${API_URL}/therapist/profiles/${params.therapistId}/appointments/`;
+        }
         const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
           },
         });
 
@@ -49,7 +62,8 @@ const AppointmentManagementScreen: React.FC = () => {
         }
 
         const data = await response.json();
-        setAppointments(data.results);
+        // Support both paginated and non-paginated responses
+        setAppointments(data.results || data);
       } catch (error) {
         console.error('Error fetching appointments:', error);
       } finally {
@@ -84,16 +98,26 @@ const AppointmentManagementScreen: React.FC = () => {
           <View key={appointment.id} style={styles.card}>
             <View style={styles.cardContent}>
               <View>
-                <Text style={styles.therapistName}>{appointment.therapist.full_name}</Text>
+                <Text style={styles.therapistName}>
+                  {appointment.therapist?.full_name ||
+                    `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`.trim()}
+                </Text>
                 <View style={styles.infoRow}>
                   <Calendar size={16} color="#666" />
-                  <Text style={styles.infoText}>{new Date(appointment.appointment_date).toLocaleString()}</Text>
+                  <Text style={styles.infoText}>
+                    {new Date(appointment.appointment_date).toLocaleString()}
+                  </Text>
                 </View>
+                {appointment.notes ? (
+                  <Text style={styles.infoText}>Notes: {appointment.notes}</Text>
+                ) : null}
               </View>
               <View
                 style={[
                   styles.statusBadge,
-                  appointment.status === 'upcoming' ? styles.upcomingBadge : styles.completedBadge,
+                  appointment.status === 'scheduled' || appointment.status === 'pending'
+                    ? styles.upcomingBadge
+                    : styles.completedBadge,
                 ]}
               >
                 <Text style={styles.statusText}>{appointment.status}</Text>
@@ -106,7 +130,7 @@ const AppointmentManagementScreen: React.FC = () => {
           <CalendarCheck size={48} color="#CCC" />
           <Text style={styles.emptyStateTitle}>No appointments yet</Text>
           <Text style={styles.emptyStateText}>
-            {params?.therapistId 
+            {params?.therapistId
               ? "Schedule your first appointment with this therapist"
               : "Book your first appointment to get started"}
           </Text>
