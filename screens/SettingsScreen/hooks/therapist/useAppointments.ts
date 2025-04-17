@@ -5,15 +5,12 @@ import { useAuth } from '../../../../contexts/AuthContext';
 
 interface Appointment {
   id: number;
-  unique_id: string; // Add UUID field
   therapist: {
     id: number;
-    unique_id: string;
     full_name: string;
   };
   patient: {
     id: number;
-    unique_id: string;
     full_name: string;
   };
   appointment_date: string;
@@ -41,12 +38,12 @@ export const useTherapistAppointments = () => {
 
   const fetchAppointments = useCallback(async () => {
     try {
-      if (!accessToken || !user?.therapist_profile?.unique_id) {
+      if (!accessToken || !user?.therapist_profile?.id) {
         throw new Error('No access token or therapist profile available');
       }
 
       const response = await fetch(
-        `${API_URL}/therapist/appointments/${user.therapist_profile.unique_id}/`, 
+        `${API_URL}/therapist/appointments/${user.therapist_profile.id}/`, 
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -69,7 +66,7 @@ export const useTherapistAppointments = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [accessToken, user?.therapist_profile?.unique_id]);
+  }, [accessToken, user?.therapist_profile?.id]);
 
   const refreshAppointments = useCallback(() => {
     setRefreshing(true);
@@ -80,9 +77,9 @@ export const useTherapistAppointments = () => {
     fetchAppointments();
   }, [fetchAppointments]);
 
-  const cancelAppointment = async (appointmentId: string) => {
+  const cancelAppointment = async (appointmentId: number) => {
     try {
-      if (!accessToken || !user?.therapist_profile?.unique_id) {
+      if (!accessToken || !user?.therapist_profile?.id) {
         throw new Error('No access token or therapist profile available');
       }
 

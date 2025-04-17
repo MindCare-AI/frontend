@@ -11,7 +11,13 @@ import Animated, {
   FadeOut,
 } from 'react-native-reanimated';
 
-export const TypingIndicator: React.FC = () => {
+interface TypingIndicatorProps {
+  visible: boolean;
+}
+
+const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible }) => {
+  if (!visible) return null;
+
   const dots = Array(3).fill(0);
   const opacityValues = dots.map(() => useSharedValue(0.3));
 

@@ -2,8 +2,11 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Switch, Text } from 'react-native-paper';
 
+// Backend supports notification_preferences and disabled_notification_types in User Preferences.
+// This component should be used to toggle individual notification types.
+
 interface NotificationPreferenceItemProps {
-  type: string;
+  type: string; // e.g., "email_notifications", "in_app_notifications", or a notification type string from backend
   description: string;
   isEnabled: boolean;
   onToggle: () => void;
@@ -15,6 +18,7 @@ export const NotificationPreferenceItem: React.FC<NotificationPreferenceItemProp
   isEnabled,
   onToggle,
 }) => {
+  // Format type label to match backend API types (capitalize each word)
   const formattedType = type
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -29,6 +33,7 @@ export const NotificationPreferenceItem: React.FC<NotificationPreferenceItemProp
       <Switch
         value={isEnabled}
         onValueChange={onToggle}
+        accessibilityLabel={`Toggle ${formattedType} notification`}
       />
     </View>
   );

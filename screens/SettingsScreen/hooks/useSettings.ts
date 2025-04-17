@@ -1,7 +1,7 @@
-//screens/SettingsScreen/hooks/common/useSettings.ts
+//screens/SettingsScreen/hooks/useSettings.ts
 import { useState, useEffect, useCallback } from 'react';
-import { API_URL } from '../../../../config';
-import { useAuth } from '../../../../contexts/AuthContext';
+import { API_URL } from '../../../config'
+import { useAuth } from '../../../contexts/AuthContext';
 
 export interface Settings {
   id: number;
@@ -10,7 +10,7 @@ export interface Settings {
   profile_visibility: 'PUBLIC' | 'PRIVATE' | 'CONTACTS';
   theme_preferences: Record<string, string>;
   privacy_settings: Record<string, string>;
-  // Removed notification_preferences (belongs to a separate serializer)
+  notification_preferences?: Record<string, string>;
   created_at: string;
   updated_at: string;
 }
@@ -24,7 +24,9 @@ export const useSettings = () => {
 
   const fetchSettings = useCallback(async () => {
     try {
-      if (!accessToken) throw new Error('No access token available');
+      if (!accessToken) {
+        throw new Error('No access token available');
+      }
       setLoading(true);
       setError(null);
 
@@ -34,6 +36,7 @@ export const useSettings = () => {
           'Accept': 'application/json'
         }
       });
+
       if (response.status === 401) {
         throw new Error('Authentication failed. Please login again.');
       }
@@ -42,6 +45,7 @@ export const useSettings = () => {
         throw new Error(errorData.message || `Failed to fetch settings: ${response.statusText}`);
       }
       const data = await response.json();
+      // If the response is paginated and returns an array, use the first result.
       if (data.results && data.results.length > 0) {
         setSettings(data.results[0]);
       } else {
@@ -63,7 +67,7 @@ export const useSettings = () => {
       if (!accessToken) throw new Error('No access token available');
       setIsSaving(true);
       
-      // Format payload as required by the User Settings Serializer.
+      // Format the settings payload as per backend requirements.
       const formattedData = {
         timezone: updatedSettings.timezone,
         theme_preferences: {
@@ -72,8 +76,11 @@ export const useSettings = () => {
         },
         privacy_settings: {
           profile_visibility: updatedSettings.privacy_settings?.profile_visibility?.toUpperCase(),
-          // Preserve false values using nullish coalescing
           show_online_status: String(updatedSettings.privacy_settings?.show_online_status ?? true)
+        },
+        notification_preferences: {
+          email_notifications: String(updatedSettings.notification_preferences?.email_notifications ?? true),
+          in_app_notifications: String(updatedSettings.notification_preferences?.in_app_notifications ?? true)
         }
       };
 
@@ -86,7 +93,7 @@ export const useSettings = () => {
         method: settingsId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify(formattedData)
       });

@@ -1,15 +1,13 @@
 //screens/SettingsScreen/UserSettingsScreen.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, StyleSheet, ActivityIndicator, Modal, Alert, SafeAreaView } from 'react-native';
-import { Button, Text, IconButton, Surface } from 'react-native-paper';
-import { Picker } from '@react-native-picker/picker';
+import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import { Button, Text } from 'react-native-paper';
 import { ThemeSelector } from './components/common/ThemeSelector';
 import { PrivacySettings } from './components/common/PrivacySettings';
 import { timezones } from './constants';
 import { useSettings } from './hooks/common/useSettings';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { SettingsStackParamList } from '../../types/navigation';
@@ -35,24 +33,24 @@ interface UserSettings {
     profile_visibility?: ProfileVisibility;
     show_online_status?: boolean;
   };
-  notification_preferences?: {
-    email_notifications?: boolean;
-    in_app_notifications?: boolean;
-  };
 }
 
 interface APISettings {
   id?: number;
   timezone: string;
-  theme_mode?: APIThemeMode;
-  profile_visibility?: APIProfileVisibility;
-  theme_preferences: Record<string, string>;
-  privacy_settings: Record<string, string>;
+  theme_preferences: {
+    mode?: APIThemeMode;
+    color_scheme?: string;
+  };
+  privacy_settings: {
+    profile_visibility?: APIProfileVisibility;
+    show_online_status?: boolean;
+  };
 }
 
 export const UserSettingsScreen: React.FC = () => {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
-  const { settings, loading, error, saveSettings, refetch } = useSettings();
+  const { settings, loading, error, saveSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -71,16 +69,12 @@ export const UserSettingsScreen: React.FC = () => {
         id: settings.id,
         timezone: settings.timezone,
         theme_preferences: {
-          mode: (settings.theme_mode?.toLowerCase() || 'system') as ThemeMode,
+          mode: (settings.theme_preferences?.mode?.toLowerCase() || 'system') as ThemeMode,
           color_scheme: settings.theme_preferences?.color_scheme || 'blue'
         },
         privacy_settings: {
-          profile_visibility: (settings.profile_visibility?.toLowerCase() || 'public') as ProfileVisibility,
-          show_online_status: settings.privacy_settings?.show_online_status === 'true'
-        },
-        notification_preferences: {
-          email_notifications: settings.privacy_settings?.email_notifications === 'true',
-          in_app_notifications: settings.privacy_settings?.in_app_notifications === 'true'
+          profile_visibility: (settings.privacy_settings?.profile_visibility?.toLowerCase() || 'public') as ProfileVisibility,
+          show_online_status: Boolean(settings.privacy_settings?.show_online_status),
         }
       });
     }
@@ -95,23 +89,17 @@ export const UserSettingsScreen: React.FC = () => {
   useEffect(() => {
     const beforeRemoveListener = navigation.addListener('beforeRemove', (e) => {
       if (allowDiscard || !hasUnsavedChanges) return;
-
-      e.preventDefault(); // Block navigation by default
-
+      e.preventDefault();
       Alert.alert(
         'Discard changes?',
         'You have unsaved changes. Are you sure you want to discard them?',
         [
-          {
-            text: "Don't leave",
-            style: 'cancel'
-          },
+          { text: "Don't leave", style: 'cancel' },
           {
             text: 'Discard',
             style: 'destructive',
             onPress: () => {
               setAllowDiscard(true);
-              // Allow the navigation to proceed:
               navigation.dispatch(e.data.action);
             }
           },
@@ -129,18 +117,16 @@ export const UserSettingsScreen: React.FC = () => {
       const apiSettings: APISettings = {
         id: localSettings.id,
         timezone: localSettings.timezone,
-        theme_mode: localSettings.theme_preferences?.mode?.toUpperCase() as APIThemeMode,
-        profile_visibility: localSettings.privacy_settings?.profile_visibility?.toUpperCase() as APIProfileVisibility,
         theme_preferences: {
+          mode: localSettings.theme_preferences?.mode?.toUpperCase() as APIThemeMode,
           color_scheme: localSettings.theme_preferences?.color_scheme || 'blue'
         },
         privacy_settings: {
-          show_online_status: String(localSettings.privacy_settings?.show_online_status ?? true),
-          email_notifications: String(localSettings.notification_preferences?.email_notifications ?? false),
-          in_app_notifications: String(localSettings.notification_preferences?.in_app_notifications ?? false)
+          profile_visibility: localSettings.privacy_settings?.profile_visibility?.toUpperCase() as APIProfileVisibility,
+          show_online_status: localSettings.privacy_settings?.show_online_status === true
         }
       };
-      await saveSettings(apiSettings);
+      await saveSettings(apiSettings as any); // Cast if Partial<Settings> has incompatible types
       gsap.to(formRef.current, { y: -5, duration: 0.2, yoyo: true, repeat: 1 });
       navigation.goBack();
     } catch (err) {
@@ -151,7 +137,6 @@ export const UserSettingsScreen: React.FC = () => {
     }
   }, [localSettings, saveSettings, navigation]);
 
-  // Style enhancements for user friendliness
   const styles = StyleSheet.create({
     safeAreaContainer: {
       flex: 1,
@@ -163,9 +148,6 @@ export const UserSettingsScreen: React.FC = () => {
     },
     scrollContainer: {
       flexGrow: 1,
-      padding: 16,
-    },
-    scrollContent: {
       padding: 16,
     },
     card: {
@@ -215,6 +197,23 @@ export const UserSettingsScreen: React.FC = () => {
     },
   });
 
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={PRIMARY_COLOR} />
+        <Text style={{ marginTop: 16, color: '#666' }}>Loading settings...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: '#D32F2F', fontSize: 16 }}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeAreaContainer}>
       <View ref={containerRef} style={styles.container}>
@@ -223,7 +222,6 @@ export const UserSettingsScreen: React.FC = () => {
             <ThemeSelector
               currentMode={localSettings?.theme_preferences?.mode ?? 'system'}
               currentColor={localSettings?.theme_preferences?.color_scheme ?? 'blue'}
-              // Accepting a string and casting it to ThemeMode
               onSelectMode={(mode: string) =>
                 setLocalSettings(prev =>
                   prev
@@ -248,7 +246,6 @@ export const UserSettingsScreen: React.FC = () => {
             <PrivacySettings
               profileVisibility={localSettings?.privacy_settings?.profile_visibility ?? 'public'}
               showOnlineStatus={localSettings?.privacy_settings?.show_online_status ?? true}
-              // Accepting a string and casting it to ProfileVisibility
               onProfileVisibilityChange={(value: string) =>
                 setLocalSettings(prev =>
                   prev
@@ -270,8 +267,46 @@ export const UserSettingsScreen: React.FC = () => {
                 )
               }
             />
+            <View style={{ marginTop: 16 }}>
+              <Text style={styles.sectionTitle}>Timezone</Text>
+              <View style={styles.card}>
+                <ScrollView horizontal>
+                  <View>
+                    <Text style={{ marginBottom: 8 }}>Select your timezone:</Text>
+                    <ScrollView style={{ maxHeight: 120 }}>
+                      {timezones.map((tz: any, index: number) => {
+                        const tzValue = typeof tz === 'object' ? tz.value : tz;
+                        return (
+                          <Button
+                            key={tzValue || index}  // Use tz.value if available, otherwise fallback to index
+                            mode={localSettings?.timezone === String(tzValue) ? 'contained' : 'outlined'}
+                            onPress={() =>
+                              setLocalSettings((prev) =>
+                                prev ? { ...prev, timezone: String(tzValue) } : null
+                              )
+                            }
+                            style={{ marginVertical: 2 }}
+                          >
+                            {String(tzValue)}
+                          </Button>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
           </View>
-          <Button ref={buttonRef} onPress={handleSave} disabled={isSaving}>Save Changes</Button>
+          <Button
+            ref={buttonRef}
+            onPress={handleSave}
+            disabled={isSaving || !hasUnsavedChanges}
+            style={styles.saveButton}
+            labelStyle={styles.saveButtonText}
+            loading={isSaving}
+          >
+            Save Changes
+          </Button>
         </ScrollView>
       </View>
     </SafeAreaView>

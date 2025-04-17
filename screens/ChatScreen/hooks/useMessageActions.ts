@@ -80,7 +80,7 @@ const useMessageActions = ({ conversationId, conversationType }: UseMessageActio
         conversationId, 
         conversationType,
         accessToken, 
-        user.id
+        user.id.toString() // Convert numeric user id to string
       );
       console.log(`Added reaction ${reaction} to message ${selectedMessage.id}`);
     } catch (error) {

@@ -3,10 +3,9 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../../../../config';
 import { useAuth } from '../../../../contexts/AuthContext';
 
-// Update the interface to match backend response
 export interface TherapistProfile {
   id: number;
-  unique_id: string; // Add this field
+  // Removed unique_id; using id as the primary key
   user: number;
   username: string;
   first_name: string;
@@ -37,13 +36,13 @@ export const useTherapistProfile = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchProfile = async () => {
-    if (!accessToken || !user?.therapist_profile?.unique_id) {
+    if (!accessToken || !user?.therapist_profile?.id) {
       setLoading(false);
       return;
     }
     try {
       const response = await fetch(
-        `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/`, 
+        `${API_URL}/therapist/profiles/${user.therapist_profile.id}/`, 
         {
           headers: { 
             'Authorization': `Bearer ${accessToken}`,
@@ -68,16 +67,15 @@ export const useTherapistProfile = () => {
     }
   };
 
-  // Update the saveProfile function to handle partial updates correctly
   const saveProfile = async (updatedProfile: Partial<TherapistProfile>) => {
     try {
-      if (!accessToken || !user?.therapist_profile?.unique_id) {
+      if (!accessToken || !user?.therapist_profile?.id) {
         throw new Error('No access token or therapist profile id available');
       }
 
       // First get current profile to merge with updates
       const currentProfile = await fetch(
-        `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/`,
+        `${API_URL}/therapist/profiles/${user.therapist_profile.id}/`,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -93,7 +91,7 @@ export const useTherapistProfile = () => {
       };
 
       const response = await fetch(
-        `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/`,
+        `${API_URL}/therapist/profiles/${user.therapist_profile.id}/`,
         {
           method: 'PUT',
           headers: {
@@ -112,7 +110,7 @@ export const useTherapistProfile = () => {
       const data = await response.json();
       setProfile(data);
       setError(null);
-      return data;
+      return data; // Always return the updated profile data
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save profile';
       setError(message);
@@ -122,12 +120,12 @@ export const useTherapistProfile = () => {
   };
 
   const updateAvailability = async (availableDays: Record<string, Array<{start: string; end: string}>>) => {
-    if (!accessToken || !user?.therapist_profile?.unique_id) {
+    if (!accessToken || !user?.therapist_profile?.id) {
       throw new Error('No access token or therapist profile id available');
     }
     try {
       const response = await fetch(
-        `${API_URL}/therapist/profiles/${user.therapist_profile.unique_id}/availability/`, 
+        `${API_URL}/therapist/profiles/${user.therapist_profile.id}/availability/`, 
         {
           method: 'POST',
           headers: {

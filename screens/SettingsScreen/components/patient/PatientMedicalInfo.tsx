@@ -94,6 +94,24 @@ export const PatientMedicalInfo: React.FC<PatientMedicalInfoProps> = ({
         style={[styles.input, styles.textArea]}
         placeholder="Describe your current treatment plan..."
       />
+
+      {/* Additional fields from the backend */}
+      <TextInput
+        label="Last Appointment"
+        value={profile.last_appointment || ''}
+        style={styles.input}
+        mode="outlined"
+        disabled
+        placeholder="Not available"
+      />
+      <TextInput
+        label="Next Appointment"
+        value={profile.next_appointment || ''}
+        style={styles.input}
+        mode="outlined"
+        disabled
+        placeholder="Not scheduled"
+      />
     </View>
   );
 };

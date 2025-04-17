@@ -7,6 +7,7 @@ interface ErrorMessageProps {
   onDismiss?: () => void;
   autoHideDuration?: number;
   severity?: 'error' | 'warning' | 'info';
+  onRetry?: () => Promise<void>;
 }
 
 const ErrorMessage: React.FC<ErrorMessageProps> = ({

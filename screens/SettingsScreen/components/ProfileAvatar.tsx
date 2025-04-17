@@ -1,14 +1,16 @@
 //screens/SettingsScreen/components/ProfileAvatar.tsx
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Image, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Button, IconButton, Text } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../../contexts/AuthContext';
 import { API_URL } from '../../../config';
+import axios from 'axios';
+import type { TherapistProfile } from '../../../types/profile';
 
 interface Profile {
   profile_pic?: string;
-  unique_id?: string;
+  id: number;
 }
 
 interface ProfileAvatarProps {
@@ -23,9 +25,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   isEditable = true 
 }) => {
   const { user, accessToken } = useAuth();
-  const isTherapist = user?.user_type === 'therapist';
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   const requestMediaPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -58,64 +58,51 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         return;
       }
 
-      await uploadImageToServer(result.assets[0].uri);
+      await uploadImageToServer({
+        uri: result.assets[0].uri,
+        type: 'image/jpeg',
+        fileName: 'profile.jpg',
+      });
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to select image. Please try again.');
     }
   };
 
-  const uploadImageToServer = async (uri: string) => {
-    if (!profile.unique_id) {
-      Alert.alert('Error', 'Profile ID not available. Please try again later.');
-      return;
-    }
-
+  const uploadImageToServer = async (image: { uri: string; type?: string; fileName?: string }) => {
     setIsUploading(true);
-    setUploadProgress(0);
+    const formData = new FormData();
+    // Clean the URI for iOS
+    const cleanedUri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
+    // Append file with key 'profile_pic'
+    formData.append('profile_pic', {
+      uri: cleanedUri,
+      type: image.type || 'image/jpeg',
+      name: image.fileName || 'profile.jpg',
+    } as any);
 
     try {
-      // Create FormData and append the file using the correct key ('profile_pic')
-      const formData = new FormData();
-      formData.append('profile_pic', {
-        uri: uri,
-        name: 'profile.jpg',
-        type: 'image/jpeg'
-      } as any);
-
-      // Determine the correct endpoint based on user type
-      const profileEndpoint = isTherapist 
-        ? `${API_URL}/therapist/profiles/${profile.unique_id}/`
-        : `${API_URL}/patient/profiles/${profile.unique_id}/`;
-
-      // Send the PATCH request with the multipart/form-data content
-      const profileResponse = await fetch(profileEndpoint, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          // Note: Do not set the Content-Type header manually when using FormData on some platforms.
-        },
-        body: formData,
-      });
-
-      if (!profileResponse.ok) {
-        const errorText = await profileResponse.text();
-        console.error('Profile update failed:', errorText);
-        throw new Error(`Profile update failed: ${errorText}`);
-      }
-
-      const updatedProfile = await profileResponse.json();
-      onImageChange(updatedProfile.profile_pic);
-
+      const response = await axios.patch<TherapistProfile>(
+        `${API_URL}/therapist/profiles/${profile.id}/`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            // Do not set Content-Type header manually.
+          },
+        }
+      );
+      const updatedProfile = response.data;
+      onImageChange(updatedProfile.profile_pic || '');
       Alert.alert('Success', 'Profile picture updated successfully!');
-    } catch (error) {
-      console.error('Error updating profile picture:', error);
+    } catch (error: any) {
+      console.error("Error updating profile picture:", error);
       Alert.alert(
         'Upload Failed',
         'Failed to upload profile picture. Please try again.',
         [{ text: 'OK' }]
       );
+      throw new Error(`Profile update failed: ${JSON.stringify(error.response?.data)}`);
     } finally {
       setIsUploading(false);
     }

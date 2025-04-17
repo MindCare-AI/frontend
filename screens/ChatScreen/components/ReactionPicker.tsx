@@ -18,15 +18,20 @@ const REACTION_MAP: { [key: string]: string } = {
 const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClose }) => {
   return (
     <View style={styles.container}>
-      {Object.entries(REACTION_MAP).map(([key, emoji]) => (
-        <TouchableOpacity 
-          key={key} 
-          style={styles.reactionButton}
-          onPress={() => onSelect(key)}
-        >
-          <Text style={styles.reactionText}>{emoji}</Text>
-        </TouchableOpacity>
-      ))}
+      <View style={styles.reactionsRow}>
+        {Object.entries(REACTION_MAP).map(([key, emoji]) => (
+          <TouchableOpacity 
+            key={key} 
+            style={styles.reactionButton}
+            onPress={() => onSelect(key)}
+          >
+            <Text style={styles.reactionText}>{emoji}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Text style={styles.closeText}>×</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -42,6 +47,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
+    alignItems: 'center',
+  },
+  reactionsRow: {
+    flexDirection: 'row',
+    flex: 1,
   },
   reactionButton: {
     padding: 6,
@@ -49,6 +59,14 @@ const styles = StyleSheet.create({
   },
   reactionText: {
     fontSize: 20,
+  },
+  closeButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  closeText: {
+    fontSize: 20,
+    color: '#007AFF',
   }
 });
 

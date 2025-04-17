@@ -1,7 +1,7 @@
 //screens/SettingsScreen/UserPreferencesScreen.tsx
 import React, { useRef } from 'react';
 import { ScrollView, View, StyleSheet, Alert } from 'react-native';
-import { Button, Text, Switch, ActivityIndicator, Appbar } from 'react-native-paper';
+import { Button, Text, Switch, ActivityIndicator, Appbar, HelperText } from 'react-native-paper';
 import { NavigationProp } from '@react-navigation/native';
 import { usePreferences } from './hooks/common/usePreferences';
 import { NotificationPreferenceItem } from './components/common/NotificationPreferenceItem';
@@ -14,7 +14,7 @@ interface Preferences {
   email_notifications: boolean;
   in_app_notifications: boolean;
   disabled_notification_types: string[];
-  notification_preferences?: string; // mark as optional
+  notification_preferences: Record<string, any>;
 }
 
 interface UserPreferencesScreenProps {
@@ -22,16 +22,15 @@ interface UserPreferencesScreenProps {
 }
 
 export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ navigation }) => {
-  const { preferences, savePreferences, loading } = usePreferences();
+  const { preferences, savePreferences, loading, error } = usePreferences();
   const [localPrefs, setLocalPrefs] = React.useState<Preferences | null>(preferences);
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
   const [hasChanges, setHasChanges] = React.useState<boolean>(false);
 
-  // Create refs for GSAP animations
+  // GSAP refs
   const containerRef = useRef(null);
   const formRef = useRef(null);
 
-  // Using useGSAP to animate the container on mount
   useGSAP(() => {
     gsap.from(containerRef.current, { 
       duration: 0.5, 
@@ -47,18 +46,15 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
     }
   }, [preferences]);
 
-  // Check for unsaved changes
   React.useEffect(() => {
     if (preferences && localPrefs) {
       setHasChanges(JSON.stringify(preferences) !== JSON.stringify(localPrefs));
     }
   }, [preferences, localPrefs]);
 
-  // Handle navigation prevention when there are unsaved changes
   React.useEffect(() => {
     const handleBeforeRemove = (e: any) => {
       if (!hasChanges) return;
-      
       e.preventDefault();
       Alert.alert(
         'Unsaved Changes',
@@ -73,7 +69,6 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
         ]
       );
     };
-
     navigation.addListener('beforeRemove', handleBeforeRemove);
     return () => navigation.removeListener('beforeRemove', handleBeforeRemove);
   }, [hasChanges, navigation]);
@@ -108,7 +103,23 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
     );
   }
 
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
   if (!localPrefs) return null;
+
+  // Notification types should be fetched from backend if available, else fallback to static
+  const notificationTypes = [
+    'reminders',
+    'messages',
+    'appointments',
+    'updates'
+  ];
 
   return (
     <View ref={containerRef} style={styles.mainContainer}>
@@ -144,6 +155,20 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
 
         <View style={styles.section}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
+            Language
+          </Text>
+          <View style={styles.row}>
+            <Text>App Language</Text>
+            {/* Replace with a dropdown/select if you support multiple languages */}
+            <Text>{localPrefs.language || 'English'}</Text>
+          </View>
+          <HelperText type="info">
+            Language selection coming soon.
+          </HelperText>
+        </View>
+
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
             Notifications
           </Text>
           <View style={styles.row}>
@@ -170,7 +195,7 @@ export const UserPreferencesScreen: React.FC<UserPreferencesScreenProps> = ({ na
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Notification Types
           </Text>
-          {['reminders', 'messages', 'appointments', 'updates'].map((type) => (
+          {notificationTypes.map((type) => (
             <NotificationPreferenceItem
               key={type}
               label={type}
@@ -219,6 +244,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+  },
+  errorText: {
+    color: '#D32F2F',
+    fontSize: 16,
+    textAlign: 'center',
+    margin: 16,
   },
   container: {
     padding: 16,

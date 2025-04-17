@@ -2,8 +2,11 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, useTheme } from 'react-native-paper';
 
+// This component is for filtering notifications by type.
+// To match backend, types should be the notification "type" field from the notification serializer.
+
 interface NotificationTypeFilterProps {
-  types: string[];
+  types: string[]; // e.g., ["reminder", "appointment", "system", ...] from backend /notifications/types/
   selectedType: string | null;
   onSelectType: (type: string | null) => void;
 }
@@ -53,6 +56,7 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
               selectedType === type && { color: theme.colors.onPrimary },
             ]}
           >
+            {/* Format type for display: e.g., "appointment_reminder" => "Appointment Reminder" */}
             {type.split('_').map(word => 
               word.charAt(0).toUpperCase() + word.slice(1)
             ).join(' ')}

@@ -80,7 +80,7 @@ export const SettingsHomeScreen: React.FC = () => {
       screen: 'MedicalHistory',
       requiresAuth: true,
       userTypes: ['patient'],
-    }
+    },
   ];
 
   if (loading) {

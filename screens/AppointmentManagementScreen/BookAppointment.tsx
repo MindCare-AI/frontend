@@ -1,30 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Platform, Alert } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import TherapistCard from '../../components/TherapistCard';
+import { TherapistCard } from '../../components/TherapistCard';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useTherapistAvailability } from './hooks/useTherapistAvailability';
 import { LoadingIndicator, ErrorMessage } from '../../components/ui';
-
-interface Therapist {
-  unique_id: string;
-  full_name: string;
-  specialization: string;
-  profile_pic: string | null;
-  rating?: number;
-}
+import type { TherapistProfile } from '../../types/profile';
 
 const BookAppointmentScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { 
-    therapists, 
-    loading, 
-    error, 
-    fetchTherapists
+  const {
+    therapists,
+    loading,
+    error,
+    fetchTherapists,
   } = useTherapistAvailability();
 
-  // Fetch therapists when component mounts
+  // Select therapist and go to their appointment management screen
+  const handleTherapistSelect = (therapist: TherapistProfile) => {
+    navigation.navigate('AppointmentManagement', {
+      therapistId: therapist.id,
+    });
+  };
+
   useEffect(() => {
     fetchTherapists();
   }, [fetchTherapists]);
@@ -34,7 +33,12 @@ const BookAppointmentScreen = () => {
   }
 
   if (error) {
-    return <ErrorMessage message={error} onRetry={fetchTherapists} />;
+    return (
+      <ErrorMessage
+        message={error.toString()}
+        onDismiss={() => {}}
+      />
+    );
   }
 
   return (
@@ -44,12 +48,12 @@ const BookAppointmentScreen = () => {
       </View>
       <View style={styles.therapistsContainer}>
         {therapists.length > 0 ? (
-          therapists.map(therapist => (
-            <TherapistCard 
-              key={therapist.unique_id} 
-              therapist={therapist} 
+          therapists.map((therapist) => (
+            <TherapistCard
+              key={therapist.id}
+              therapist={therapist}
               isSelected={false}
-              onSelect={() => navigation.navigate('AppointmentManagement', { therapistId: therapist.unique_id })}
+              onSelect={() => handleTherapistSelect(therapist)}
             />
           ))
         ) : (
@@ -83,7 +87,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 16,
     fontSize: 14,
-  }
+  },
 });
 
 export default BookAppointmentScreen;

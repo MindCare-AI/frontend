@@ -16,15 +16,18 @@ interface NotificationsScreenProps {
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const { 
-    notifications, 
-    loading, 
-    error, 
-    refreshing, 
-    refreshNotifications, 
-    markAsRead 
+
+  // Use backend types if available, otherwise fallback to static
+  const {
+    notifications,
+    loading,
+    error,
+    refreshing,
+    refreshNotifications,
+    markAsRead,
+    types: backendTypes,
   } = useNotifications(selectedType);
-  
+
   const { markAllRead } = useMarkAllRead();
 
   const handleMarkAllRead = async () => {
@@ -36,10 +39,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
     }
   };
 
-  const handleNotificationPress = (notificationId: string) => {
+  const handleNotificationPress = (notificationId: number) => {
     markAsRead(notificationId);
     navigation.navigate('NotificationDetail', { id: notificationId });
   };
+
+  // Use backend types if present, otherwise fallback to static
+  const typeOptions = backendTypes && backendTypes.length > 0 ? backendTypes : NOTIFICATION_TYPES;
 
   return (
     <View style={styles.container}>
@@ -58,7 +64,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       </Appbar.Header>
 
       <NotificationTypeFilter
-        types={NOTIFICATION_TYPES}
+        types={typeOptions}
         selectedType={selectedType}
         onSelectType={setSelectedType}
       />
@@ -96,7 +102,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             <NotificationItem
               key={notification.id}
               notification={notification}
-              onPress={() => handleNotificationPress(notification.id)}
+              onPress={() => handleNotificationPress(parseInt(notification.id))}
             />
           ))}
         </ScrollView>

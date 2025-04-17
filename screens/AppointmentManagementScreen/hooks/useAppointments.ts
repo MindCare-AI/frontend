@@ -4,24 +4,21 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 interface Appointment {
   id: number;
-  unique_id: string;
-  therapist: {
-    id: number;
-    unique_id: string;
-    full_name: string;
-  };
   patient: {
     id: number;
-    unique_id: string;
+    full_name: string;
+  };
+  therapist: {
+    id: number;
     full_name: string;
   };
   appointment_date: string;
   duration: number;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'pending';
+  status: 'scheduled' | 'completed' | 'cancelled' | 'pending' | string;
   notes: string | null;
   created_at: string;
   updated_at: string;
-  video_session_link: string | null;
+  video_session_link?: string | null;
 }
 
 interface PaginatedResponse {
@@ -38,9 +35,11 @@ export const useAppointments = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Fetch all appointments (for both therapist and patient)
   const fetchAppointments = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/appointments/`, {
+      const response = await fetch(`${API_URL}/therapist/appointments/`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
@@ -63,53 +62,123 @@ export const useAppointments = () => {
     }
   }, [accessToken]);
 
-  const bookAppointment = async (therapistId: string, appointmentDate: string, duration: number, notes?: string) => {
+  // Book appointment (for patient, using therapist profile endpoint)
+  const bookAppointment = async (
+    therapistId: number,
+    appointmentDate: string,
+    duration: number,
+    notes?: string
+  ) => {
     try {
-      const response = await fetch(`${API_URL}/appointments/book/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          therapist_id: therapistId,
-          appointment_date: appointmentDate,
-          duration_minutes: duration,
-          notes: notes || ''
-        })
-      });
+      const response = await fetch(
+        `${API_URL}/therapist/profiles/${therapistId}/book-appointment/`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            appointment_date: appointmentDate,
+            duration_minutes: duration,
+            notes: notes || ''
+          })
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to book appointment');
       }
 
       const data = await response.json();
-      await fetchAppointments(); // Refresh appointments list
+      await fetchAppointments();
       return data;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to book appointment');
     }
   };
 
-  const cancelAppointment = async (appointmentId: string) => {
+  // Cancel appointment (PATCH status to cancelled)
+  const cancelAppointment = async (appointmentId: number) => {
     try {
-      const response = await fetch(`${API_URL}/appointments/${appointmentId}/cancel/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
+      const response = await fetch(
+        `${API_URL}/therapist/appointments/${appointmentId}/`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'cancelled' })
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Failed to cancel appointment');
       }
 
-      await fetchAppointments(); // Refresh appointments list
+      await fetchAppointments();
       return true;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : 'Failed to cancel appointment');
+    }
+  };
+
+  // Update appointment (status or notes)
+  const updateAppointment = async (
+    appointmentId: number,
+    updates: Partial<{ status: string; notes: string }>
+  ) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/therapist/appointments/${appointmentId}/`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updates)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update appointment');
+      }
+
+      const data = await response.json();
+      await fetchAppointments();
+      return data;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to update appointment');
+    }
+  };
+
+  // Delete appointment
+  const deleteAppointment = async (appointmentId: number) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/therapist/appointments/${appointmentId}/`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete appointment');
+      }
+
+      await fetchAppointments();
+      return true;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to delete appointment');
     }
   };
 
@@ -129,6 +198,8 @@ export const useAppointments = () => {
     refreshing,
     refreshAppointments,
     bookAppointment,
-    cancelAppointment
+    cancelAppointment,
+    updateAppointment,
+    deleteAppointment,
   };
 };

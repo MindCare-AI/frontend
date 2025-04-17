@@ -1,8 +1,10 @@
 //contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios, { type AxiosResponse } from 'axios';
+import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 import { API_URL } from '../config';
+import { PatientProfile, TherapistProfile } from '../types/profile';
 
 // Add these interfaces at the top of your file
 
@@ -19,7 +21,7 @@ interface ProfileListResponse {
   next: string | null;
   previous: string | null;
   results: Array<{
-    unique_id: string;
+    id: number;
     user: number;
     // other profile fields...
   }>;
@@ -57,38 +59,13 @@ interface NewPatientProfileResponse {
   updated_at: string;
 }
 
-interface PatientProfile {
-  id: string | number;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string | null;
-  gender: string;
-  address: string;
-  phone_number: string;
-  emergency_contact: EmergencyContact;
-  medical_history: string;
-  current_medications: string;
-  blood_type: string;
-}
-
-interface EmergencyContact {
-  name?: string;
-  relationship?: string;
-  phone?: string;
-  email?: string;
-}
-
 interface User {
-  id: string;
+  id: number;
   email: string;
   username?: string;
   user_type: 'patient' | 'therapist' | '';
-  patient_profile?: {
-    unique_id: string;
-  };
-  therapist_profile?: {
-    unique_id: string;
-  };
+  patient_profile?: PatientProfile;
+  therapist_profile?: TherapistProfile;
   phone_number?: string;
 }
 
@@ -118,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<PatientProfile | TherapistProfile | null>(null);
 
   useEffect(() => {
     loadStoredTokens();
@@ -127,25 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authState.accessToken) return null;
     
     try {
-      // Properly type the user response
-      const response = await axios.get<UserResponse>(`${API_URL}/users/me/`, {
+      const response = await axios.get<User>(`${API_URL}/users/me/`, {
         headers: {
           Authorization: `Bearer ${authState.accessToken}`
         }
       });
       
-      const userData: User = {
-        ...response.data,
-        id: response.data.id.toString(), // convert number to string
-        user_type: response.data.user_type || '' // Preserve empty string for onboarding
-      };
+      const userData = response.data;
       
-      // Only attempt to fetch profile if user has a type
+      // Fetch profile data if user type exists
       if (userData.user_type) {
         try {
-          // Properly type the profile response
-          const profileResponse = await axios.get<ProfileListResponse>(
-            `${API_URL}/${userData.user_type}/profiles/`,
+          const profileResponse = await axios.get<PatientProfile | TherapistProfile>(
+            `${API_URL}/${userData.user_type}/profiles/?user=${userData.id}`,
             {
               headers: {
                 Authorization: `Bearer ${authState.accessToken}`
@@ -153,46 +125,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           );
           
-          if (profileResponse.data.results?.length > 0) {
-            // Find the profile belonging to this user
-            const userProfile = profileResponse.data.results.find(
-              profile => profile.user.toString() === userData.id
-            );
-            
-            if (userProfile) {
-              userData[`${userData.user_type}_profile`] = {
-                unique_id: userProfile.unique_id
-              };
-            }
-          } else {
-            // Create a new profile if none exists
-            const newProfileResponse = await axios.post<NewPatientProfileResponse>(
-              `${API_URL}/patient/profiles/`,
-              {
-                // Provide the required payload for profile creation
-                user_name: userData.username || 'new-patient',
-                first_name: '',
-                last_name: ''
-              },
-              {
-                headers: {
-                  Authorization: `Bearer ${authState.accessToken}`
-                }
-              }
-            );
-
-            // Store the UUID correctly (not the numeric id)
-            userData.patient_profile = {
-              unique_id: newProfileResponse.data.unique_id
-            };
+          if (profileResponse.data) {
+            setProfile(profileResponse.data);
+            userData[`${userData.user_type}_profile`] = profileResponse.data;
           }
         } catch (profileError) {
-          console.error("Profile fetch error (non-critical):", profileError);
-          // Don't fail completely - allow onboarding to continue
+          console.error("Profile fetch error:", profileError);
         }
       }
       
       setUser(userData);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
       return userData;
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -300,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.warn('Max retries reached for fetching user data');
               // Ensure we create a valid User object
               userData = {
-                id: 'temp-id', // Provide a temporary id
+                id: 0, // Provide a temporary id
                 email: 'pending@example.com', // Provide a temporary email
                 user_type: '', // Empty string triggers onboarding
               };

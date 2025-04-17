@@ -61,6 +61,7 @@ export interface Conversation {
   timestamp?: string;
   conversation_type: 'direct' | 'group' | 'one_to_one' | 'chatbot';
   isTyping?: boolean; // Added optional property
+  other_user_name?: string; // Added missing field
 }
 
 export interface RouteProps {

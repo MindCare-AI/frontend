@@ -39,9 +39,7 @@ export const PatientEmergencyContact: React.FC<PatientEmergencyContactProps> = (
 
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.sectionTitle}>
-        Emergency Contact
-      </Text>
+      <Text style={styles.sectionTitle}>Emergency Contact</Text>
       
       <TextInput
         label="Contact Name"
@@ -58,9 +56,9 @@ export const PatientEmergencyContact: React.FC<PatientEmergencyContactProps> = (
           style={styles.picker}
         >
           <Picker.Item label="Select Relationship" value="" />
-          {relationships.map((rel) => (
+            {(relationships as Array<string>).map((rel: string): React.ReactElement => (
             <Picker.Item key={rel} label={rel} value={rel} />
-          ))}
+            ))}
         </Picker>
       </View>
       
@@ -72,9 +70,18 @@ export const PatientEmergencyContact: React.FC<PatientEmergencyContactProps> = (
         style={[styles.input, phoneError ? styles.inputError : null]}
         mode="outlined"
         error={!!phoneError}
-        helperText={phoneError}
+        placeholder="e.g., +1234567890"
       />
       {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+
+      <TextInput
+        label="Contact Email"
+        value={emergencyContact.email || ''}
+        onChangeText={(text) => handleChange('email', text)}
+        style={styles.input}
+        mode="outlined"
+        placeholder="Enter email (optional)"
+      />
     </View>
   );
 };
