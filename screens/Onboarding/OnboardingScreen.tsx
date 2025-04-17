@@ -4,15 +4,15 @@ import { useNavigation } from '@react-navigation/native';
 import { Brain, HandHeart, MessageSquare } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/ToastContext';
-import UserTypeSelection from '../../components/UserTypeSelection';
-import OnboardingSlide from '../../components/OnboardingSlide';
-import OnboardingLayout from '../../components/OnboardingLayout';
+import UserTypeSelection from '../../components/Onboarding/UserTypeSelection';
+import OnboardingSlide from '../../components/Onboarding/OnboardingSlide';
+import OnboardingLayout from '../../components/Onboarding/OnboardingLayout';
 import axios from 'axios';
 import { API_URL } from '../../config';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
-import PatientProfileForm from '../../components/PatientProfileForm'
-import TherapistProfileForm from '../../components/TherapistProfileForm'
+import PatientProfileForm from '../../components/Onboarding/PatientProfileForm'
+import TherapistProfileForm from '../../components/Onboarding/TherapistProfileForm'
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 

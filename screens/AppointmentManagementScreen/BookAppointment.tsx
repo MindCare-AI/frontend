@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { TherapistCard } from '../../components/TherapistCard';
+import { TherapistCard } from '../../components/AppointmentManagementScreen/TherapistCard';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { useTherapistAvailability } from '../../hooks/AppointmentManagementScreen/useTherapistAvailability';
