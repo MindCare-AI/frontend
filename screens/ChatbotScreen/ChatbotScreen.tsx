@@ -14,8 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { API_URL } from '../../config'; // Ensure this is properly defined in your config
 import { useAuth } from '../../contexts/AuthContext';
-import { AnimatedBotMessage } from './components/AnimatedBotMessage'; // updated import
-import TypingIndicator from './components/TypingIndicator';
+import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage'; // updated import
+import TypingIndicator from '../../components/ChatbotScreen/TypingIndicator';
 
 interface Message {
   id: string;

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image } from 'react-native';
 import Avatar from './Avatar';
-import { Button } from '../../../components/ui/Button';
+import { Button } from '../ui/Button';
 import { Image as ImageIcon, Send, Smile, X, Camera, Video, Paperclip } from 'lucide-react';
-import { useToast } from "../../../components/ui/use-toast";
-import { getShadowStyles } from '../../../styles/global';
+import { useToast } from "../ui/use-toast";
+import { getShadowStyles } from '../../styles/global';
 
 const CreatePostCard = () => {
   const [postContent, setPostContent] = useState('');

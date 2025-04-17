@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Appointment {
   id: number;

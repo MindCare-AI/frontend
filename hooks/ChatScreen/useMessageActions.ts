@@ -1,8 +1,8 @@
 //screens/ChatScreen/hooks/useMessageActions.ts
 import { useState, useCallback } from 'react';
-import { useAuth } from '../../../contexts/AuthContext';
-import { API_BASE_URL } from '../../../config';
-import { Message } from '../../../types/chat';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_BASE_URL } from '../../config';
+import { Message } from '../../types/chat';
 
 // Define the conversation types
 type ConversationType = 'one_to_one' | 'group' | 'chatbot';

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Keyboard, Animated, Platform, Text } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Message } from '../../../types/chat';
+import { Message } from '../../types/chat';
 import AttachmentPicker from './AttachmentPicker'; // New import for attachments
 
 interface MessageInputProps {

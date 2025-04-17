@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 // This hook provides the feature to mark all notifications as read for the authenticated user.
 // Endpoint: POST /notifications/mark-all-read/ (see PRD/Backend docs)

@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { TherapistCard } from '../../components/TherapistCard';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
-import { useTherapistAvailability } from './hooks/useTherapistAvailability';
+import { useTherapistAvailability } from '../../hooks/AppointmentManagementScreen/useTherapistAvailability';
 import { LoadingIndicator, ErrorMessage } from '../../components/ui';
 import type { TherapistProfile } from '../../types/profile';
 

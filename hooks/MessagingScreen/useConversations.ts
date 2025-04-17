@@ -1,8 +1,8 @@
 //screens/MessagingScreen/hooks/useConversations.ts
 import { useState, useEffect, useCallback } from 'react';
-import { Conversation } from '../../../types/chat';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
+import { Conversation } from '../../types/chat';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
 
 const useConversations = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);

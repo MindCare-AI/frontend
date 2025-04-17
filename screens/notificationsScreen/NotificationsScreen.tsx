@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { ScrollView, View, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text, Appbar, Button, Divider, useTheme } from 'react-native-paper';
-import { NotificationItem } from './components/NotificationItem';
-import { NotificationTypeFilter } from './components/NotificationTypeFilter';
-import { useNotifications } from './hooks/useNotifications';
-import { useMarkAllRead } from './hooks/useMarkAllRead';
+import { NotificationItem } from '../../components/notificationsScreen/NotificationItem';
+import { NotificationTypeFilter } from '../../components/notificationsScreen/NotificationTypeFilter';
+import { useNotifications } from '../../hooks/notificationsScreen/useNotifications';
+import { useMarkAllRead } from '../../hooks/notificationsScreen/useMarkAllRead';
 import { NOTIFICATION_TYPES } from './constants';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types/navigation';

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { API_URL } from '../../../config';
-import { useAuth } from '../../../contexts/AuthContext';
-import { Notification } from '../../../types/notifications';
+import { API_URL } from '../../config';
+import { useAuth } from '../../contexts/AuthContext';
+import { Notification } from '../../types/notifications';
 
 // This hook provides all notification features for the authenticated user.
 // Endpoints used (see PRD/Backend docs):

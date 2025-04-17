@@ -1,12 +1,12 @@
 //screens/ChatScreen/hooks/useChatMessages.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { useAuth } from '../../../contexts/AuthContext';
-import { Message, Conversation } from '../../../types/chat';
-import { API_BASE_URL } from '../../../config';
-import { getAuthToken } from '../../../lib/utils';
-import { connectWebSocket } from '../../../services/websocket';
-import { API_URL } from '../../../config';
+import { useAuth } from '../../contexts/AuthContext';
+import { Message, Conversation } from '../../types/chat';
+import { API_BASE_URL } from '../../config';
+import { getAuthToken } from '../../lib/utils';
+import { connectWebSocket } from '../../services/websocket';
+import { API_URL } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface EditMessageParams {

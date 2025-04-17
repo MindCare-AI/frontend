@@ -3,14 +3,14 @@ import React from 'react';
 import { View, StyleSheet, SectionList, Text, Alert, StatusBar } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MessagingStackParamList } from '../../navigation/MessagingNavigator'; // Adjust path as needed
-import useConversations from './hooks/useConversations';
-import ConversationItem from './components/ConversationItem';
-import SearchBar from './components/SearchBar';
-import NewChatButton from './components/NewChatButton';
+import useConversations from '../../hooks/MessagingScreen/useConversations';
+import ConversationItem from '../../components/MessagingScreen/ConversationItem';
+import SearchBar from '../../components/MessagingScreen/SearchBar';
+import NewChatButton from '../../components/MessagingScreen/NewChatButton';
 import { LoadingIndicator, ErrorMessage } from '../../components/ui';
 import { API_URL } from '../../config'; // Ensure correct API_URL
 import { useAuth } from '../../contexts/AuthContext';
-import TypingIndicator from '../ChatScreen/components/TypingIndicator';
+import TypingIndicator from '../../components/ChatScreen/TypingIndicator';
 
 type MessagingScreenNavigationProp = StackNavigationProp<MessagingStackParamList, 'Messaging'>;
 

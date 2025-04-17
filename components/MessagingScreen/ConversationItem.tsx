@@ -1,8 +1,8 @@
 //screens/MessagingScreen/components/ConversationItem.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Avatar } from "../../../components/ui/avatar"; 
-import { formatTime } from '../../../utils/helpers';
+import { Avatar } from "../ui/avatar"; 
+import { formatTime } from '../../utils/helpers';
 
 // Define interface for component props
 interface Participant {
