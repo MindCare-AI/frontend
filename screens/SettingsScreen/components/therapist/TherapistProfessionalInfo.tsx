@@ -20,7 +20,7 @@ export const TherapistProfessionalInfo: React.FC<TherapistProfessionalInfoProps>
     setProfile({ ...profile, phone_number: `${countryCode}${localPhone}` });
   }, [countryCode, localPhone]);
 
-  const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const initial = Array.isArray(profile.treatment_approaches) && profile.treatment_approaches.length
@@ -143,12 +143,12 @@ export const TherapistProfessionalInfo: React.FC<TherapistProfessionalInfoProps>
             <Chip
               onPress={() => toggleDay(d)}
               style={{
-                backgroundColor: selectedDays.includes(d) ? '#002D62' : '#E4F0F6',
+                backgroundColor: selectedDays.includes(d.toLowerCase()) ? '#002D62' : '#E4F0F6',
                 borderColor: '#002D62',
                 borderWidth: 1,
                 margin: 4
               }}
-              textStyle={{ color: selectedDays.includes(d) ? '#FFF' : '#000' }}
+              textStyle={{ color: selectedDays.includes(d.toLowerCase()) ? '#FFF' : '#000' }}
             >
               {d}
             </Chip>

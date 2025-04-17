@@ -77,7 +77,7 @@ export const SettingsHomeScreen: React.FC = () => {
       title: 'Medical History',
       description: 'Manage your medical records',
       icon: '🏥',
-      screen: 'MedicalHistory',
+      screen: 'MedicalHistory', 
       requiresAuth: true,
       userTypes: ['patient'],
     },

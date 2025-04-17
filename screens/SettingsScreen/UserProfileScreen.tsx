@@ -218,7 +218,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation
 
           <View ref={avatarRef} style={styles.avatarSection}>
             <ProfileAvatar 
-              profile={{ ...localProfile, profile_pic: localProfile?.profile_pic || undefined }}
+              profile={{ ...localProfile, profile_pic: localProfile?.profile_pic || undefined, user_type: userType }}
               onImageChange={(uri: string) => setLocalProfile({ ...localProfile, profile_pic: uri })}
             />
             <Image

@@ -3,8 +3,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { NavigationProp, ParamListBase } from '@react-navigation/native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
+import { NavigationProp } from '@react-navigation/native';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import MessagingNavigator from './MessagingNavigator';
@@ -14,21 +14,11 @@ import { SettingsHomeScreen } from '../screens/SettingsScreen/SettingsHomeScreen
 import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
 import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
 import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
-import { RootStackParamList } from '../types/navigation';
-
-export type RootStackParamList = {
-  Home: undefined;
-  Chatbot: undefined;
-  MessagingTab: undefined;
-  Settings: { screen?: string };
-  Appointments: undefined;
-  AppointmentManagement: undefined;
-  BookAppointment: undefined;
-};
+import { RootStackParamList, SettingsStackParamList, AppointmentStackParamList } from '../types/navigation';
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
-const SettingsStack = createStackNavigator();
-const AppointmentStack = createStackNavigator<RootStackParamList>();
+const SettingsStack = createStackNavigator<SettingsStackParamList>();
+const AppointmentStack = createStackNavigator<AppointmentStackParamList>();
 
 interface NotificationBadgeProps {
   navigation: NavigationProp<RootStackParamList>;
@@ -135,16 +125,10 @@ const AppNavigator = () => {
         name="Settings" 
         component={SettingsStackNavigator} 
         options={{ tabBarLabel: 'Settings' }}
-        listeners={({ navigation, route }) => ({
-          tabPress: (e) => {
-            // If the nested stack has routes beyond the initial one, navigate back to the initial screen.
-            if (route.state && route.state.index > 0) {
-              navigation.navigate('Settings', { screen: 'SettingsHome' });
-            } else {
-              navigation.navigate('Settings', { 
-                screen: route.params?.screen || 'SettingsHome'
-              });
-            }
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Simply navigate to Settings since it's defined as undefined in RootStackParamList
+            navigation.navigate('Settings');
           },
         })}
       />
