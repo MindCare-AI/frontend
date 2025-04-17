@@ -6,8 +6,6 @@ import type { AxiosResponse } from 'axios';
 import { API_URL } from '../config';
 import { PatientProfile, TherapistProfile } from '../types/profile';
 
-// Add these interfaces at the top of your file
-
 interface ApiResponse<T> {
   data: T;
   status: number;
@@ -16,47 +14,56 @@ interface ApiResponse<T> {
   config: any;
 }
 
-interface ProfileListResponse {
+interface PatientProfileResponse {
   count: number;
   next: string | null;
   previous: string | null;
   results: Array<{
     id: number;
     user: number;
-    // other profile fields...
+    user_name: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone_number: string | null;
+    medical_history: string | null;
+    current_medications: string | null;
+    profile_pic: string | null;
+    blood_type: string | null;
+    treatment_plan: string | null;
+    pain_level: number | null;
+    last_appointment: string | null;
+    next_appointment: string | null;
+    created_at: string;
+    updated_at: string;
   }>;
 }
 
-interface UserResponse {
+interface TherapistProfileResponse {
   id: number;
-  email: string;
-  username: string;
-  user_type: 'patient' | 'therapist' | '';
-  // other user fields...
-}
-
-// Define interfaces for API responses
-interface PatientProfileResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Array<PatientProfile>;
-}
-
-// Define the interface for patient profile creation response
-interface NewPatientProfileResponse {
-  id: number;
-  unique_id: string;  // Add this field
   user: number;
+  username: string;
   first_name: string;
   last_name: string;
   email: string;
   phone_number: string | null;
-  medical_history: string | null;
-  current_medications: string | null;
-  blood_type: string | null;
+  specialization: string;
+  license_number: string | null;
+  years_of_experience: number;
+  bio: string | null;
+  profile_pic: string | null;
+  treatment_approaches: string[];
+  available_days: {
+    [key: string]: any[];
+  };
+  license_expiry: string | null;
+  video_session_link: string | null;
+  languages_spoken: string[];
+  profile_completion_percentage: number;
+  is_profile_complete: boolean;
   created_at: string;
   updated_at: string;
+  verification_status: 'pending' | 'in_progress' | 'verified' | 'rejected';
 }
 
 interface User {
@@ -82,7 +89,7 @@ interface AuthContextType extends AuthState {
   updateTokens: (tokens: { access: string; refresh?: string }) => Promise<void>;
   updateUserRole: (role: 'patient' | 'therapist') => Promise<void>;
   fetchUserData: () => Promise<User | null>;
-  updateUser: (updatedUser: User) => Promise<void>; // Add this line
+  updateUser: (updatedUser: User) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -127,7 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (profileResponse.data) {
             setProfile(profileResponse.data);
-            userData[`${userData.user_type}_profile`] = profileResponse.data;
+            if (userData.user_type === 'patient') {
+              userData.patient_profile = profileResponse.data as PatientProfile;
+            } else if (userData.user_type === 'therapist') {
+              userData.therapist_profile = profileResponse.data as TherapistProfile;
+            }
           }
         } catch (profileError) {
           console.error("Profile fetch error:", profileError);
@@ -380,7 +391,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateTokens,
         updateUserRole,
         fetchUserData,
-        updateUser, // Add updateUser here
+        updateUser,
       }}
     >
       {children}

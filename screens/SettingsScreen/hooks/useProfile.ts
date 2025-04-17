@@ -6,6 +6,7 @@ import { useTherapistProfile } from './therapist/useTherapistProfile';
 import { useAuth } from '../../../contexts/AuthContext';
 import { API_URL } from '../../../config';
 import axios from 'axios';
+import { useUpload } from './common/useUpload';  // added import
 
 type UserType = 'patient' | 'therapist' | '';
 
@@ -29,22 +30,7 @@ interface UserPreferences {
   notification_preferences: string;
 }
 
-interface UserData {
-  id: number;
-  username: string;
-  email: string;
-  user_type: UserType;
-  phone_number: string;
-  date_of_birth: string;
-  preferences: UserPreferences;
-  settings: UserSettings;
-  patient_profile?: {
-    id: number;
-  };
-  therapist_profile?: {
-    id: number;
-  };
-}
+// type UserData = { /* ... */ }; // Unused, so removed
 
 interface BaseProfile {
   id: number;
@@ -105,6 +91,7 @@ interface ProfileHookReturn {
 
 export const useProfile = (): ProfileHookReturn => {
   const { user, accessToken } = useAuth();
+  const { uploadImage } = useUpload();  // initialize uploader
   const [profile, setProfile] = useState<ProfileType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,15 +107,14 @@ export const useProfile = (): ProfileHookReturn => {
   // Single fetch attempt without retry logic
   const fetchProfileData = useCallback(async (): Promise<any> => {
     if (!user || !accessToken) throw new Error('User or token missing');
-    const response = await fetch(
-      `${API_URL}/${user.user_type}/profiles/?user=${user.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-        },
-      }
-    );
+    // Ensure the URL is constructed with a trailing slash
+    const url = `${API_URL}/${normalizedUserType}/profiles/?user=${user.id}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`Profile fetch error ${response.status}: ${errorBody}`);
@@ -141,7 +127,7 @@ export const useProfile = (): ProfileHookReturn => {
     }
     
     return data.results[0];
-  }, [user, accessToken]);
+  }, [user, accessToken, normalizedUserType]);
 
   const fetchProfile = useCallback(async () => {
     if (!user?.user_type) {
@@ -186,9 +172,18 @@ export const useProfile = (): ProfileHookReturn => {
       userType: 'patient' as UserType,
       saveProfile: async (data: Partial<ProfileType>) => {
         if (!profile) throw new Error('No profile loaded');
+        const payload: Partial<PatientProfile> = { ...(data as Partial<PatientProfile>) };
+        // if local image URI, upload first
+        if (payload.profile_pic && payload.profile_pic.startsWith('file://')) {
+          payload.profile_pic = await uploadImage(
+            payload.profile_pic,
+            'patient',
+            0
+          );
+        }
         const response = await axios.patch<PatientProfile>(
           `${API_URL}/patient/profiles/${profile.id}/`,
-          data as Partial<PatientProfile>,
+          payload,
           {
             headers: {
               'Content-Type': 'application/json',
@@ -212,22 +207,74 @@ export const useProfile = (): ProfileHookReturn => {
       error,
       refetch: fetchProfile,
       userType: 'therapist' as UserType,
-      saveProfile: async (data: Partial<ProfileType>): Promise<ProfileType | null> => {
+      saveProfile: async (
+        data: Partial<ProfileType>
+      ): Promise<ProfileType | null> => {
         if (!profile) throw new Error('No profile loaded');
-        const response = await axios.patch<TherapistProfile>(
-          `${API_URL}/therapist/profiles/${profile.id}/`,
-          data as Partial<TherapistProfile>,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
-        );
-        const updated = response.data;
-        setProfile(updated as ProfileType);
-        setError(null);
-        return updated as ProfileType;
+        const therapistProfile = profile as TherapistProfile;
+        const tData = data as Partial<TherapistProfile>;
+
+        // handle file URI for profile_pic first
+        let picUrl: string | undefined;
+        if (tData.profile_pic && (tData.profile_pic as string).startsWith('file://')) {
+          picUrl = await uploadImage(
+            tData.profile_pic as string,
+            'therapist',
+            0
+          );
+        }
+        // Build the JSON payload
+        const payload: Partial<TherapistProfile> = {};
+        if (picUrl) payload.profile_pic = picUrl;
+        // user fields (mapped by serializer via source="user.<field>")
+        if (tData.first_name !== undefined) payload.first_name = tData.first_name;
+        if (tData.last_name !== undefined) payload.last_name = tData.last_name;
+        if (tData.phone_number !== undefined) payload.phone_number = tData.phone_number;
+
+        // therapist-specific fields
+        if (tData.specialization !== undefined) payload.specialization = tData.specialization;
+        if (tData.license_number !== undefined) payload.license_number = tData.license_number;
+        if (tData.years_of_experience !== undefined) payload.years_of_experience = tData.years_of_experience;
+        if (tData.bio !== undefined) payload.bio = tData.bio;
+        if (tData.treatment_approaches !== undefined) {
+          // Ensure treatment_approaches is sent as a list of strings
+          payload.treatment_approaches = Array.isArray(tData.treatment_approaches)
+            ? tData.treatment_approaches
+            : [tData.treatment_approaches];
+        }
+        if (tData.available_days !== undefined) payload.available_days = tData.available_days;
+        if (tData.license_expiry !== undefined) payload.license_expiry = tData.license_expiry;
+        if (tData.video_session_link !== undefined) payload.video_session_link = tData.video_session_link;
+        if (tData.languages_spoken !== undefined) payload.languages_spoken = tData.languages_spoken;
+
+        try {
+          const response = await axios.patch<TherapistProfile>(
+            `${API_URL}/therapist/profiles/${therapistProfile.id}/`,
+            payload,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }
+          );
+          setProfile(response.data as ProfileType);
+          setError(null);
+          return response.data as ProfileType;
+        } catch (err: any) {
+          console.error(
+            'DRF validation errors:',
+            err.response?.status,
+            err.response?.data
+          );
+          Alert.alert(
+            'Save failed',
+            typeof err.response?.data === 'object'
+              ? JSON.stringify(err.response.data, null, 2)
+              : err.message
+          );
+          throw err;
+        }
       },
     };
   }

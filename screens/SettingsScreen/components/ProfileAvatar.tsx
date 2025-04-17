@@ -5,12 +5,13 @@ import { Button, IconButton, Text } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../../contexts/AuthContext';
 import { API_URL } from '../../../config';
-import axios from 'axios';
 import type { TherapistProfile } from '../../../types/profile';
+import { useUpload } from '../hooks/common/useUpload';
 
 interface Profile {
   profile_pic?: string;
   id: number;
+  user_type: 'patient' | 'therapist';
 }
 
 interface ProfileAvatarProps {
@@ -25,6 +26,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   isEditable = true 
 }) => {
   const { user, accessToken } = useAuth();
+  const { uploadImage } = useUpload();
   const [isUploading, setIsUploading] = useState(false);
 
   const requestMediaPermission = async () => {
@@ -48,7 +50,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // updated per fix
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -58,51 +60,46 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         return;
       }
 
-      await uploadImageToServer({
-        uri: result.assets[0].uri,
-        type: 'image/jpeg',
-        fileName: 'profile.jpg',
-      });
+      await uploadImageToServer(result.assets[0].uri);
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to select image. Please try again.');
     }
   };
 
-  const uploadImageToServer = async (image: { uri: string; type?: string; fileName?: string }) => {
-    setIsUploading(true);
-    const formData = new FormData();
-    // Clean the URI for iOS
-    const cleanedUri = Platform.OS === 'ios' ? image.uri.replace('file://', '') : image.uri;
-    // Append file with key 'profile_pic'
-    formData.append('profile_pic', {
-      uri: cleanedUri,
-      type: image.type || 'image/jpeg',
-      name: image.fileName || 'profile.jpg',
-    } as any);
+  const uploadImageToServer = async (imageUri: string) => {
+    if (!profile?.id) {
+      console.error('No profile ID available');
+      Alert.alert('Error', 'Profile not properly loaded. Please try again.');
+      return;
+    }
 
+    setIsUploading(true);
     try {
-      const response = await axios.patch<TherapistProfile>(
-        `${API_URL}/therapist/profiles/${profile.id}/`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            // Do not set Content-Type header manually.
-          },
-        }
+      const uri = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
+      
+      console.log('Starting image upload...', {
+        uri,
+        profileId: profile.id,
+        userType: profile.user_type
+      });
+
+      const url = await uploadImage(
+        uri, 
+        profile.user_type,
+        profile.id
       );
-      const updatedProfile = response.data;
-      onImageChange(updatedProfile.profile_pic || '');
+
+      console.log('Upload successful, URL:', url);
+      onImageChange(url);
       Alert.alert('Success', 'Profile picture updated successfully!');
-    } catch (error: any) {
-      console.error("Error updating profile picture:", error);
+    } catch (err: any) {
+      console.error('Upload error details:', err);
       Alert.alert(
         'Upload Failed',
-        'Failed to upload profile picture. Please try again.',
+        err.message || 'Please try again. If the problem persists, check your internet connection.',
         [{ text: 'OK' }]
       );
-      throw new Error(`Profile update failed: ${JSON.stringify(error.response?.data)}`);
     } finally {
       setIsUploading(false);
     }
