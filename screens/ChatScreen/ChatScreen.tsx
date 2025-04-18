@@ -1,6 +1,6 @@
 //screens/ChatScreen/ChatScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Animated } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNetInfo } from '@react-native-community/netinfo';
@@ -25,6 +25,7 @@ interface ChatScreenProps {
 }
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const { conversationId, conversationType, title } = route.params;
   const { accessToken, user } = useAuth();
   const netInfo = useNetInfo();
@@ -104,6 +105,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   useEffect(() => {
     console.log('ChatScreen opened with:', conversationId, conversationType, title);
   }, []);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, [fadeAnim]);
 
   const { handleReactionSelect, removeReaction } = useMessageActions({
     conversationId: String(conversationId),
@@ -223,7 +228,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   }
   
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
       <ChatHeader conversation={conversation} />
       
       {error && !loading && (
@@ -266,22 +271,22 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           onEditCancel={handleCancelEdit}
         />
       </KeyboardAvoidingView>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F4F8',
+    backgroundColor: '#E4F0F6',
   },
   content: {
     flex: 1,
   },
   listContent: {
     paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
   loader: {
     marginVertical: 20,
