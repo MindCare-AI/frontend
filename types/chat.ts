@@ -3,6 +3,7 @@ export interface Participant {
   id: string;
   name: string;
   avatar?: string;
+  is_online?: boolean; // Add this property
 }
 
 export interface Message {
@@ -14,9 +15,7 @@ export interface Message {
   };
   timestamp: string;
   status: 'sending' | 'sent' | 'failed' | 'read';
-  reactions: {
-    [key: string]: string[];
-  };
+  reactions: { type: string }[]; // Update this to match MessageBubble
   // Make these optional if they might not be present
   deleted?: boolean;
   edit_history?: {

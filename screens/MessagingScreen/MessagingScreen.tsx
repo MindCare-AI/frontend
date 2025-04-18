@@ -1,6 +1,6 @@
 //screens/MessagingScreen/MessagingScreen.tsx
-import React from 'react';
-import { View, StyleSheet, SectionList, Text, Alert, StatusBar } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, SectionList, Text, Alert, StatusBar, Animated } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MessagingStackParamList } from '../../navigation/MessagingNavigator'; // Adjust path as needed
 import useConversations from '../../hooks/MessagingScreen/useConversations';
@@ -24,8 +24,13 @@ interface TypingIndicatorProps {
 }
 
 const MessagingScreen: React.FC<Props> = ({ navigation }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const { accessToken } = useAuth();
   const { conversations, loading, error, searchQuery, handleSearch, loadMore, refresh, typingIndicators } = useConversations();
+  
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, [fadeAnim]);
 
   const createNewConversation = async () => {
     try {
@@ -49,8 +54,8 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar backgroundColor="#007BFF" barStyle="light-content" />
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
+      <StatusBar backgroundColor="#002D62" barStyle="light-content" />
       <SearchBar value={searchQuery} onChangeText={handleSearch} />
       
       {error && <ErrorMessage message="Failed to load conversations" onRetry={refresh} />}
@@ -125,31 +130,38 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
           }
         }}
       />
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA', // Lighter, modern background color
+    backgroundColor: '#E4F0F6',
   },
   listContent: {
-    padding: 12,
-    paddingBottom: 80, // Extra padding at bottom for FAB
+    padding: 20,
+    paddingBottom: 100, // Extra padding at bottom for FAB
   },
   sectionHeader: {
-    backgroundColor: 'rgba(245, 247, 250, 0.95)', // Semi-transparent background
-    paddingVertical: 10,
+    backgroundColor: '#E4F0F6',
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E9EEF6',
-    marginTop: 4,
+    borderBottomColor: '#CFCFCF',
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#667892', // More subdued color for section headers
+    color: '#002D62',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -157,19 +169,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
-    marginTop: 40,
+    marginTop: 80,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#3A4B66',
-    marginBottom: 8,
+    color: '#374151',
+    marginBottom: 12,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#667892',
+    fontSize: 16,
+    color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 24,
+    maxWidth: '80%',
   }
 });
 
