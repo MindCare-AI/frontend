@@ -1,158 +1,194 @@
 //screens/ChatScreen/components/ChatHeader.tsx
-import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Animated, Platform } from 'react-native';
+import React, { memo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  withSpring,
+  interpolateColor,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '../../contexts/AuthContext';
+import { Avatar } from '../ui/avatar';
 import TypingIndicator from './TypingIndicator';
-import { Conversation } from '../../types/chat';
+import { useChat } from '../../contexts/ChatContext';
 
 interface ChatHeaderProps {
-  conversation?: Conversation | null;
+  conversationId: string;
+  conversationType: 'one_to_one' | 'group' | 'chatbot';
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
 }
 
-const ChatHeader: React.FC<ChatHeaderProps> = ({ conversation }) => {
+const ChatHeader: React.FC<ChatHeaderProps> = ({
+  conversationId,
+  conversationType,
+  connectionStatus,
+}) => {
   const navigation = useNavigation();
-  const { user } = useAuth();
-  const currentUser = user || { id: '', username: '', email: '' };
-  
-  // Add animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(-10)).current;
+  const { conversations } = useChat();
+  const conversation = conversations[conversationId];
+  const onlineStatus = useSharedValue(connectionStatus === 'connected' ? 1 : 0);
+  const typingAnimation = useSharedValue(0);
 
-  useEffect(() => {
-    // Animate header entrance
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateY, {
-        toValue: 0,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  // Animate connection status
+  const statusStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(
+      onlineStatus.value,
+      [0, 1],
+      ['#FF3B30', '#34C759']
+    );
 
-  const getHeaderTitle = (): string => {
-    if (!conversation) return 'Chat';
+    return {
+      backgroundColor,
+      transform: [{ scale: withSpring(onlineStatus.value ? 1 : 0.8) }],
+    };
+  });
 
-    if (conversation.conversation_type === 'chatbot') {
-      return 'Support Bot';
+  // Animate typing indicator
+  const typingStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withRepeat(
+        withSequence(
+          withTiming(1, { duration: 500 }),
+          withTiming(0.3, { duration: 500 })
+        ),
+        -1,
+        true
+      ),
+    };
+  });
+
+  const getHeaderTitle = () => {
+    if (!conversation) return '';
+
+    switch (conversationType) {
+      case 'one_to_one':
+        return conversation.other_participant?.name || 'Chat';
+      case 'group':
+        return conversation.name || 'Group Chat';
+      case 'chatbot':
+        return 'AI Assistant';
+      default:
+        return 'Chat';
     }
-
-    if (conversation.conversation_type === 'one_to_one' || conversation.conversation_type === 'direct') {
-      if (conversation.other_user_name) {
-        return conversation.other_user_name;
-      }
-      const otherParticipant = conversation.participants?.find(
-        p => p.id !== currentUser.id
-      );
-      return otherParticipant?.name || conversation.title || conversation.name || 'Chat';
-    }
-
-    // For group or other conversation types
-    return conversation.title || conversation.name || 'Group Chat';
   };
 
-  const getHeaderAvatar = (): string | null => {
+  const getSubtitle = () => {
+    if (!conversation) return '';
+
+    if (connectionStatus !== 'connected') {
+      return connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected';
+    }
+
+    if (conversation.typing_users?.length) {
+      return conversation.typing_users.length === 1
+        ? `${conversation.typing_users[0]} is typing...`
+        : 'Several people are typing...';
+    }
+
+    switch (conversationType) {
+      case 'one_to_one':
+        return conversation.other_participant?.is_online ? 'Online' : 'Offline';
+      case 'group':
+        return `${conversation.participants.length} members`;
+      default:
+        return '';
+    }
+  };
+
+  const getAvatar = () => {
     if (!conversation) return null;
 
-    try {
-      if (conversation.conversation_type === 'chatbot') {
-        return 'https://via.placeholder.com/36';
-      }
-
-      if (conversation.conversation_type === 'one_to_one' || conversation.conversation_type === 'direct') {
-        if (conversation.otherParticipant?.avatar) {
-          return conversation.otherParticipant.avatar;
-        }
-        const otherParticipant = conversation.participants?.find(
-          p => p.id !== currentUser.id
-        );
-        return otherParticipant?.avatar || 'https://via.placeholder.com/36';
-      }
-
-      return null;
-    } catch (error) {
-      console.warn('Failed to load avatar:', error);
-      return 'https://via.placeholder.com/36';
+    switch (conversationType) {
+      case 'one_to_one':
+        return conversation.other_participant?.avatar;
+      case 'group':
+        return conversation.metadata?.group_avatar;
+      case 'chatbot':
+        return require('../../assets/images/bot-avatar.png');
+      default:
+        return null;
     }
   };
-
-  const getSubtitle = (): string => {
-    if (!conversation) return '';
-    if (conversation.conversation_type === 'group') {
-      return `${conversation.participants?.length || 0} participants`;
-    }
-    
-    // Show online status for individual chats
-    return conversation.otherParticipant?.is_online ? 'Online' : 'Offline';
-  };
-
-  const avatar = getHeaderAvatar();
-  const isTyping = conversation?.isTyping || false;
-  const isOnline = conversation?.otherParticipant?.is_online || false;
 
   return (
-    <Animated.View 
-      style={[
-        styles.container, 
-        { 
-          opacity: fadeAnim,
-          transform: [{ translateY }] 
-        }
-      ]}
-    >
-      <TouchableOpacity 
-        onPress={() => navigation.goBack()} 
+    <View style={styles.container}>
+      <TouchableOpacity
         style={styles.backButton}
-        activeOpacity={0.7}
+        onPress={() => navigation.goBack()}
       >
-        <Icon name="arrow-back" size={24} color="#007BFF" />
+        <Icon name="chevron-back" size={28} color="#007AFF" />
       </TouchableOpacity>
 
-      <View style={styles.avatarContainer}>
-        {avatar && (
-          <Image source={{ uri: avatar }} style={styles.avatar} />
-        )}
-        {isOnline && <View style={styles.onlineIndicator} />}
-      </View>
+      <TouchableOpacity
+        style={styles.titleContainer}
+        onPress={() => {
+          if (conversationType !== 'chatbot') {
+            navigation.navigate('ConversationDetails', {
+              conversationId,
+              conversationType,
+            });
+          }
+        }}
+      >
+        <View style={styles.avatarContainer}>
+          <Avatar
+            size="sm"
+            source={getAvatar()}
+            fallback={getHeaderTitle().charAt(0)}
+          />
+          <Animated.View style={[styles.statusIndicator, statusStyle]} />
+        </View>
 
-      <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>{getHeaderTitle()}</Text>
-        {isTyping ? (
-          <TypingIndicator visible={true} conversationId={conversation?.id || ''} />
-        ) : (
-          getSubtitle() !== '' && (
-            <Text style={[
-              styles.subtitle,
-              isOnline && styles.onlineSubtitle
-            ]}>
-              {getSubtitle()}
-            </Text>
-          )
-        )}
-      </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.title} numberOfLines={1}>
+            {getHeaderTitle()}
+          </Text>
+          <Animated.Text
+            style={[styles.subtitle, typingStyle]}
+            numberOfLines={1}
+          >
+            {getSubtitle()}
+          </Animated.Text>
+        </View>
+      </TouchableOpacity>
 
-      <View style={styles.actionButtons}>
-        {conversation?.conversation_type !== 'chatbot' && (
-          <TouchableOpacity style={styles.actionButton}>
-            <Icon name="call-outline" size={22} color="#007BFF" />
+      {conversationType !== 'chatbot' && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              if (conversationType === 'one_to_one') {
+                navigation.navigate('Call', { conversationId });
+              }
+            }}
+          >
+            <Icon name="call-outline" size={24} color="#007AFF" />
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity 
-          style={styles.actionButton}
-          activeOpacity={0.7}
-        >
-          <Icon name="ellipsis-vertical" size={22} color="#007BFF" />
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {
+              navigation.navigate('ConversationDetails', {
+                conversationId,
+                conversationType,
+              });
+            }}
+          >
+            <Icon name="ellipsis-horizontal" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -160,82 +196,69 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E5E5',
+    height: Platform.OS === 'ios' ? 44 : 56,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowRadius: 1,
       },
       android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        elevation: 2,
       },
     }),
   },
   backButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F7',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginLeft: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#34D399',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   titleContainer: {
     flex: 1,
-    marginHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  statusIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  textContainer: {
+    flex: 1,
     justifyContent: 'center',
   },
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#000000',
   },
   subtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 1,
   },
-  onlineSubtitle: {
-    color: '#34D399',
-    fontWeight: '500',
-  },
-  actionButtons: {
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   actionButton: {
     padding: 8,
-    marginLeft: 4,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F7',
+    marginLeft: 8,
   },
 });
 
-export default ChatHeader;
+export default memo(ChatHeader);

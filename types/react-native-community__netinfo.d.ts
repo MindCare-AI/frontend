@@ -7,8 +7,13 @@ declare module '@react-native-community/netinfo' {
     details: any;
   }
 
-  export function useNetInfo(): NetInfoState;
-  export default {
-    useNetInfo
-  };
+  type NetInfoSubscription = () => void;
+  
+  export interface NetInfo {
+    addEventListener(listener: (state: NetInfoState) => void): NetInfoSubscription;
+    useNetInfo(): NetInfoState;
+  }
+
+  const NetInfo: NetInfo;
+  export default NetInfo;
 }

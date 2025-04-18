@@ -1,230 +1,196 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { WS_BASE_URL } from '../config';
+import React from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { API_URL } from '../config';
 import { getAuthToken } from '../lib/utils';
-import * as NetInfo from "@react-native-community/netinfo";
-import type { NetInfoState } from "@react-native-community/netinfo";
+import NetInfo from "@react-native-community/netinfo";
+import { EventEmitter } from 'events';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Message, TypingIndicator, ReadReceipt, ConnectionStatus } from '../types/chat';
 
-interface WebSocketMessage {
-  type: string;
-  data?: any;
+export enum WebSocketEvent {
+  MESSAGE = 'message',
+  TYPING = 'typing',
+  READ_RECEIPT = 'read_receipt',
+  REACTION = 'reaction',
+  ERROR = 'error',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
 }
 
-interface WebSocketHook {
-  sendMessage: (message: WebSocketMessage) => void;
-  connectionStatus: 'connecting' | 'connected' | 'disconnected';
+interface WebSocketOptions {
+  onMessage?: (data: any) => void;
+  onConnectionChange?: (status: ConnectionStatus) => void;
+  onError?: (error: Error) => void;
 }
- 
-const baseUrl = WS_BASE_URL.replace('127.0.0.1','10.0.2.2');
 
-export const connectWebSocket = (
-  conversationId: string,
-  token: string,
-  onMessageReceived: (message: any) => void,
-  onTypingIndicator?: (data: any) => void,
-  onReadReceipt?: (data: any) => void
-): WebSocket => {
-  // Ensure token is included in the WebSocket URL
-  const socket = new WebSocket(`${baseUrl}/ws/messaging/${conversationId}/?token=${token}`);
+export class WebSocketService {
+  private ws: WebSocket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimeout = 1000;
+  private pingInterval: NodeJS.Timeout | null = null;
+  private options: WebSocketOptions;
 
-  socket.onopen = () => {
-    console.log('[WS] Connection established for conversation', conversationId);
-    // Send join message with user information
-    socket.send(JSON.stringify({ 
-      type: 'join', 
-      data: { 
-        conversation_id: conversationId,
-        token // Include token in join message
-      } 
-    }));
-  };
+  constructor(options: WebSocketOptions) {
+    this.options = options;
+  }
 
-  socket.onmessage = (event) => {
+  connect(userId: string, token: string) {
     try {
-      const data = JSON.parse(event.data);
-      console.log('[WS Utility] Raw message:', data);
+      this.ws = new WebSocket(`${API_URL}/ws/?token=${token}`);
+      
+      this.ws.onopen = () => {
+        this.reconnectAttempts = 0;
+        this.reconnectTimeout = 1000;
+        this.options.onConnectionChange?.('connected');
+        this.startPingInterval();
+      };
 
-      // Handle standardized message format
-      if (data.type === 'conversation_message') {
-        console.log('[WS Utility] New message event received.');
-        onMessageReceived({
-          id: data.id,
-          content: data.content,
-          sender: data.sender,
-          timestamp: data.timestamp,
-          status: 'sent',
-          conversation: data.conversation
-        });
-      }
-      // Handle all message types
-      else if (data.type === 'conversation_message' && data.message) {
-        console.log('[WS] Processing conversation_message:', data.message);
-        onMessageReceived(data.message);
-      } 
-      else if (data.type === 'new_message' && data.data) {
-        console.log('[WS] Processing new_message:', data.data);
-        onMessageReceived(data.data);
-      }
-      else if (data.type === 'message_create' || data.type === 'message_update') {
-        console.log('[WS] Processing message event:', data);
-        // Extract the message from whatever format it's in
-        const messageData = data.message || data.data || data;
-        onMessageReceived(messageData);
-      }
-      else if (data.type === 'typing_indicator' && onTypingIndicator) {
-        onTypingIndicator(data);
-      }
-      else if (data.type === 'read_receipt' && onReadReceipt) {
-        onReadReceipt(data);
-      }
-      else if (data.type === 'connection_established') {
-        console.log('[WS] Connection confirmed for conversation', conversationId);
-      }
-      else {
-        // Try to identify any message-like structure
-        console.log('[WS] Unhandled message type:', data.type);
-        if (data.id && (data.content || data.message)) {
-          const messageData = data.message || data;
-          onMessageReceived(messageData);
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.options.onMessage?.(data);
+        } catch (error) {
+          console.error('Error parsing websocket message:', error);
         }
-      }
+      };
+
+      this.ws.onclose = () => {
+        this.options.onConnectionChange?.('disconnected');
+        this.stopPingInterval();
+        this.handleDisconnect();
+      };
+
+      this.ws.onerror = (error) => {
+        this.options.onError?.(error as Error);
+      };
+
     } catch (error) {
-      console.error('[WS] Error processing message:', error);
+      console.error('WebSocket connection error:', error);
+      this.handleDisconnect();
     }
-  };
+  }
 
-  socket.onerror = (error) => {
-    console.error('[WS] WebSocket error:', error);
-  };
+  private startPingInterval() {
+    this.pingInterval = setInterval(() => {
+      this.send({ type: 'ping' });
+    }, 30000);
+  }
 
-  socket.onclose = (event) => {
-    console.log('[WS] Connection closed for conversation', conversationId, 'Code:', event.code);
-  };
-
-  return socket;
-};
-
-// The hook now uses connectWebSocket and does not override its events.
-export const useWebSocket = (
-  conversationId: string,
-  onMessageReceived: (data: any) => void
-): WebSocketHook => {
-  const ws = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 5;
-  const reconnectDelay = 2000; 
-  const onMessageReceivedRef = useRef(onMessageReceived);
-  const connectionStatusRef = useRef<'connecting' | 'connected' | 'disconnected'>('disconnected');
-
-  // Update the message callback ref on change.
-  useEffect(() => {
-    onMessageReceivedRef.current = onMessageReceived;
-  }, [onMessageReceived]);
-
-  const connect = useCallback(async () => { // changed: add async
-    if (!conversationId) {
-      console.warn('Missing conversation ID');
-      return;
+  private stopPingInterval() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
     }
+  }
 
-    const token = await getAuthToken(); // changed: await getAuthToken()
-    if (!token) {
-      console.error('No authentication token available');
-      return; 
-    }
-
-    connectionStatusRef.current = 'connecting';
-
-    ws.current = connectWebSocket(
-      conversationId,
-      token, // now token is resolved string
-      (msg) => {
-        console.log('[WS Hook] onMessageReceived invoked with:', msg);
-        onMessageReceivedRef.current(msg);
-      },
-      (data) => {
-        console.log('[WS Hook] Typing indicator:', data);
-      },
-      (data) => {
-        console.log('[WS Hook] Read receipt:', data);
-      }
-    );
-
-    ws.current.onclose = (event) => {
-      connectionStatusRef.current = 'disconnected';
-      if (event.code !== 1000) {
-        console.warn(`WebSocket closed unexpectedly. Code: ${event.code}`);
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          reconnectAttempts.current += 1;
-          console.log(`Reconnecting... Attempt ${reconnectAttempts.current}`);
-          setTimeout(connect, reconnectDelay);
-        } else {
-          console.error('Max reconnection attempts reached');
-        }
-      }
-      ws.current = null; // changed: reset ws.current to allow future reconnections
-    };
-
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error (hook):', error);
-      ws.current = null; // changed: reset ws.current to allow reconnections via NetInfo
-    };
-
-    ws.current.onopen = () => {
-      console.log(`[WS Hook] Connected to conversation ${conversationId}`);
-      connectionStatusRef.current = 'connected';
-      reconnectAttempts.current = 0;
-    };
-  }, [conversationId]);
-
-  // Connect on mount and when conversationId changes.
-  useEffect(() => {
-    connect();
-    return () => {
-      if (ws.current) {
-        console.log('[WS Hook] Closing WebSocket on component unmount');
-        ws.current.close(1000, 'Component unmounted');
-        ws.current = null;
-      }
-    };
-  }, [connect]);
-
-  const sendMessage = useCallback((message: WebSocketMessage) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(message));
+  private handleDisconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.options.onConnectionChange?.('reconnecting');
+      setTimeout(() => {
+        this.reconnectAttempts++;
+        this.reconnectTimeout *= 2;
+        getAuthToken().then(token => {
+          if (token) {
+            AsyncStorage.getItem('userId').then(userId => {
+              if (userId) this.connect(userId, token);
+            });
+          }
+        });
+      }, this.reconnectTimeout);
     } else {
-      console.error('WebSocket not connected');
+      this.options.onError?.(new Error('Max reconnection attempts reached'));
+    }
+  }
+
+  send(data: any) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    } else {
+      console.warn('WebSocket is not connected');
+    }
+  }
+
+  sendMessage(message: Partial<Message>) {
+    this.send({
+      type: 'message',
+      payload: message,
+    });
+  }
+
+  sendTypingIndicator(conversationId: string, isTyping: boolean) {
+    this.send({
+      type: 'typing',
+      payload: {
+        conversationId,
+        isTyping,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  sendReadReceipt(messageId: string, conversationId: string) {
+    this.send({
+      type: 'read_receipt',
+      payload: {
+        messageId,
+        conversationId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  disconnect() {
+    this.stopPingInterval();
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+}
+
+export const useWebSocket = (
+  channel: string,
+  onMessage?: (data: any) => void
+) => {
+  const wsRef = useRef<WebSocketService | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
+
+  useEffect(() => {
+    wsRef.current = new WebSocketService({
+      onMessage,
+      onConnectionChange: setConnectionStatus,
+      onError: (error) => console.error(`WebSocket error in ${channel}:`, error),
+    });
+
+    const connect = async () => {
+      const [userId, token] = await Promise.all([
+        AsyncStorage.getItem('userId'),
+        AsyncStorage.getItem('accessToken'),
+      ]);
+
+      if (userId && token) {
+        wsRef.current?.connect(userId, token);
+      }
+    };
+
+    connect();
+
+    return () => {
+      wsRef.current?.disconnect();
+    };
+  }, [channel, onMessage]);
+
+  const sendMessage = useCallback((data: any) => {
+    try {
+      wsRef.current?.send(data);
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
   }, []);
 
-  // Heartbeat to keep the connection alive
-  useEffect(() => {
-    const heartbeatInterval = setInterval(() => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        sendMessage({ type: 'heartbeat' });
-      }
-    }, 30000); // every 30 seconds
-    return () => clearInterval(heartbeatInterval);
-  }, [sendMessage]);
-
-  // Add NetInfo listener for reconnection
-  useEffect(() => {
-    const handleNetworkChange = (state: NetInfoState) => {
-      console.log("Connection type", state.type);
-      console.log("Is connected?", state.isConnected);
-      if (state.isConnected && !ws.current) {
-        connect();
-      }
-    };
-
-    const unsubscribe = (NetInfo as any).addEventListener(handleNetworkChange);
-
-    return () => {
-      unsubscribe();
-    };
-  }, [connect]);
-
   return {
     sendMessage,
-    connectionStatus: connectionStatusRef.current,
+    connectionStatus,
   };
 };

@@ -1,136 +1,309 @@
-// screens/ChatScreen/components/AttachmentPicker.tsx
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Modal, Text, Platform } from 'react-native';
+import React, { memo, useState } from 'react';
+import {
+  View,
+  TouchableOpacity,
+  Image,
+  Text,
+  StyleSheet,
+  Platform,
+  ActivityIndicator,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
-import * as ImagePicker from 'react-native-image-picker';
-
-// Define the DocumentPickerResponse interface
-interface DocumentPickerResponse {
-  uri: string;
-  type: string;
-  name?: string;
-  size?: number;
-  fileCopyUri?: string;
-}
-
-const DocumentPicker = Platform.OS !== 'web' ? require('react-native-document-picker') : null;
-
-interface Attachment {
-  uri: string;
-  type: string;
-  name?: string;
-}
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInRight,
+  SlideOutRight,
+} from 'react-native-reanimated';
+import { formatFileSize, isImageFile } from '../../utils/helpers';
+import * as Haptics from 'expo-haptics';
 
 interface AttachmentPickerProps {
-  onSelect: (attachments: Attachment[]) => void;
-  visible: boolean;
-  onClose: () => void;
+  onSelectAttachments: (attachments: Array<{
+    uri: string;
+    type: 'image' | 'file';
+    name?: string;
+    size?: number;
+  }>) => void;
+  maxSize?: number; // in bytes
+  maxCount?: number;
 }
 
-const AttachmentPicker: React.FC<AttachmentPickerProps> = ({ onSelect, visible, onClose }) => {
-  const pickImage = async () => {
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const AttachmentPicker = memo(({
+  onSelectAttachments,
+  maxSize = MAX_FILE_SIZE,
+  maxCount = 10,
+}: AttachmentPickerProps) => {
+  const [selectedFiles, setSelectedFiles] = useState<Array<{
+    uri: string;
+    type: 'image' | 'file';
+    name?: string;
+    size?: number;
+  }>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleImagePick = async () => {
     try {
-      const result = await ImagePicker.launchImageLibrary({
-        mediaType: 'mixed',
-        quality: 1,
-        selectionLimit: 5,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: maxCount - selectedFiles.length,
       });
 
-      if (!result.didCancel && result.assets) {
-        const attachments = result.assets.map(asset => ({
-          uri: asset.uri || '',
-          type: asset.type || 'image',
-          name: asset.fileName == null ? undefined : asset.fileName,
+      if (!result.canceled) {
+        const validAssets = result.assets.filter(asset => 
+          !asset.fileSize || asset.fileSize <= maxSize
+        );
+
+        if (validAssets.length < result.assets.length) {
+          // Show warning about skipped files
+          console.warn('Some files were too large and were skipped');
+        }
+
+        const newAttachments = validAssets.map(asset => ({
+          uri: asset.uri,
+          type: 'image' as const,
+          name: asset.fileName || 'image.jpg',
+          size: asset.fileSize,
         }));
-        onSelect(attachments);
+
+        setSelectedFiles(prev => [...prev, ...newAttachments]);
+        onSelectAttachments(newAttachments);
       }
-      onClose();
     } catch (error) {
-      console.error('Image picker error:', error);
+      console.error('Error picking image:', error);
     }
   };
 
-  const pickDocument = async () => {
-    if (Platform.OS === 'web') {
-      console.warn("DocumentPicker is not supported on web");
-      onClose();
-      return;
-    }
-    
+  const handleDocumentPick = async () => {
     try {
-      // Verify DocumentPicker is available
-      if (!DocumentPicker) {
-        console.warn("DocumentPicker is not available on this platform");
-        onClose();
-        return;
-      }
-      
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
-        allowMultiSelection: true,
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        multiple: true,
+        copyToCacheDirectory: true,
       });
 
-      const attachments = result.map((file: DocumentPickerResponse) => ({
-        uri: file.uri,
-        type: file.type || 'file',
-        name: file.name == null ? undefined : file.name,
-      }));
-      onSelect(attachments);
-      onClose();
-    } catch (error) {
-      if (DocumentPicker && !DocumentPicker.isCancel(error)) {
-        console.error('Document picker error:', error);
+      if (result.type === 'success') {
+        const attachment = {
+          uri: result.uri,
+          type: 'file' as const,
+          name: result.name,
+          size: result.size,
+        };
+
+        if (attachment.size && attachment.size > maxSize) {
+          console.warn('File is too large');
+          return;
+        }
+
+        setSelectedFiles(prev => [...prev, attachment]);
+        onSelectAttachments([attachment]);
       }
+    } catch (error) {
+      console.error('Error picking document:', error);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setSelectedFiles(prev => {
+      const newFiles = [...prev];
+      newFiles.splice(index, 1);
+      onSelectAttachments(newFiles);
+      return newFiles;
+    });
+  };
+
+  const renderAttachmentPreview = (
+    attachment: {
+      uri: string;
+      type: 'image' | 'file';
+      name?: string;
+      size?: number;
+    },
+    index: number
+  ) => {
+    return (
+      <Animated.View
+        key={attachment.uri}
+        entering={SlideInRight}
+        exiting={SlideOutRight}
+        style={styles.previewContainer}
+      >
+        {attachment.type === 'image' ? (
+          <Image
+            source={{ uri: attachment.uri }}
+            style={styles.imagePreview}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.filePreview}>
+            <Icon name="document" size={24} color="#666" />
+            <Text numberOfLines={1} style={styles.fileName}>
+              {attachment.name}
+            </Text>
+            {attachment.size && (
+              <Text style={styles.fileSize}>
+                {formatFileSize(attachment.size)}
+              </Text>
+            )}
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => removeAttachment(index)}
+        >
+          <Icon name="close-circle" size={20} color="#FF3B30" />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const launchCamera = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        alert('Sorry, we need camera permissions to make this work!');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const attachment = {
+          uri: result.assets[0].uri,
+          type: 'image' as const,
+          name: 'camera_photo.jpg',
+          size: result.assets[0].fileSize,
+        };
+        
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onSelectAttachments([attachment]);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <TouchableOpacity style={styles.option} onPress={pickImage}>
-            <Icon name="image" size={24} color="#007AFF" />
-            <Text style={styles.optionText}>Photo or Video</Text>
-          </TouchableOpacity>
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity style={styles.option} onPress={pickDocument}>
-              <Icon name="document" size={24} color="#007AFF" />
-              <Text style={styles.optionText}>File</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.option} onPress={onClose}>
-            <Icon name="close" size={24} color="#FF3B30" />
-            <Text style={styles.optionText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleImagePick}
+          disabled={selectedFiles.length >= maxCount || isLoading}
+        >
+          <Icon name="image" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleDocumentPick}
+          disabled={selectedFiles.length >= maxCount || isLoading}
+        >
+          <Icon name="document" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={launchCamera}
+          disabled={selectedFiles.length >= maxCount || isLoading}
+        >
+          <Icon name="camera" size={24} color="#007AFF" />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      {selectedFiles.length > 0 && (
+        <Animated.ScrollView
+          horizontal
+          style={styles.previewScroll}
+          showsHorizontalScrollIndicator={false}
+          entering={FadeIn}
+          exiting={FadeOut}
+        >
+          {selectedFiles.map((file, index) => 
+            renderAttachmentPreview(file, index)
+          )}
+        </Animated.ScrollView>
+      )}
+
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color="#007AFF" />
+        </View>
+      )}
+    </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  container: {
+    paddingVertical: 8,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-  },
-  option: {
+  buttonContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 16,
+    gap: 8,
   },
-  optionText: {
-    fontSize: 16,
-    marginLeft: 16,
-    color: '#333',
+  button: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  previewScroll: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  previewContainer: {
+    marginRight: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+  },
+  imagePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  filePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+  },
+  fileName: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+    maxWidth: 56,
+    textAlign: 'center',
+  },
+  fileSize: {
+    fontSize: 9,
+    color: '#999',
+    marginTop: 2,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+  },
+  loadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
