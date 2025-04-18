@@ -1,296 +1,236 @@
-//screens/ChatScreen/ChatScreen.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Animated } from 'react-native';
-import { RouteProp } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import React, { useState, useCallback, useRef, memo } from 'react';
+import {
+  View,
+  StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
+  InteractionManager,
+} from 'react-native';
+import Animated, {
+  FadeIn,
+  Layout,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { FlashList } from '@shopify/flash-list';
 import { useNetInfo } from '@react-native-community/netinfo';
-import { MessagingStackParamList } from '../../navigation/MessagingNavigator';
-import useChatMessages from '../../hooks/ChatScreen/useChatMessages';
-import useMessageActions from '../../hooks/ChatScreen/useMessageActions';
+import { useFocusEffect } from '@react-navigation/native';
+import { Message } from '../../types/chat';
+import { useChatMessages } from '../../hooks/ChatScreen/useChatMessages';
+import { useChat } from '../../contexts/ChatContext';
 import MessageBubble from '../../components/ChatScreen/MessageBubble';
 import MessageInput from '../../components/ChatScreen/MessageInput';
 import ChatHeader from '../../components/ChatScreen/ChatHeader';
+import OfflineNotice from '../../components/ui/OfflineNotice';
 import LoadingIndicator from '../../components/ui/LoadingIndicator';
-import ErrorMessage from '../../components/ui/ErrorMessage';
-import { Message } from '../../types/chat';
-import { useAuth } from '../../contexts/AuthContext';
-import { useWebSocket } from '../../services/websocket';
-
-type ChatRouteProp = RouteProp<MessagingStackParamList, 'Chat'>;
-type ChatNavigationProp = StackNavigationProp<MessagingStackParamList, 'Chat'>;
+import ErrorRetry from '../../components/ui/ErrorRetry';
 
 interface ChatScreenProps {
-  route: ChatRouteProp;
-  navigation: ChatNavigationProp;
+  route: {
+    params: {
+      conversationId: string;
+      conversationType: 'one_to_one' | 'group' | 'chatbot';
+    };
+  };
+  navigation: any;
 }
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const { conversationId, conversationType, title } = route.params;
-  const { accessToken, user } = useAuth();
+  const { conversationId, conversationType } = route.params;
   const netInfo = useNetInfo();
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const listRef = useRef<FlashList<Message>>(null);
+  const lastMessageRef = useRef<string | null>(null);
+  const scrollY = useSharedValue(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     messages,
-    loading,
+    isLoading,
     error,
-    inputText,
-    handleSend,
-    setInputText,
-    loadMessages,
-    conversation,
-    hasMore: hasMoreMessages,
-    deleteMessage: deleteMessageApi,
-    editMessage: editMessageApi,
-    setMessages,
+    hasMore,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    loadMore,
+    refresh,
+    connectionStatus,
   } = useChatMessages({
-    conversationId: String(conversationId),
+    conversationId,
     conversationType,
   });
 
-  const loadMoreMessagesFromApi = useCallback(async () => {
-    if (!hasMoreMessages || isLoadingMore) return;
-    
-    try {
-      setIsLoadingMore(true);
-      await loadMessages();
-    } catch (error) {
-      console.error('Failed to fetch more messages:', error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [hasMoreMessages, isLoadingMore, loadMessages]);
+  const { setTypingStatus, markAsRead } = useChat();
 
-  const handleWebSocketMessage = useCallback(
-    (data: any) => {
-      console.log("[WS] Raw data received:", data);
-      if (data.type === 'conversation_message' || data.message) {
-        const newMsg = data.message || data;
-        if (newMsg.id && newMsg.content && newMsg.sender) {
-          console.log("[WS] Adding valid message:", newMsg);
-          // Use functional update to avoid stale dependency on "messages"
-          setMessages(prev => {
-            if (!prev.some(msg => msg.id === newMsg.id)) {
-              return [newMsg, ...prev];
-            }
-            return prev;
-          });
+  // Optimized scroll handler using Reanimated
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  // Memoized render item for better performance
+  const renderMessage = useCallback(({ item, index }: { item: Message; index: number }) => {
+    const isFirstInSequence = index === 0 || 
+      messages[index - 1]?.sender.id !== item.sender.id;
+    const isLastInSequence = index === messages.length - 1 || 
+      messages[index + 1]?.sender.id !== item.sender.id;
+
+    return (
+      <MessageBubble
+        message={item}
+        isFirstInSequence={isFirstInSequence}
+        isLastInSequence={isLastInSequence}
+        showAvatar={isLastInSequence}
+        onReaction={(messageId, reaction) => {
+          // Handle reaction
+        }}
+        onEdit={(messageId) => {
+          // Handle edit
+        }}
+        onDelete={(messageId) => {
+          Alert.alert(
+            'Delete Message',
+            'Are you sure you want to delete this message?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => deleteMessage(messageId),
+              },
+            ]
+          );
+        }}
+      />
+    );
+  }, [messages, deleteMessage]);
+
+  // Handle sending new messages
+  const handleSend = useCallback(async (content: string, type?: string, metadata?: any) => {
+    if (!netInfo.isConnected) {
+      Alert.alert('No Connection', 'Unable to send message while offline');
+      return;
+    }
+
+    try {
+      await sendMessage(content);
+      
+      // Scroll to bottom after sending
+      InteractionManager.runAfterInteractions(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send message');
+    }
+  }, [netInfo.isConnected, sendMessage]);
+
+  // Handle typing status
+  const handleTypingStatus = useCallback((isTyping: boolean) => {
+    setTypingStatus(conversationId, isTyping);
+  }, [conversationId, setTypingStatus]);
+
+  // Mark messages as read when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const markMessagesAsRead = async () => {
+        if (messages.length > 0 && lastMessageRef.current !== messages[0].id) {
+          await markAsRead(conversationId);
+          lastMessageRef.current = messages[0].id;
         }
-      }
-    },
-    [setMessages] // Removed "messages" from dependencies
+      };
+
+      markMessagesAsRead();
+    }, [messages, conversationId, markAsRead])
   );
 
-  const validConversationId =
-    typeof conversationId === 'string' ? conversationId.trim() : '';
-
-  const wsHook =
-    (title !== 'New Chat' && validConversationId !== '')
-      ? useWebSocket(validConversationId, handleWebSocketMessage)
-      : { sendMessage: () => {}, connectionStatus: 'disconnected' };
-
-  const { sendMessage, connectionStatus } = wsHook;
-
-  useEffect(() => {
-    const isNewChat = title === 'New Chat';
-    if (!conversationType || !title || (!isNewChat && conversationId === '')) {
-      console.error('Invalid navigation parameters:', route.params);
-      navigation.goBack();
-    }
-  }, [conversationId, conversationType, title, navigation]);
-
-  useEffect(() => {
-    console.log('ChatScreen opened with:', conversationId, conversationType, title);
-  }, []);
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-  }, [fadeAnim]);
-
-  const { handleReactionSelect, removeReaction } = useMessageActions({
-    conversationId: String(conversationId),
-    conversationType,
-  });
-
-  const handleReaction = useCallback(
-    async (messageId: string, reaction: string) => {
-      try {
-        console.log(`Adding reaction ${reaction} to message ${messageId}`);
-        await handleReactionSelect(reaction);
-      } catch (error) {
-        console.error('Failed to add reaction:', error);
-        Alert.alert('Error', 'Failed to add reaction');
-      }
-    },
-    [handleReactionSelect]
-  );
-
-  const handleDeleteMessage = useCallback(
-    (messageId: string) => {
-      Alert.alert('Delete Message', 'Are you sure you want to delete this message?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteMessageApi(messageId);
-            } catch (error) {
-              console.error('Failed to delete message:', error);
-              Alert.alert('Error', 'Failed to delete message');
-            }
-          },
-        },
-      ]);
-    },
-    [deleteMessageApi]
-  );
-
-  const handleEditMessage = useCallback(
-    (messageId: string) => {
-      const message = messages.find((msg) => msg.id === messageId);
-      if (message) {
-        setEditingMessage(message);
-        setInputText(message.content);
-      }
-    },
-    [messages, setInputText]
-  );
-
-  const handleSaveEdit = useCallback(async () => {
-    if (!editingMessage) return;
-    
+  // Handle pull to refresh
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
     try {
-      await editMessageApi(editingMessage.id, inputText);
-      setEditingMessage(null);
-      setInputText('');
-    } catch (error) {
-      console.error('Failed to update message:', error);
-      Alert.alert('Error', 'Failed to update message');
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [editingMessage, inputText, editMessageApi]);
+  }, [refresh]);
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingMessage(null);
-    setInputText('');
-  }, []);
-
-  useEffect(() => {
-    if (error && !isRetrying) {
-      Alert.alert('Error', 'Failed to load messages. Would you like to retry?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Retry',
-          onPress: async () => {
-            setIsRetrying(true);
-            try {
-              await loadMessages();
-            } finally {
-              setIsRetrying(false);
-            }
-          },
-        },
-      ]);
-    }
-  }, [error, isRetrying, loadMessages]);
-
-  useEffect(() => {
-    if (!netInfo.isConnected && netInfo.isInternetReachable === false) {
-      Alert.alert(
-        'No Connection',
-        'You are currently offline. Messages will be sent when you reconnect.'
-      );
-    }
-  }, [netInfo.isConnected, netInfo.isInternetReachable]);
-
-  useEffect(() => {
-    if (!netInfo.isConnected) return;
-    
-    const interval = setInterval(() => {
-      loadMessages();
-    }, 30000); // Change from 10000 (10s) to 30000 (30s)
-    
-    return () => clearInterval(interval);
-  }, [loadMessages, netInfo.isConnected]);
-
-  const renderFooter = () => {
-    if ((loading && hasMoreMessages) || isRetrying || isLoadingMore) {
-      return <ActivityIndicator style={styles.loader} color="#007AFF" size="small" />;
-    }
-    return null;
-  };
-
-  if (loading && !messages.length) {
+  if (isLoading && !isRefreshing) {
     return <LoadingIndicator />;
   }
-  
+
+  if (error) {
+    return (
+      <ErrorRetry
+        message="Couldn't load messages"
+        onRetry={refresh}
+      />
+    );
+  }
+
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
-      <ChatHeader conversation={conversation} />
+    <View style={styles.container}>
+      <ChatHeader
+        conversationId={conversationId}
+        conversationType={conversationType}
+        connectionStatus={connectionStatus}
+      />
       
-      {error && !loading && (
-        <ErrorMessage message="Couldn't load all messages" onRetry={loadMessages} />
-      )}
-      
+      {!netInfo.isConnected && <OfflineNotice />}
+
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
-        <FlatList
-          data={messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())}
-          renderItem={({ item }) => (
-            <MessageBubble 
-              message={item} 
-              onReaction={handleReaction}
-              onRemoveReaction={removeReaction}
-              onEdit={handleEditMessage}
-              onDelete={handleDeleteMessage}
-            />
-          )}
-          keyExtractor={(item) => item.id + item.timestamp} // More unique key
-          inverted
-          onEndReached={hasMoreMessages ? loadMoreMessagesFromApi : null}
-          onEndReachedThreshold={0.1}
-          maintainVisibleContentPosition={{
-            minIndexForVisible: 0,
-            autoscrollToTopThreshold: 10,
-          }}
-          ListFooterComponent={renderFooter}
-          contentContainerStyle={styles.listContent}
-        />
-        
+        <Animated.View style={styles.listContainer}>
+          <FlashList
+            ref={listRef}
+            data={messages}
+            renderItem={renderMessage}
+            estimatedItemSize={100}
+            inverted
+            onScroll={scrollHandler}
+            onEndReached={hasMore ? loadMore : undefined}
+            onEndReachedThreshold={0.5}
+            onRefresh={handleRefresh}
+            refreshing={isRefreshing}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            removeClippedSubviews={Platform.OS !== 'web'}
+            initialNumToRender={15}
+            maxToRenderPerBatch={10}
+            windowSize={21}
+            ListHeaderComponent={hasMore ? LoadingIndicator : null}
+          />
+        </Animated.View>
+
         <MessageInput
-          value={inputText}
-          onChangeText={setInputText}
-          onSend={editingMessage ? handleSaveEdit : handleSend}
-          editMessage={editingMessage}
-          onEditCancel={handleCancelEdit}
+          onSendMessage={handleSend}
+          onTypingStatusChange={handleTypingStatus}
+          disabled={!netInfo.isConnected}
         />
       </KeyboardAvoidingView>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E4F0F6',
+    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
   },
-  listContent: {
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+  listContainer: {
+    flex: 1,
   },
-  loader: {
-    marginVertical: 20,
+  listContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
 });
 
-export default ChatScreen;
+export default memo(ChatScreen);

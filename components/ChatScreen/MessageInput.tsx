@@ -1,397 +1,494 @@
 //screens/ChatScreen/components/MessageInput.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Keyboard, 
-  Animated, 
-  Platform, 
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import {
+  View,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Keyboard,
+  ActivityIndicator,
+  Image,
+  LayoutAnimation,
   Text,
-  Easing
+  KeyboardAvoidingView,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+  useSharedValue,
+} from 'react-native-reanimated';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Message } from '../../types/chat';
-import AttachmentPicker from './AttachmentPicker'; // New import for attachments
+import { debounce } from '../../utils/helpers';
+import { useKeyboard } from '@react-native-community/hooks';
 import * as Haptics from 'expo-haptics';
+import { useVoiceRecording } from '../../hooks/ChatScreen/useVoiceRecording';
+import { PanGestureHandler } from 'react-native-gesture-handler';
+import AttachmentPicker from './AttachmentPicker';
 
 interface MessageInputProps {
-  value: string;
-  onChangeText: (text: string) => void;
-  onSend: () => void;
-  editMessage?: Message | null;
-  onEditCancel: () => void;
+  onSendMessage: (content: string, type?: string, metadata?: any) => Promise<void>;
+  onTypingStatusChange?: (isTyping: boolean) => void;
+  editingMessage?: Message | null;
+  onCancelEdit?: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  maxLength?: number;
+  onSendVoiceMessage: (uri: string) => void;
+  onAttachmentsSelected: (attachments: any[]) => void;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ 
-  value, 
-  onChangeText, 
-  onSend,
-  editMessage,
-  onEditCancel
+const CANCEL_THRESHOLD = -150;
+
+export const MessageInput: React.FC<MessageInputProps> = memo(({
+  onSendMessage,
+  onTypingStatusChange,
+  editingMessage,
+  onCancelEdit,
+  disabled = false,
+  placeholder = 'Type a message...',
+  maxLength = 1000,
+  onSendVoiceMessage,
+  onAttachmentsSelected,
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
+  const [text, setText] = useState('');
+  const [attachments, setAttachments] = useState<Array<{
+    uri: string;
+    type: 'image' | 'file';
+    name?: string;
+    size?: number;
+  }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const [keyboardHeight] = useState(new Animated.Value(0));
-  const [showAttachments, setShowAttachments] = useState(false); // New state for attachments
-  
-  // Animation values
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const editBgAnim = useRef(new Animated.Value(0)).current;
-  
-  useEffect(() => {
-    const keyboardWillShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        Animated.timing(keyboardHeight, {
-          toValue: e.endCoordinates.height,
-          duration: 250,
-          useNativeDriver: false
-        }).start();
-      }
-    );
-    
-    const keyboardWillHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        Animated.timing(keyboardHeight, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: false
-        }).start();
-      }
-    );
+  const { keyboardHeight, keyboardVisible } = useKeyboard();
+  const [showAttachments, setShowAttachments] = useState(false);
 
-    return () => {
-      keyboardWillShowListener.remove();
-      keyboardWillHideListener.remove();
+  const {
+    hasPermission,
+    isRecording,
+    duration,
+    formattedDuration,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useVoiceRecording({
+    onRecordingComplete: (uri) => {
+      onSendVoiceMessage(uri);
+    },
+  });
+
+  // Animated values
+  const attachmentScale = useSharedValue(1);
+  const sendScale = useSharedValue(1);
+  const inputHeight = useSharedValue(40);
+
+  // Load draft message from storage if any
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        const draft = await AsyncStorage.getItem('message_draft');
+        if (draft) {
+          setText(draft);
+        }
+      } catch (error) {
+        console.error('Error loading draft:', error);
+      }
     };
-  }, [keyboardHeight]);
+    loadDraft();
+  }, []);
 
-  // Focus input when entering edit mode
+  // Save draft when component unmounts
   useEffect(() => {
-    if (editMessage) {
-      inputRef.current?.focus();
-      // Animate the background color change
-      Animated.timing(editBgAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-    } else {
-      // Reset animation when exiting edit mode
-      Animated.timing(editBgAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [editMessage]);
+    return () => {
+      if (text.trim()) {
+        AsyncStorage.setItem('message_draft', text).catch(console.error);
+      } else {
+        AsyncStorage.removeItem('message_draft').catch(console.error);
+      }
+    };
+  }, [text]);
 
-  const handleSend = () => {
-    // Provide haptic feedback
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  // Handle editing message
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.content);
+      inputRef.current?.focus();
     }
-    
-    // Animate the send button
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.85,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onSend();
-    });
+  }, [editingMessage]);
+
+  // Debounced typing indicator
+  const debouncedTyping = useCallback(
+    debounce((isTyping: boolean) => {
+      onTypingStatusChange?.(isTyping);
+    }, 500),
+    [onTypingStatusChange]
+  );
+
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (value.trim().length > 0) {
+      debouncedTyping(true);
+    } else {
+      debouncedTyping(false);
+    }
   };
 
-  const handleAttachmentPress = () => {
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+      });
+
+      if (!result.canceled) {
+        const newAttachments = result.assets.map(asset => ({
+          uri: asset.uri,
+          type: 'image' as const,
+          name: asset.fileName || 'image.jpg',
+          size: asset.fileSize,
+        }));
+        setAttachments(prev => [...prev, ...newAttachments]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+    }
+  };
+
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+
+      if (result.type === 'success') {
+        const newAttachment = {
+          uri: result.uri,
+          type: 'file' as const,
+          name: result.name,
+          size: result.size,
+        };
+        setAttachments(prev => [...prev, newAttachment]);
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSend = async () => {
+    if (disabled || (!text.trim() && attachments.length === 0)) return;
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
-    Animated.sequence([
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.elastic(1.2),
-        useNativeDriver: true,
-      }),
-      Animated.timing(rotateAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.elastic(1.2),
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowAttachments(true);
-    });
+
+    try {
+      setIsUploading(true);
+      
+      // Handle attachments first if any
+      if (attachments.length > 0) {
+        for (const attachment of attachments) {
+          await onSendMessage('', attachment.type, {
+            file_url: attachment.uri,
+            file_name: attachment.name,
+            file_size: attachment.size,
+          });
+        }
+        setAttachments([]);
+      }
+
+      // Then send text message if any
+      if (text.trim()) {
+        await onSendMessage(text.trim());
+        setText('');
+        AsyncStorage.removeItem('message_draft').catch(console.error);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  // Calculate the background color based on edit mode
-  const containerBackgroundColor = editBgAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#FFFFFF', '#F0F8FF']
-  });
-  
-  // Calculate the rotation for attachment icon
-  const rotate = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '45deg']
-  });
-
-  // Length counter color
-  const getCounterColor = () => {
-    if (value.length >= 450) return '#DC2626'; // Red when close to limit
-    if (value.length >= 400) return '#F59E0B'; // Amber when approaching limit
-    return '#666666'; // Default gray
+  const handlePressIn = async () => {
+    if (hasPermission) {
+      Keyboard.dismiss();
+      await startRecording();
+    }
   };
+
+  const handlePressOut = async () => {
+    if (isRecording) {
+      await stopRecording();
+    }
+  };
+
+  const handleGestureEvent = ({ translationX }: { translationX: number }) => {
+    if (translationX < CANCEL_THRESHOLD) {
+      runOnJS(cancelRecording)();
+    }
+  };
+
+  const attachmentAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: attachmentScale.value }],
+  }));
+
+  const sendAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendScale.value }],
+  }));
+
+  const inputAnimatedStyle = useAnimatedStyle(() => ({
+    height: inputHeight.value,
+  }));
+
+  const recordingIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: withSpring(isRecording ? 1 : 0) },
+    ],
+    opacity: withTiming(isRecording ? 1 : 0),
+  }));
+
+  const attachmentsStyle = useAnimatedStyle(() => ({
+    height: withSpring(showAttachments ? 120 : 0),
+    opacity: withTiming(showAttachments ? 1 : 0),
+  }));
 
   return (
-    <Animated.View 
-      style={[
-        styles.containerWrapper,
-        { backgroundColor: containerBackgroundColor }
-      ]}
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {editMessage && (
-        <View style={styles.editHeader}>
-          <Text style={styles.editHeaderText}>Editing Message</Text>
-          <TouchableOpacity onPress={onEditCancel} style={styles.editCancelButton}>
-            <Icon name="close" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        </View>
-      )}
-
       <View style={styles.container}>
-        {!editMessage && (
-          <Animated.View style={{ transform: [{ rotate }] }}>
-            <TouchableOpacity 
-              style={styles.attachmentButton}
-              onPress={handleAttachmentPress}
-            >
-              <Icon name="attach" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-        
-        <TextInput
-          ref={inputRef}
-          style={[
-            styles.input,
-            isFocused && styles.focusedInput,
-            editMessage && styles.editInput
-          ]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={editMessage ? "Edit your message..." : "Type a message..."}
-          placeholderTextColor="#999"
-          multiline
-          maxLength={500}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          returnKeyType="default"
-          blurOnSubmit={false}
-        />
-        
-        {value ? (
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <TouchableOpacity 
-              style={[styles.sendButton, editMessage && styles.editSendButton]} 
+        <Animated.View style={[styles.attachmentsContainer, attachmentsStyle]}>
+          <AttachmentPicker onSelectAttachments={onAttachmentsSelected} />
+        </Animated.View>
+
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.attachButton}
+            onPress={() => setShowAttachments(!showAttachments)}
+          >
+            <Icon name="attach" size={24} color="#007AFF" />
+          </TouchableOpacity>
+
+          <TextInput
+            ref={inputRef}
+            style={styles.input}
+            value={text}
+            onChangeText={handleTextChange}
+            placeholder={placeholder}
+            multiline
+            maxLength={maxLength}
+            editable={!disabled && !isRecording}
+          />
+
+          {text.trim() ? (
+            <TouchableOpacity
+              style={styles.sendButton}
               onPress={handleSend}
-              activeOpacity={0.7}
+              disabled={disabled}
             >
-              <Icon 
-                name={editMessage ? "checkmark" : "send"} 
-                size={24} 
-                color="white" 
-              />
+              <Icon name="send" size={24} color="#007AFF" />
             </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          !editMessage && (
-            <TouchableOpacity 
-              style={styles.mediaButton}
-              activeOpacity={0.7}
-            >
-              <Icon name="camera" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          )
+          ) : (
+            <PanGestureHandler onGestureEvent={handleGestureEvent}>
+              <Animated.View>
+                <TouchableOpacity
+                  style={[
+                    styles.sendButton,
+                    isRecording && styles.recordingButton,
+                  ]}
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  disabled={disabled || !hasPermission}
+                >
+                  <Icon
+                    name={isRecording ? 'radio' : 'mic'}
+                    size={24}
+                    color={isRecording ? '#FF3B30' : '#007AFF'}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </PanGestureHandler>
+          )}
+        </View>
+
+        <Animated.View style={[styles.recordingOverlay, recordingIndicatorStyle]}>
+          <Icon name="radio" size={24} color="#FF3B30" />
+          <Animated.Text style={styles.recordingTime}>
+            {formattedDuration}
+          </Animated.Text>
+          <Animated.Text style={styles.recordingHint}>
+            Slide left to cancel
+          </Animated.Text>
+        </Animated.View>
+
+        {attachments.length > 0 && (
+          <ScrollView
+            horizontal
+            style={styles.attachmentsContainer}
+            showsHorizontalScrollIndicator={false}
+          >
+            {attachments.map((attachment, index) => (
+              <View key={index} style={styles.attachmentPreview}>
+                {attachment.type === 'image' ? (
+                  <Image
+                    source={{ uri: attachment.uri }}
+                    style={styles.attachmentImage}
+                  />
+                ) : (
+                  <View style={styles.filePreview}>
+                    <Icon name="document" size={24} color="#666" />
+                    <Text numberOfLines={1} style={styles.fileName}>
+                      {attachment.name}
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.removeAttachment}
+                  onPress={() => removeAttachment(index)}
+                >
+                  <Icon name="close-circle" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
         )}
       </View>
-
-      <Text style={[
-        styles.characterCounter, 
-        { color: getCounterColor() }
-      ]}>
-        {value.length}/500
-      </Text>
-
-      {/* Attachment Picker */}
-      <AttachmentPicker
-        visible={showAttachments}
-        onClose={() => setShowAttachments(false)}
-        onSelect={(attachments) => {
-          // Handle selected attachments here
-          setShowAttachments(false);
-        }}
-      />
-    </Animated.View>
+    </KeyboardAvoidingView>
   );
-};
+});
 
 const styles = StyleSheet.create({
-  containerWrapper: {
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 -2px 4px rgba(0,0,0,0.05)',
-      },
-    }),
-  },
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingHorizontal: 16,
+    backgroundColor: '#FFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5E5',
+    paddingBottom: Platform.OS === 'ios' ? 30 : 10,
   },
   editHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(0, 122, 255, 0.08)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 122, 255, 0.2)',
+    padding: 8,
+    backgroundColor: '#F8F8F8',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E5E5',
   },
   editHeaderText: {
+    flex: 1,
+    marginLeft: 8,
     fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
+    color: '#666',
   },
-  editCancelButton: {
-    padding: 4,
-    borderRadius: 12,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
   },
-  input: {
+  attachButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  textInputContainer: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    minHeight: 40,
     maxHeight: 120,
+  },
+  input: {
     fontSize: 16,
-    marginHorizontal: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-      },
-    }),
-  },
-  focusedInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#007AFF',
-    borderWidth: 1.5,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#007AFF',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 0 0 2px rgba(0,122,255,0.2)',
-      },
-    }),
-  },
-  editInput: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#007AFF',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-  },
-  attachmentButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 122, 255, 0.08)',
-  },
-  mediaButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 122, 255, 0.08)',
+    color: '#000',
+    lineHeight: 20,
+    padding: 0,
   },
   sendButton: {
-    padding: 10,
-    backgroundColor: '#007AFF',
-    borderRadius: 22,
-    width: 44,
-    height: 44,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  attachmentsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  attachmentPreview: {
+    marginRight: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+  },
+  attachmentImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  filePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#007AFF',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        boxShadow: '0 2px 6px rgba(0,122,255,0.4)',
-      },
-    }),
   },
-  editSendButton: {
-    backgroundColor: '#34C759', // Green color for save/confirm
-    ...Platform.select({
-      ios: {
-        shadowColor: '#34C759',
-      },
-      web: {
-        boxShadow: '0 2px 6px rgba(52,199,89,0.4)',
-      },
-    }),
+  fileName: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 4,
+    maxWidth: 56,
   },
-  characterCounter: {
-    textAlign: 'right',
-    fontSize: 12,
-    marginRight: 16,
-    marginTop: 2,
-    marginBottom: 6,
+  removeAttachment: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+  },
+  recordingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  recordingTime: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginHorizontal: 8,
+    minWidth: 50,
+    textAlign: 'center',
+  },
+  recordingHint: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 16,
   },
 });
 

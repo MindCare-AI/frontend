@@ -1,255 +1,108 @@
-//screens/ChatScreen/components/TypingIndicator.tsx
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Easing, Platform } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
-import { API_URL } from '../../config';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { useTheme } from '@react-navigation/native';
 
 interface TypingIndicatorProps {
-  visible: boolean;
-  conversationId: string;
+  typingUsers: string[];
+  style?: any;
 }
 
-const TypingIndicator: React.FC<TypingIndicatorProps> = ({ visible, conversationId }) => {
-  // Add multiple animations for a more dynamic effect
-  const dot1Scale = useRef(new Animated.Value(0.8)).current;
-  const dot2Scale = useRef(new Animated.Value(0.8)).current;
-  const dot3Scale = useRef(new Animated.Value(0.8)).current;
-  
-  const dot1Opacity = useRef(new Animated.Value(0.4)).current;
-  const dot2Opacity = useRef(new Animated.Value(0.4)).current;
-  const dot3Opacity = useRef(new Animated.Value(0.4)).current;
-  
-  const containerOpacity = useRef(new Animated.Value(0)).current;
-  const containerTranslateY = useRef(new Animated.Value(10)).current;
-  
-  const { accessToken } = useAuth();
+export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
+  typingUsers,
+  style
+}) => {
+  const { colors } = useTheme();
+  const dots = [useRef(new Animated.Value(0)).current, 
+                useRef(new Animated.Value(0)).current,
+                useRef(new Animated.Value(0)).current];
 
   useEffect(() => {
-    if (visible && conversationId) {
-      const ws = new WebSocket(`${API_URL.replace('http', 'ws')}/ws/messaging/${conversationId}/`);
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'typing', is_typing: true }));
-      };
-
-      ws.onclose = () => {
-        ws.send(JSON.stringify({ type: 'typing', is_typing: false }));
-      };
-
-      return () => {
-        ws.close();
-      };
+    if (typingUsers.length > 0) {
+      animateDots();
     }
-  }, [visible, conversationId]);
+  }, [typingUsers]);
 
-  // Entrance and exit animations
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(containerOpacity, {
+  const animateDots = () => {
+    const animations = dots.map((dot, index) => {
+      return Animated.sequence([
+        Animated.delay(index * 200),
+        Animated.timing(dot, {
           toValue: 1,
-          duration: 250,
+          duration: 400,
+          easing: Easing.ease,
           useNativeDriver: true,
         }),
-        Animated.spring(containerTranslateY, {
+        Animated.timing(dot, {
           toValue: 0,
-          friction: 6,
-          tension: 40,
+          duration: 400,
+          easing: Easing.ease,
           useNativeDriver: true,
         })
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(containerOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(containerTranslateY, {
-          toValue: 10,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start();
-    }
-  }, [visible]);
+      ]);
+    });
 
-  // Dot bobbing animation
-  useEffect(() => {
-    if (visible) {
-      Animated.loop(
-        Animated.stagger(150, [
-          // First dot animation
-          Animated.sequence([
-            Animated.parallel([
-              Animated.timing(dot1Scale, {
-                toValue: 1,
-                duration: 300,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot1Opacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ]),
-            Animated.parallel([
-              Animated.timing(dot1Scale, {
-                toValue: 0.8,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot1Opacity, {
-                toValue: 0.4,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ])
-          ]),
-          
-          // Second dot animation
-          Animated.sequence([
-            Animated.parallel([
-              Animated.timing(dot2Scale, {
-                toValue: 1,
-                duration: 300,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot2Opacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ]),
-            Animated.parallel([
-              Animated.timing(dot2Scale, {
-                toValue: 0.8,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot2Opacity, {
-                toValue: 0.4,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ])
-          ]),
-          
-          // Third dot animation
-          Animated.sequence([
-            Animated.parallel([
-              Animated.timing(dot3Scale, {
-                toValue: 1,
-                duration: 300,
-                easing: Easing.out(Easing.ease),
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot3Opacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ]),
-            Animated.parallel([
-              Animated.timing(dot3Scale, {
-                toValue: 0.8,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(dot3Opacity, {
-                toValue: 0.4,
-                duration: 300,
-                useNativeDriver: true,
-              })
-            ])
-          ])
-        ])
-      ).start();
-    }
-  }, [visible]);
+    Animated.loop(
+      Animated.parallel(animations)
+    ).start();
+  };
 
-  if (!visible) return null;
+  if (typingUsers.length === 0) return null;
+
+  const typingText = typingUsers.length === 1
+    ? `${typingUsers[0]} is typing...`
+    : typingUsers.length === 2
+    ? `${typingUsers[0]} and ${typingUsers[1]} are typing...`
+    : `${typingUsers.length} people are typing...`;
 
   return (
-    <Animated.View 
-      style={[
-        styles.container,
-        {
-          opacity: containerOpacity,
-          transform: [{ translateY: containerTranslateY }]
-        }
-      ]}
-    >
-      <View style={styles.bubble}>
-        <Animated.View 
-          style={[
-            styles.dot, 
-            { 
-              opacity: dot1Opacity,
-              transform: [{ scale: dot1Scale }] 
-            }
-          ]} 
-        />
-        <Animated.View 
-          style={[
-            styles.dot, 
-            { 
-              opacity: dot2Opacity,
-              transform: [{ scale: dot2Scale }] 
-            }
-          ]} 
-        />
-        <Animated.View 
-          style={[
-            styles.dot, 
-            { 
-              opacity: dot3Opacity,
-              transform: [{ scale: dot3Scale }] 
-            }
-          ]} 
-        />
+    <View style={[styles.container, style]}>
+      <Text style={[styles.text, { color: colors.text }]}>
+        {typingText}
+      </Text>
+      <View style={styles.dotsContainer}>
+        {dots.map((dot, index) => (
+          <Animated.View
+            key={index}
+            style={[
+              styles.dot,
+              {
+                backgroundColor: colors.text,
+                opacity: dot,
+                transform: [{
+                  translateY: dot.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -4]
+                  })
+                }]
+              }
+            ]}
+          />
+        ))}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    marginLeft: 16,
-  },
-  bubble: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-      },
-    }),
+    padding: 8,
+  },
+  text: {
+    fontSize: 12,
+    marginRight: 8,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#007BFF',
-    marginHorizontal: 3,
-  },
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginHorizontal: 2,
+  }
 });
 
 export default TypingIndicator;

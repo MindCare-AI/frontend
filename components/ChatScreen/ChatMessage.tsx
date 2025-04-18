@@ -1,198 +1,124 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
-import { format } from 'date-fns';
-import { Image } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, StyleSheet, Pressable } from 'react-native';
+import { MessageBubble } from './MessageBubble';
+import { MessageStatus } from './MessageStatus';
+import { ReadReceipts } from './ReadReceipts';
+import { ReactionPicker } from './ReactionPicker';
+import { useMessageInteractions } from '../../hooks/ChatScreen/useMessageInteractions';
 
 interface ChatMessageProps {
-  message: string | { content: string; [key: string]: any };
-  isBot: boolean;
-  timestamp: Date;
-  avatar?: string;
-  botName?: string;
+  message: any;
+  isLastInGroup: boolean;
+  showAvatar: boolean;
+  onLongPress?: (message: any) => void;
+  onReactionSelect?: (reaction: string) => void;
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ 
-  message, 
-  isBot, 
-  timestamp,
-  avatar,
-  botName = 'Samantha' 
-}) => {
-  // Animation refs 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateXAnim = useRef(new Animated.Value(isBot ? -20 : 20)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+export const ChatMessage = React.memo(({
+  message,
+  isLastInGroup,
+  showAvatar,
+  onLongPress,
+  onReactionSelect
+}: ChatMessageProps) => {
+  const {
+    handlePress,
+    handleLongPress,
+    isSelected,
+    reactions,
+    handleReactionSelect
+  } = useMessageInteractions(message, onLongPress, onReactionSelect);
 
-  useEffect(() => {
-    // Sequence of animations for a more natural feel
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.parallel([
-        Animated.spring(translateXAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ])
-    ]).start();
-  }, []);
-
-  // Ensure we render a string for the message
-  const displayMessage =
-    typeof message === 'object' && message !== null
-      ? message.content
-        ? message.content
-        : JSON.stringify(message)
-      : message;
-
-  const defaultBotAvatar = require('../../assets/images/bot-avatar.png');
+  const messageStyle = useMemo(() => [
+    styles.message,
+    message.isSent ? styles.sentMessage : styles.receivedMessage,
+    isLastInGroup && styles.lastInGroup
+  ], [message.isSent, isLastInGroup]);
 
   return (
-    <Animated.View
-      style={[
+    <Pressable
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      style={({ pressed }) => [
         styles.container,
-        isBot ? styles.botContainer : styles.userContainer,
-        { 
-          opacity: fadeAnim,
-          transform: [
-            { translateX: translateXAnim },
-            { scale: scaleAnim }
-          ]
-        }
+        pressed && styles.pressed
       ]}
     >
-      {isBot && (
-        <View style={styles.botHeader}>
-          <Image 
-            source={avatar ? { uri: avatar } : defaultBotAvatar} 
-            style={styles.botAvatar}
-          />
-          <View style={styles.botIndicator}>
-            <Text style={styles.botName}>{botName}</Text>
-          </View>
-        </View>
-      )}
-      
-      <View style={[
-        styles.bubble,
-        isBot ? styles.botBubble : styles.userBubble
-      ]}>
-        <Text style={[
-          styles.message,
-          isBot ? styles.botMessage : styles.userMessage
-        ]}>
-          {displayMessage}
-        </Text>
+      <View style={messageStyle}>
+        <MessageBubble
+          content={message.content}
+          type={message.type}
+          metadata={message.metadata}
+          isSent={message.isSent}
+          isSelected={isSelected}
+        />
         
-        <Text style={[
-          styles.timestamp,
-          isBot ? styles.botTimestamp : styles.userTimestamp
-        ]}>
-          {format(timestamp, 'HH:mm')}
-        </Text>
+        {reactions.length > 0 && (
+          <View style={styles.reactionsContainer}>
+            {reactions.map((reaction) => (
+              <ReactionPicker
+                key={reaction.id}
+                reaction={reaction}
+                onSelect={handleReactionSelect}
+              />
+            ))}
+          </View>
+        )}
+        
+        {isLastInGroup && (
+          <View style={styles.messageFooter}>
+            <MessageStatus 
+              status={message.status}
+              timestamp={message.timestamp}
+            />
+            {message.isSent && (
+              <ReadReceipts 
+                readBy={message.readBy}
+                style={styles.readReceipts}
+              />
+            )}
+          </View>
+        )}
       </View>
-    </Animated.View>
+    </Pressable>
   );
-};
+});
+
+ChatMessage.displayName = 'ChatMessage';
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
-    maxWidth: '80%',
+    marginVertical: 2,
+    paddingHorizontal: 12,
   },
-  userContainer: {
-    alignSelf: 'flex-end',
-    marginRight: 16,
-  },
-  botContainer: {
-    alignSelf: 'flex-start',
-    marginLeft: 16,
-  },
-  botHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  botAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 45, 98, 0.1)',
-  },
-  botIndicator: {
-    justifyContent: 'center',
-  },
-  botName: {
-    fontSize: 13,
-    color: '#002D62',
-    fontWeight: '600',
-  },
-  bubble: {
-    padding: 14,
-    borderRadius: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      },
-    }),
-  },
-  userBubble: {
-    backgroundColor: '#002D62',
-    borderTopRightRadius: 4,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderTopLeftRadius: 20,
-  },
-  botBubble: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 4,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderTopRightRadius: 20,
+  pressed: {
+    opacity: 0.7,
   },
   message: {
-    fontSize: 15,
-    lineHeight: 22,
+    maxWidth: '80%',
+    flexDirection: 'column',
   },
-  userMessage: {
-    color: '#FFFFFF',
-  },
-  botMessage: {
-    color: '#333333',
-  },
-  timestamp: {
-    fontSize: 11,
-    marginTop: 6,
+  sentMessage: {
     alignSelf: 'flex-end',
   },
-  userTimestamp: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  receivedMessage: {
+    alignSelf: 'flex-start',
   },
-  botTimestamp: {
-    color: '#666666',
+  lastInGroup: {
+    marginBottom: 8,
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  readReceipts: {
+    marginLeft: 4,
+  },
+  reactionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
   },
 });
-
-export default ChatMessage;

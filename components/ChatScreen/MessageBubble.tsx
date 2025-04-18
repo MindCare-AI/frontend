@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Easing, ActivityIndicator, Modal, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { formatTime } from '../../utils/helpers';
 import ReactionPicker from './ReactionPicker';
 import { useAuth } from '../../contexts/AuthContext'; 
 import * as Haptics from 'expo-haptics';
+import VoiceMessage from './VoiceMessage';
 
 // Update Message interface
 export interface Message {
@@ -19,6 +20,15 @@ export interface Message {
   status: 'sending' | 'sent' | 'failed' | 'read' | 'delivered';
   reactions?: { type: string }[];
   isEdited?: boolean;
+  attachments?: Attachment[];
+}
+
+export interface Attachment {
+  type: 'image' | 'voice' | 'file';
+  url: string;
+  fileName?: string;
+  fileSize?: number;
+  duration?: number;
 }
 
 interface MessageBubbleProps {
@@ -27,6 +37,10 @@ interface MessageBubbleProps {
   onRemoveReaction: (messageId: string, reaction: string) => void;
   onEdit: (messageId: string) => void;
   onDelete: (messageId: string) => void;
+  isOwnMessage: boolean;
+  showAvatar?: boolean;
+  onReactionPress?: (messageId: string, reaction: string) => void;
+  onLongPress?: (message: Message) => void;
 }
 
 // Map of reaction emoji 
@@ -39,12 +53,16 @@ const REACTION_EMOJI: { [key: string]: string } = {
   angry: '😠'
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ 
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ 
   message, 
   onReaction, 
-  onRemoveReaction, 
+  onRemoveReaction,
   onEdit, 
-  onDelete
+  onDelete,
+  isOwnMessage,
+  showAvatar = true,
+  onReactionPress,
+  onLongPress
 }) => {
   const { user } = useAuth();
   const isUserMessage = message.sender.id === (user?.id || '');
@@ -52,15 +70,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
   const [showActions, setShowActions] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
   
-  // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const actionsOpacityAnim = useRef(new Animated.Value(0)).current;
   const reactionsScaleAnim = useRef(new Animated.Value(0)).current;
 
-  // Entry animation
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacityAnim, {
@@ -76,246 +93,238 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     ]).start();
   }, []);
 
-  // Menu toggle animation
-  useEffect(() => {
-    if (showActions) {
-      Animated.timing(actionsOpacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(actionsOpacityAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [showActions]);
-
-  useEffect(() => {
-    if (hasReactions) {
-      Animated.spring(reactionsScaleAnim, {
-        toValue: 1,
-        tension: 40,
-        friction: 7,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [hasReactions, message.reactions]);
-
   const handleLongPress = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.05,
-        duration: 150,
-        easing: Easing.elastic(1),
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowActions(true);
   };
 
-  // Fix reaction handling
-  const getReactionCounts = () => {
-    if (!message.reactions || message.reactions.length === 0) {
-      return [];
+  const toggleReactions = () => {
+    setShowReactions(!showReactions);
+    Animated.spring(reactionsScaleAnim, {
+      toValue: showReactions ? 0 : 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleReaction = async (type: string) => {
+    try {
+      if (message.reactions?.some(r => r.type === type)) {
+        await onRemoveReaction(message.id, type);
+      } else {
+        await onReaction(message.id, type);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('Error handling reaction:', error);
+    }
+  };
+
+  const renderMessageStatus = () => {
+    switch (message.status) {
+      case 'sending':
+        return <ActivityIndicator size="small" color="#999" />;
+      case 'sent':
+        return <Icon name="checkmark" size={16} color="#999" />;
+      case 'delivered':
+        return <Icon name="checkmark-done" size={16} color="#999" />;
+      case 'read':
+        return <Icon name="checkmark-done" size={16} color="#4CAF50" />;
+      case 'failed':
+        return (
+          <TouchableOpacity onPress={() => onRetry?.(message.id)}>
+            <Icon name="alert-circle" size={16} color="#F44336" />
+          </TouchableOpacity>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderAttachment = (attachment: Attachment) => {
+    switch (attachment.type) {
+      case 'image':
+        return (
+          <Image
+            source={{ uri: attachment.url }}
+            style={styles.imageAttachment}
+            resizeMode="cover"
+          />
+        );
+      case 'voice':
+        return <VoiceMessage audioUrl={attachment.url} duration={attachment.duration} />;
+      default:
+        return (
+          <TouchableOpacity style={styles.fileAttachment}>
+            <Text style={styles.fileName}>{attachment.fileName}</Text>
+            <Text style={styles.fileSize}>
+              {(attachment.fileSize / 1024).toFixed(1)} KB
+            </Text>
+          </TouchableOpacity>
+        );
+    }
+  };
+
+  const renderReactions = () => {
+    if (!message.reactions || Object.keys(message.reactions).length === 0) {
+      return null;
     }
 
-    const counts: { [key: string]: number } = {};
-    message.reactions.forEach((reaction: { type: string }) => {
-      counts[reaction.type] = (counts[reaction.type] || 0) + 1;
-    });
-
-    return Object.entries(counts).map(([type, count]) => ({ type, count }));
+    return (
+      <View style={styles.reactionsContainer}>
+        {Object.entries(message.reactions).map(([emoji, reaction]) => (
+          <TouchableOpacity
+            key={emoji}
+            style={styles.reaction}
+            onPress={() => onReactionPress?.(message.id, emoji)}
+          >
+            <Text style={styles.reactionEmoji}>{emoji}</Text>
+            <Text style={styles.reactionCount}>{reaction.count}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
   };
 
-  const reactionCounts = getReactionCounts();
+  const messageContainerStyle = [
+    styles.container,
+    isUserMessage ? styles.userMessage : styles.otherMessage,
+  ];
 
-  // Generate a highlight color based on the message's sender ID for consistent user colors
-  const getUserHighlightColor = () => {
-    // Safely convert sender ID to string before splitting
-    const idStr = String(message.sender.id || '');
-    const idSum = idStr
-      .split('')
-      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const hue = idSum % 360;
-    return `hsla(${hue}, 70%, 90%, 0.6)`;
-  };
+  const messageContentStyle = [
+    styles.content,
+    isUserMessage ? styles.userContent : styles.otherContent,
+    message.status === 'failed' && styles.failedMessage,
+  ];
 
   return (
-    <Animated.View style={[
-      styles.container,
-      isUserMessage ? styles.userContainer : styles.otherContainer,
-      {
-        opacity: opacityAnim,
-        transform: [
-          { translateY: slideAnim },
-        ],
-      }
-    ]}>
-      {message.sender.name && !isUserMessage && (
-        <Text style={styles.senderName}>{message.sender.name}</Text>
-      )}
-      
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <TouchableOpacity 
-          onLongPress={handleLongPress}
-          onPress={() => setShowActions(false)}
-          activeOpacity={0.9}
-          delayLongPress={200}
-        >
-          <View 
-            style={[
-              styles.bubble,
-              isUserMessage ? styles.userBubble : styles.otherBubble,
-              message.isEdited && styles.editedBubble,
-              // Apply highlight_color only for other users if provided
-              !isUserMessage && message.sender.highlight_color && { backgroundColor: message.sender.highlight_color },
-            ]}
-          >
-            <Text style={[
-              styles.messageText,
-              isUserMessage ? styles.userText : styles.otherText
-            ]}>
-              {message.content}
-            </Text>
-            
-            <View style={styles.footer}>
-              <Text style={[
-                styles.time,
-                isUserMessage ? styles.userTime : styles.otherTime
-              ]}>
-                {formatTime(message.timestamp)}
-                {message.isEdited && <Text style={styles.editedText}> (edited)</Text>}
-              </Text>
-              
-              {message.status && isUserMessage && (
-                <View style={styles.statusContainer}>
-                  {message.status === 'sent' && (
-                    <Icon name="checkmark" size={14} color="#A3A3A3" />
-                  )}
-                  {message.status === 'delivered' && (
-                    <Icon name="checkmark-done" size={14} color="#A3A3A3" />
-                  )}
-                  {message.status === 'read' && (
-                    <Icon name="checkmark-done" size={14} color="#4CD964" />
-                  )}
-                </View>
-              )}
+    <Animated.View
+      style={[
+        messageContainerStyle,
+        {
+          opacity: opacityAnim,
+          transform: [
+            { translateY: slideAnim },
+            { scale: scaleAnim },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onLongPress={handleLongPress}
+        delayLongPress={200}
+        activeOpacity={0.7}
+      >
+        <View style={messageContentStyle}>
+          <Text style={styles.messageText}>{message.content}</Text>
+          
+          {message.attachments?.map((attachment, index) => (
+            <View key={index} style={styles.attachmentContainer}>
+              {renderAttachment(attachment)}
             </View>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
+          ))}
 
-      {/* Reactions display */}
+          <View style={styles.messageFooter}>
+            <Text style={styles.timestamp}>
+              {formatTime(message.timestamp)}
+              {message.isEdited && 
+                <Text style={styles.editedText}> (edited)</Text>
+              }
+            </Text>
+            {isUserMessage && renderMessageStatus()}
+          </View>
+        </View>
+      </TouchableOpacity>
+
       {hasReactions && (
         <Animated.View 
           style={[
             styles.reactionsContainer,
-            isUserMessage ? styles.userReactionsContainer : styles.otherReactionsContainer,
-            { transform: [{ scale: reactionsScaleAnim }] }
+            {
+              transform: [{ scale: reactionsScaleAnim }]
+            }
           ]}
         >
-          {reactionCounts.map(({ type, count }) => (
-            <View key={type} style={styles.reactionBadge}>
+          {message.reactions.map((reaction, index) => (
+            <TouchableOpacity
+              key={`${reaction.type}-${index}`}
+              style={styles.reactionBubble}
+              onPress={() => handleReaction(reaction.type)}
+            >
               <Text style={styles.reactionEmoji}>
-                {REACTION_EMOJI[type] || '👍'}
+                {REACTION_EMOJI[reaction.type]}
               </Text>
-              {count > 1 && (
-                <Text style={styles.reactionCount}>{count}</Text>
-              )}
-            </View>
+              <Text style={styles.reactionCount}>
+                {reaction.users.length}
+              </Text>
+            </TouchableOpacity>
           ))}
         </Animated.View>
       )}
-      
-      {/* Action buttons */}
-      {showActions && (
-        <Animated.View 
-          style={[
-            styles.actionsContainer,
-            isUserMessage ? styles.userActionsContainer : styles.otherActionsContainer,
-            { opacity: actionsOpacityAnim }
-          ]}
-        >
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => {
-              setShowActions(false);
-              setShowReactions(true);
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }
-            }}
-          >
-            <Icon name="happy-outline" size={20} color="#666" />
-          </TouchableOpacity>
-          
-          {isUserMessage && (
-            <>
-              <TouchableOpacity 
-                style={styles.actionButton} 
-                onPress={() => {
-                  if (Platform.OS !== 'web') {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }
-                  setShowActions(false); 
-                  onEdit(message.id);
-                }}
-              >
-                <Icon name="pencil-outline" size={18} color="#666" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.deleteButton]} 
-                onPress={() => {
-                  if (Platform.OS !== 'web') {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  }
-                  setShowActions(false); 
-                  onDelete(message.id);
-                }}
-              >
-                <Icon name="trash-outline" size={18} color="#FF3B30" />
-              </TouchableOpacity>
-            </>
-          )}
-          
-          <TouchableOpacity 
-            style={styles.actionButton} 
-            onPress={() => setShowActions(false)}
-          >
-            <Icon name="close-outline" size={20} color="#666" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
 
-      {/* Reaction picker */}
-      {showReactions && (
-        <View style={[
-          styles.reactionPickerContainer,
-          isUserMessage ? styles.userReactionPicker : styles.otherReactionPicker
-        ]}>
-          <ReactionPicker 
-            onSelect={(reaction) => {
-              setShowReactions(false);
-              onReaction(message.id, reaction);
-            }} 
-            onClose={() => setShowReactions(false)}
-          />
-        </View>
-      )}
+      <Modal
+        visible={showActions}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActions(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowActions(false)}
+        >
+          <View style={styles.actionSheet}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {
+                toggleReactions();
+                setShowActions(false);
+              }}
+            >
+              <Icon name="heart-outline" size={24} color="#666" />
+              <Text style={styles.actionText}>React</Text>
+            </TouchableOpacity>
+
+            {isUserMessage && (
+              <>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => {
+                    onEdit(message.id);
+                    setShowActions(false);
+                  }}
+                >
+                  <Icon name="pencil" size={24} color="#666" />
+                  <Text style={styles.actionText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => {
+                    onDelete(message.id);
+                    setShowActions(false);
+                  }}
+                >
+                  <Icon name="trash" size={24} color="#FF3B30" />
+                  <Text style={[styles.actionText, styles.deleteText]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      {renderReactions()}
+      <ReactionPicker
+        messageId={message.id}
+        isVisible={showReactionPicker}
+        onClose={() => setShowReactionPicker(false)}
+        onReactionSelected={(reaction) => {
+          onReactionPress?.(message.id, reaction);
+          setShowReactionPicker(false);
+        }}
+        existingReactions={message.reactions}
+      />
     </Animated.View>
   );
 };
@@ -519,6 +528,48 @@ const styles = StyleSheet.create({
   },
   otherReactionPicker: {
     left: 0,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  actionSheet: {
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    padding: 16,
+    width: '80%',
+    alignItems: 'center',
+  },
+  actionText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  deleteText: {
+    color: '#FF3B30',
+  },
+  attachmentContainer: {
+    marginTop: 8,
+  },
+  imageAttachment: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+  },
+  fileAttachment: {
+    backgroundColor: '#e3e3e3',
+    padding: 8,
+    borderRadius: 8,
+  },
+  fileName: {
+    fontSize: 14,
+    color: '#000',
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 
