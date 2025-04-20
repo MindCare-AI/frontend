@@ -10,7 +10,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { NavigationProp } from "@react-navigation/native";
+import { NavigationProp } from "@react-navigation/native"; import { globalStyles } from "../../styles/global";
 import Icon from "react-native-vector-icons/FontAwesome";
 import Logo from "../../assets/images/logo_mindcare.svg";
 import { gsap } from 'gsap';
@@ -21,11 +21,11 @@ type ForgotPasswordScreenProps = {
 
 const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
   const [email, setEmail] = useState("");
-  const [isEmailValid, setIsEmailValid] = useState<boolean | null>(null);
+  const [isEmailValid, setIsEmailValid] = useState < boolean | null > (null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showResetInstructions, setShowResetInstructions] = useState(false);
-  
+
   const formRef = useRef(null);
   const logoRef = useRef(null);
   const titleRef = useRef(null);
@@ -38,44 +38,43 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
       y: -30,
       opacity: 0,
       duration: 0.8,
-      ease: "power3.out"
+      ease: "power3.out",
     })
-    .from(formRef.current, {
-      y: 30,
-      opacity: 0,
-      duration: 0.6,
-      ease: "power2.out"
-    }, "-=0.4")
-    .from(titleRef.current, {
-      scale: 0.9,
-      opacity: 0,
-      duration: 0.4,
-      ease: "back.out"
-    }, "-=0.3");
+      .from(formRef.current, {
+        y: 30,
+        opacity: 0,
+        duration: 0.6,
+        ease: "power2.out",
+      }, "-=0.4")
+      .from(titleRef.current, {
+        scale: 0.9,
+        opacity: 0,
+        duration: 0.4,
+        ease: "back.out",
+      }, "-=0.3");
   }, []);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
   };
-
+  
   const handleChange = (value: string) => {
     setEmail(value);
-    
+
     if (value.length > 0) {
       setIsEmailValid(validateEmail(value));
     } else {
       setIsEmailValid(null);
     }
-    
-    // Clear any messages when user starts typing again
+
     if (error) setError(null);
     if (successMessage) {
       setSuccessMessage(null);
       setShowResetInstructions(false);
     }
   };
-
+  
   // Replace shakeError with GSAP version
   const shakeError = () => {
     gsap.to(formRef.current, {
@@ -83,10 +82,10 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
       duration: 0.1,
       repeat: 3,
       yoyo: true,
-      ease: "power2.inOut"
+      ease: "power2.inOut",
     });
   };
-
+  
   const handleSendResetLink = async () => {
     // Check for empty email
     if (!email) {
@@ -94,7 +93,7 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
       shakeError();
       return;
     }
-  
+
     // Check email format
     if (!validateEmail(email)) {
       setError("Please enter a valid email address");
@@ -102,13 +101,13 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
       return;
     }
   
-    try {
+    try{
       // Add button press animation
       gsap.to(formRef.current, {
         scale: 0.98,
         duration: 0.1,
         yoyo: true,
-        repeat: 1
+        repeat: 1,
       });
 
       const response = await fetch("http://127.0.0.1:8000/api/v1/auth/password/reset/", {
@@ -121,15 +120,14 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
 
       console.log("Response status:", response.status);
 
-      if (response.ok) {
-        // Success animation
+      if(response.ok) {
         gsap.to(formRef.current, {
           y: -10,
           opacity: 0.8,
           duration: 0.3,
           ease: "power2.inOut",
           yoyo: true,
-          repeat: 1
+          repeat: 1,
         });
         setSuccessMessage("Password reset link sent to your email");
         setShowResetInstructions(true);
@@ -139,207 +137,181 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
         setError(data.detail || "Failed to send reset link");
         shakeError();
       }
-    } catch (error) {
+    } catch(error) {
       console.error("Error:", error);
       setError("An error occurred. Please try again.");
       shakeError();
     }
   };
-
+  
   const handleManualReset = () => {
     navigation.navigate("ManualResetEntry");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View ref={logoRef} style={styles.logoContainer}>
-          <Logo width={120} height={120} />
-          <Text style={styles.logoText}>MindCare AI</Text>
-        </View>
-
-        <View ref={formRef} style={styles.formContainer}>
-          <Text ref={titleRef} style={styles.title}>Forgot Password</Text>
-          <Text style={styles.subtitle}>
-            Enter your email and we'll send you a link to reset your password
-          </Text>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={[styles.input, error && styles.inputError]}
-              placeholder="Email Address"
-              placeholderTextColor="#888888"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={handleChange}
-            />
-            {isEmailValid !== null && (
-              <Icon
-                name={isEmailValid ? "check" : "times"}
-                size={20}
-                color={isEmailValid ? "#27AE60" : "#E74C3C"}
-                style={styles.inputIcon}
-              />
-            )}
+      <SafeAreaView style={[styles.container, { backgroundColor: globalStyles.colors.background }]}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View ref={logoRef} style={styles.logoContainer}>
+            <Logo width={120} height={120} />
+            <Text style={[styles.logoText, globalStyles.title]}>MindCare AI</Text>
           </View>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
-          
-          {showResetInstructions && (
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsText}>
-                1. Check your email inbox for the reset link
-              </Text>
-              <Text style={styles.instructionsText}>
-                2. Open the link and copy the UID and token values from the URL
-              </Text>
-              <Text style={styles.instructionsText}>
-                3. Return to this app to complete the password reset
-              </Text>
-              <TouchableOpacity 
-                style={styles.manualResetButton} 
-                onPress={() => navigation.navigate("SetNewPassword", { uid: "", token: "" })}
-              >
-                <Text style={styles.manualResetButtonText}>Enter Reset Information</Text>
-              </TouchableOpacity>
+          <View ref={formRef} style={[styles.formContainer, {
+            backgroundColor: globalStyles.colors.white,
+            shadowColor: globalStyles.colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
+            elevation: 3,
+          }]}>
+            <Text ref={titleRef} style={[styles.title, globalStyles.title]}>Forgot Password</Text>
+            <Text style={[styles.subtitle, globalStyles.subtitle]}>
+              Enter your email and we'll send you a link to reset your password
+            </Text>
+
+            <View style={[styles.inputContainer, { borderColor: globalStyles.colors.border }]}>
+              <TextInput
+                style={[styles.input, globalStyles.body, error && styles.inputError]}
+                placeholder="Email Address"
+                placeholderTextColor={globalStyles.colors.textPlaceholder}
+                keyboardType="email-address"
+                value={email}
+                onChangeText={handleChange}
+              />
+              {isEmailValid !== null && (
+                <Icon
+                  name={isEmailValid ? "check" : "times"}
+                  size={20}
+                  color={isEmailValid ? "#27AE60" : "#E74C3C"}
+                  style={styles.inputIcon}
+                />
+              )}
             </View>
-          )}
 
-          {!showResetInstructions && (
-            <TouchableOpacity style={styles.button} onPress={handleSendResetLink}>
-              <Text style={styles.buttonText}>SEND RESET LINK</Text>
+            {error && <Text style={[styles.errorText, { color: globalStyles.colors.error }]}>{error}</Text>}
+            {successMessage && <Text style={[styles.successText, { color: globalStyles.colors.success }]}>{successMessage}</Text>}
+
+            {showResetInstructions && (
+              <View style={styles.instructionsContainer}>
+                <Text style={[styles.instructionsText, { color: globalStyles.colors.textSecondary }]}>
+                  1. Check your email inbox for the reset link
+                </Text>
+                <Text style={[styles.instructionsText, { color: globalStyles.colors.textSecondary }]}>
+                  2. Open the link and copy the UID and token values from the URL
+                </Text>
+                <Text style={[styles.instructionsText, { color: globalStyles.colors.textSecondary }]}>
+                  3. Return to this app to complete the password reset
+                </Text>
+                <TouchableOpacity
+                  style={[styles.manualResetButton, { backgroundColor: globalStyles.colors.primary }]}
+                  onPress={() => navigation.navigate("SetNewPassword", { uid: "", token: "" })}
+                >
+                  <Text style={[styles.manualResetButtonText, globalStyles.bodyBold, { color: globalStyles.colors.white }]}>Enter Reset Information</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {!showResetInstructions && (
+              <TouchableOpacity style={[styles.button, {
+                backgroundColor: globalStyles.colors.primary,
+                shadowColor: globalStyles.colors.shadow,
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 1.5,
+                elevation: 3,
+              }]} onPress={handleSendResetLink}>
+                <Text style={[styles.buttonText, globalStyles.bodyBold, { color: globalStyles.colors.white }]}>SEND RESET LINK</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+              <Text style={[styles.backToLogin, { color: globalStyles.colors.primary }]}>Back to Login</Text>
             </TouchableOpacity>
-          )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  };
 
-          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-            <Text style={styles.backToLogin}>Back to Login</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    scrollContainer: {
+      flexGrow: 1,
+      padding: globalStyles.spacing.md,
+    },
+    logoContainer: {
+      alignItems: "center",
+      marginTop: globalStyles.spacing.xxl,
+      marginBottom: globalStyles.spacing.xl,
+    },
+    logoText: {
+      marginTop: globalStyles.spacing.xs,
+    },
+    formContainer: {
+      padding: globalStyles.spacing.md,
+      borderRadius: globalStyles.spacing.sm,
+    },
+    title: {
+      marginBottom: globalStyles.spacing.xs,
+      textAlign: "center",
+    },
+    subtitle: {
+      marginBottom: globalStyles.spacing.md,
+      textAlign: "center",
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: globalStyles.spacing.sm,
+      backgroundColor: globalStyles.colors.white,
+      borderWidth: 1,
+      borderRadius: globalStyles.spacing.sm,
+    },
+    input: {
+      flex: 1,
+      height: 50,
+      paddingHorizontal: globalStyles.spacing.md,
+    },
+    inputIcon: {
+      padding: globalStyles.spacing.xs,
+    },
+    inputError: {
+      borderColor: globalStyles.colors.error,
+    },
+    errorText: {
+      marginBottom: globalStyles.spacing.sm,
+      textAlign: "center",
+    },
+    successText: {
+      marginBottom: globalStyles.spacing.sm,
+      textAlign: "center",
+    },
+    instructionsContainer: {
+      marginTop: globalStyles.spacing.md,
+    },
+    instructionsText: {
+      marginBottom: globalStyles.spacing.xs,
+    },
+    manualResetButton: {
+      padding: globalStyles.spacing.xs,
+      borderRadius: globalStyles.spacing.xxs,
+      alignItems: "center",
+      marginTop: globalStyles.spacing.xs,
+    },
+    manualResetButtonText: {},
+    button: {
+      width: "100%",
+      padding: globalStyles.spacing.sm,
+      borderRadius: globalStyles.spacing.sm,
+      alignItems: "center",
+    },
+    buttonText: {},
+    backToLogin: {
+      textAlign: "center",
+      marginTop: globalStyles.spacing.md,
+    },
+  });
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#E4F0F6",
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  logoContainer: {
-    alignItems: "center",
-    marginTop: 40,
-    marginBottom: 30,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#002D62",
-    marginTop: 10,
-  },
-  formContainer: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#002D62",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#CFCFCF",
-    borderRadius: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: "#333",
-  },
-  inputIcon: {
-    padding: 10,
-  },
-  inputError: {
-    borderColor: "#E74C3C",
-  },
-  errorText: {
-    color: "#E74C3C",
-    fontSize: 14,
-    marginBottom: 15,
-    textAlign: "center",
-  },
-  successText: {
-    color: "#27AE60",
-    fontSize: 14,
-    marginBottom: 15,
-    textAlign: "center",
-  },
-  instructionsContainer: {
-    marginTop: 20,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 10,
-  },
-  manualResetButton: {
-    backgroundColor: "#002D62",
-    padding: 10,
-    borderRadius: 5,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  manualResetButtonText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  button: {
-    width: "100%",
-    backgroundColor: "#002D62",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  backToLogin: {
-    color: "#002D62",
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 14,
-  },
-});
-
-export default ForgotPasswordScreen;
+  export default ForgotPasswordScreen;

@@ -1,9 +1,9 @@
 //screens/SettingsScreen/UserSettingsScreen.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { ScrollView, View, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { ThemeSelector } from './components/common/ThemeSelector';
-import { PrivacySettings } from './components/common/PrivacySettings';
+import { PrivacySettings } from './components/common/PrivacySettings';import { TimeZoneSelector } from './components/common/TimeZoneSelector';
 import { timezones } from './constants';
 import { useSettings } from './hooks/common/useSettings';
 import { useNavigation } from '@react-navigation/native';
@@ -11,8 +11,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { SettingsStackParamList } from '../../types/navigation';
-
-const PRIMARY_COLOR = '#002D62';
+import { globalStyles } from '../../styles/global';
+import { Separator } from '../../components/common/Separator';
 
 type SettingsScreenNavigationProp = StackNavigationProp<SettingsStackParamList, 'UserSettings'>;
 
@@ -59,7 +59,10 @@ export const UserSettingsScreen: React.FC = () => {
   const formRef = useRef(null);
   const buttonRef = useRef(null);
 
-  useGSAP(() => {
+  const fadeIn = useRef(gsap.timeline({ paused: true }));
+  const buttonPress = useRef(gsap.timeline({ paused: true }));
+
+  useGSAP(() => {    
     gsap.from(containerRef.current, { duration: 1, opacity: 0, y: -50 });
   }, { scope: containerRef });
 
@@ -112,7 +115,7 @@ export const UserSettingsScreen: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!localSettings) return;
     setIsSaving(true);
-    gsap.to(buttonRef.current, { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 });
+    buttonPress.current.to(buttonRef.current, { scale: 0.95, duration: 0.1, yoyo: true, repeat: 1 }).play();
     try {
       const apiSettings: APISettings = {
         id: localSettings.id,
@@ -127,7 +130,7 @@ export const UserSettingsScreen: React.FC = () => {
         }
       };
       await saveSettings(apiSettings as any); // Cast if Partial<Settings> has incompatible types
-      gsap.to(formRef.current, { y: -5, duration: 0.2, yoyo: true, repeat: 1 });
+      fadeIn.current.to(formRef.current, { y: -5, duration: 0.2, yoyo: true, repeat: 1 }).play();
       navigation.goBack();
     } catch (err) {
       console.error('Error saving settings:', err);
@@ -137,111 +140,51 @@ export const UserSettingsScreen: React.FC = () => {
     }
   }, [localSettings, saveSettings, navigation]);
 
-  const styles = StyleSheet.create({
-    safeAreaContainer: {
-      flex: 1,
-      backgroundColor: '#FFFFFF',
-    },
-    container: {
-      flex: 1,
-      backgroundColor: '#FFFFFF',
-    },
-    scrollContainer: {
-      flexGrow: 1,
-      padding: 16,
-    },
-    card: {
-      backgroundColor: '#FFFFFF',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: '#1A1A1A',
-      marginBottom: 16,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: '#E5E5E5',
-      marginVertical: 16,
-    },
-    option: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 12,
-    },
-    optionText: {
-      fontSize: 16,
-      color: '#1A1A1A',
-    },
-    saveButton: {
-      backgroundColor: '#002D62',
-      marginHorizontal: 16,
-      marginVertical: 24,
-      paddingVertical: 12,
-      borderRadius: 8,
-    },
-    saveButtonText: {
-      color: '#FFFFFF',
-      fontSize: 16,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-  });
-
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={PRIMARY_COLOR} />
-        <Text style={{ marginTop: 16, color: '#666' }}>Loading settings...</Text>
+      <View style={[globalStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={globalStyles.loading}><ActivityIndicator animating={true} color={globalStyles.colors.primary} size="large" /></View>
+        </View>
+        <Text style={{ ...globalStyles.body, marginTop: globalStyles.spacing.md, color: globalStyles.colors.neutralMedium }}>
+          Loading settings...
+        </Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: '#D32F2F', fontSize: 16 }}>{error}</Text>
+      <View style={[globalStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={globalStyles.errorText}>{error}</Text>
+        <TouchableOpacity style={{ ...globalStyles.button, marginTop: globalStyles.spacing.md }} onPress={handleSave}>
+          <Text style={globalStyles.button.text}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeAreaContainer}>
-      <View ref={containerRef} style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: globalStyles.colors.white }}>
+      <View ref={containerRef} style={globalStyles.container}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: globalStyles.spacing.md }}>
           <View ref={formRef}>
             <ThemeSelector
               currentMode={localSettings?.theme_preferences?.mode ?? 'system'}
               currentColor={localSettings?.theme_preferences?.color_scheme ?? 'blue'}
-              onSelectMode={(mode: string) =>
-                setLocalSettings(prev =>
-                  prev
-                    ? {
-                        ...prev,
-                        theme_preferences: { ...(prev.theme_preferences || {}), mode: mode as ThemeMode }
-                      }
-                    : null
-                )
-              }
-              onSelectColor={(color: string) =>
-                setLocalSettings(prev =>
-                  prev
-                    ? {
-                        ...prev,
-                        theme_preferences: { ...(prev.theme_preferences || {}), color_scheme: color }
-                      }
-                    : null
-                )
-              }
+              onSelectMode={(mode: string) => setLocalSettings(prev => prev ? {
+                ...prev,
+                theme_preferences: {
+                  ...(prev.theme_preferences || {}),
+                  mode: mode as ThemeMode
+                }
+              } : null)}
+              onSelectColor={(color: string) => setLocalSettings(prev => prev ? {
+                ...prev,
+                theme_preferences: {
+                  ...(prev.theme_preferences || {}),
+                  color_scheme: color
+                }
+              } : null)}
             />
             <PrivacySettings
               profileVisibility={localSettings?.privacy_settings?.profile_visibility ?? 'public'}
@@ -250,61 +193,31 @@ export const UserSettingsScreen: React.FC = () => {
                 setLocalSettings(prev =>
                   prev
                     ? {
-                        ...prev,
-                        privacy_settings: { ...(prev.privacy_settings || {}), profile_visibility: value as ProfileVisibility }
+                      ...prev,
+                      privacy_settings: { ...(prev.privacy_settings || {}), profile_visibility: value as ProfileVisibility }
                       }
                     : null
                 )
               }
-              onOnlineStatusChange={(value: boolean) =>
-                setLocalSettings(prev =>
-                  prev
-                    ? {
-                        ...prev,
-                        privacy_settings: { ...(prev.privacy_settings || {}), show_online_status: value }
-                      }
-                    : null
-                )
-              }
+              onOnlineStatusChange={(value: boolean) => setLocalSettings(prev => prev ? {
+                ...prev,
+                privacy_settings: {
+                  ...(prev.privacy_settings || {}),
+                  show_online_status: value
+                }
+              } : null)}
             />
-            <View style={{ marginTop: 16 }}>
-              <Text style={styles.sectionTitle}>Timezone</Text>
-              <View style={styles.card}>
-                <ScrollView horizontal>
-                  <View>
-                    <Text style={{ marginBottom: 8 }}>Select your timezone:</Text>
-                    <ScrollView style={{ maxHeight: 120 }}>
-                      {timezones.map((tz: any, index: number) => {
-                        const tzValue = typeof tz === 'object' ? tz.value : tz;
-                        return (
-                          <Button
-                            key={tzValue || index}  // Use tz.value if available, otherwise fallback to index
-                            mode={localSettings?.timezone === String(tzValue) ? 'contained' : 'outlined'}
-                            onPress={() =>
-                              setLocalSettings((prev) =>
-                                prev ? { ...prev, timezone: String(tzValue) } : null
-                              )
-                            }
-                            style={{ marginVertical: 2 }}
-                          >
-                            {String(tzValue)}
-                          </Button>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
+            <Separator style={{ marginVertical: globalStyles.spacing.md }} />
+            <TimeZoneSelector
+              currentTimezone={localSettings?.timezone ?? ''}
+              onTimezoneChange={(timezone: string) => setLocalSettings(prev => prev ? { ...prev, timezone } : null)}
+            />
           </View>
-          <Button
+          <TouchableOpacity
             ref={buttonRef}
             onPress={handleSave}
             disabled={isSaving || !hasUnsavedChanges}
-            style={styles.saveButton}
-            labelStyle={styles.saveButtonText}
-            loading={isSaving}
-          >
+            style={{ ...globalStyles.button, marginTop: globalStyles.spacing.md, backgroundColor: isSaving || !hasUnsavedChanges ? globalStyles.colors.disabled : globalStyles.colors.primary }}><Text style={globalStyles.button.text}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
             Save Changes
           </Button>
         </ScrollView>
@@ -313,4 +226,4 @@ export const UserSettingsScreen: React.FC = () => {
   );
 };
 
-export default UserSettingsScreen;
+

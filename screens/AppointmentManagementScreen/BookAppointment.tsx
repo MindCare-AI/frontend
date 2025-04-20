@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { TherapistCard } from '../../components/AppointmentManagementScreen/TherapistCard';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { useTherapistAvailability } from '../../hooks/AppointmentManagementScreen/useTherapistAvailability';
 import { LoadingIndicator, ErrorMessage } from '../../components/ui';
 import type { TherapistProfile } from '../../types/profile';
+import { globalStyles } from '../../styles/global';
 
 const BookAppointmentScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -17,7 +18,6 @@ const BookAppointmentScreen = () => {
     fetchTherapists,
   } = useTherapistAvailability();
 
-  // Select therapist and go to their appointment management screen
   const handleTherapistSelect = (therapist: TherapistProfile) => {
     navigation.navigate('AppointmentManagement', {
       therapistId: therapist.id,
@@ -42,52 +42,35 @@ const BookAppointmentScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Available Therapists</Text>
+    <ScrollView style={{
+      flex: 1,
+      backgroundColor: globalStyles.colors.white,
+    }}>
+      <View style={{
+        padding: globalStyles.spacing.md,
+      }}>
+        <Text style={{
+          ...globalStyles.title2,
+          color: globalStyles.colors.textPrimary,
+        }}>Available Therapists</Text>
       </View>
-      <View style={styles.therapistsContainer}>
-        {therapists.length > 0 ? (
-          therapists.map((therapist) => (
-            <TherapistCard
-              key={therapist.id}
-              therapist={therapist}
-              isSelected={false}
-              onSelect={() => handleTherapistSelect(therapist)}
-            />
-          ))
-        ) : (
-          <Text style={styles.noTherapistsText}>No therapists available at the moment</Text>
-        )}
-      </View>
+      {therapists.length > 0 ? (
+        therapists.map((therapist) => (
+          <TherapistCard
+            key={therapist.id}
+            therapist={therapist}
+            isSelected={false}
+            onSelect={() => handleTherapistSelect(therapist)}
+          />
+        ))
+      ) : (
+        <Text style={{
+          textAlign: 'center',
+          color: globalStyles.colors.textSecondary,
+          marginTop: globalStyles.spacing.md,
+          fontSize: 14,
+        }}>No therapists available at the moment</Text>
+      )}
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  therapistsContainer: {
-    padding: 20,
-  },
-  noTherapistsText: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 16,
-    fontSize: 14,
-  },
-});
-
-export default BookAppointmentScreen;

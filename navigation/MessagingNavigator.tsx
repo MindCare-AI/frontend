@@ -1,11 +1,11 @@
 //navigation/MessagingNavigator.tsx
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { TouchableOpacity, Platform } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MessagingScreen from '../screens/MessagingScreen/MessagingScreen';
 import ChatScreen from '../screens/ChatScreen/ChatScreen';
-import { useAuth } from '../contexts/AuthContext';
+import { globalStyles } from '../styles/global';
 
 export type MessagingStackParamList = {
   Messaging: undefined;
@@ -18,50 +18,44 @@ export type MessagingStackParamList = {
 
 const Stack = createStackNavigator<MessagingStackParamList>();
 
-const MessagingNavigator = () => {
-  const { accessToken } = useAuth();
-  
-  console.log('MessagingNavigator accessToken:', accessToken); // ✅ Debug
-
-  if (!accessToken) {
-    return null; 
-  }
-
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#007BFF',
-          elevation: 0, // Remove shadow on Android
-          shadowOpacity: 0, // Remove shadow on iOS
-        },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-          fontSize: 18,
-        },
-        headerTitleAlign: 'center',
-        headerLeftContainerStyle: {
-          paddingLeft: 10,
-        },
-        headerRightContainerStyle: {
-          paddingRight: 10,
-        },
-        headerLeft: ({ canGoBack, onPress }) => 
-          canGoBack ? (
-            <TouchableOpacity 
-              style={{ padding: 8 }} 
-              onPress={onPress}
-            >
-              <Ionicons 
-                name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
-                size={24} 
-                color="#FFFFFF" 
-              />
-            </TouchableOpacity>
-          ) : null,
-      }}
-    >
+const MessagingNavigator = () => (
+  <Stack.Navigator
+    screenOptions={{
+      headerStyle: {
+        backgroundColor: globalStyles.colors.primary,
+        shadowColor: globalStyles.colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 2,
+      },
+      headerTintColor: globalStyles.colors.white,
+      headerTitleStyle: {
+        ...globalStyles.bodyBold,
+        fontSize: 18,
+      },
+      headerTitleAlign: 'center',
+      headerLeftContainerStyle: {
+        paddingLeft: globalStyles.spacing.sm,
+      },
+      headerRightContainerStyle: {
+        paddingRight: globalStyles.spacing.sm,
+      },
+      headerLeft: ({ canGoBack, onPress }) =>
+        canGoBack ? (
+          <TouchableOpacity
+            style={{ padding: globalStyles.spacing.xs }}
+            onPress={onPress}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={globalStyles.colors.white}
+            />
+          </TouchableOpacity>
+        ) : null,
+    }}
+  >
       <Stack.Screen
         name="Messaging"
         component={MessagingScreen}
@@ -69,10 +63,9 @@ const MessagingNavigator = () => {
           title: 'Messages',
           headerLeft: () => null,
           headerRight: () => (
-            <TouchableOpacity 
-              style={{ padding: 8 }}
+            <TouchableOpacity
+              style={{ padding: globalStyles.spacing.xs }}
               onPress={() => {
-                console.log('Create new conversation');
                 // TODO: Navigate to new conversation screen or show modal
               }}
             >
@@ -88,29 +81,28 @@ const MessagingNavigator = () => {
           title: route.params.title,
           headerBackTitleVisible: false,
           headerTitleAlign: 'center',
-          headerStyle: {
-            backgroundColor: '#007BFF',
-          },
-          headerTintColor: '#fff',
+          headerStyle: { backgroundColor: globalStyles.colors.primary },
+          headerTintColor: globalStyles.colors.white,
           headerTitleStyle: {
-            fontWeight: '600',
-            fontSize: 17,
+            ...globalStyles.bodyBold,
+            fontSize: 18,
           },
           headerRight: () => (
-            <TouchableOpacity 
-              style={{ padding: 8 }}
+            <TouchableOpacity
+              style={{ padding: globalStyles.spacing.xs }}
               onPress={() => {
-                console.log('Chat options for:', route.params.conversationId);
                 // TODO: Show chat options menu or navigate to chat details
               }}
             >
-              <Ionicons name="ellipsis-vertical" size={24} color="#FFFFFF" />
+              <Ionicons
+                name="ellipsis-vertical"
+                size={24}
+                color={globalStyles.colors.white} />
             </TouchableOpacity>
           ),
         })}
       />
     </Stack.Navigator>
   );
-};
 
 export default MessagingNavigator;
