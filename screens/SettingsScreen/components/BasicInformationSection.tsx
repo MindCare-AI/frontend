@@ -1,9 +1,10 @@
 //screens/SettingsScreen/components/BasicInformationSection.tsx
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Surface, Text, TextInput, Divider } from 'react-native-paper';
+import { View, TouchableOpacity } from 'react-native';
+import { Surface, TextInput, Divider } from 'react-native-paper';
+import { Text } from '../../../components/ui/Text';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import { globalStyles } from '../../../styles/global';
 export interface BasicUserInfo {
   first_name: string;
   last_name: string;
@@ -38,11 +39,23 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
   };
 
   return (
-    <Surface style={styles.card}>
-      <Text style={styles.cardTitle}>Basic Information</Text>
-      <Divider style={styles.divider} />
-      
-      <TextInput
+    <Surface style={{
+      padding: globalStyles.spacing.md,
+      marginVertical: globalStyles.spacing.xs,
+      borderRadius: globalStyles.spacing.sm,
+      backgroundColor: globalStyles.colors.white,
+      shadowColor: globalStyles.colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    }}>
+      <Text style={{ ...globalStyles.title3, marginBottom: globalStyles.spacing.xs }}>Basic Information</Text>
+      <Divider style={{
+        marginVertical: globalStyles.spacing.xs,
+        backgroundColor: globalStyles.colors.divider,
+      }} />
+        <TextInput
         label="First Name"
         mode="outlined"
         value={userInfo.first_name}
@@ -108,26 +121,3 @@ export const BasicInformationSection: React.FC<BasicInformationSectionProps> = (
     </Surface>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    padding: 16,
-    marginVertical: 8,
-    elevation: 4,
-    borderRadius: 8,
-    backgroundColor: 'white',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  divider: {
-    marginVertical: 8,
-    height: 1,
-    backgroundColor: '#ccc',
-  },
-  inputField: {
-    marginBottom: 16,
-  },
-});

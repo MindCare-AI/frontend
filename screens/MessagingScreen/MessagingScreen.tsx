@@ -1,6 +1,6 @@
 //screens/MessagingScreen/MessagingScreen.tsx
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, SectionList, Text, Alert, StatusBar, Animated } from 'react-native';
+import { View, SectionList, Text, Alert, StatusBar, Animated } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { MessagingStackParamList } from '../../navigation/MessagingNavigator'; // Adjust path as needed
 import useConversations from '../../hooks/MessagingScreen/useConversations';
@@ -11,6 +11,7 @@ import { LoadingIndicator, ErrorMessage } from '../../components/ui';
 import { API_URL } from '../../config'; // Ensure correct API_URL
 import { useAuth } from '../../contexts/AuthContext';
 import TypingIndicator from '../../components/ChatScreen/TypingIndicator';
+import { globalStyles } from '../../styles/global';
 
 type MessagingScreenNavigationProp = StackNavigationProp<MessagingStackParamList, 'Messaging'>;
 
@@ -54,8 +55,15 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}> 
-      <StatusBar backgroundColor="#002D62" barStyle="light-content" />
+    <Animated.View style={[{ 
+      flex: 1,
+      backgroundColor: globalStyles.colors.background,
+      }, { opacity: fadeAnim }]}
+    >
+      <StatusBar 
+        backgroundColor={globalStyles.colors.primary} 
+        barStyle="light-content" 
+      />
       <SearchBar value={searchQuery} onChangeText={handleSearch} />
       
       {error && <ErrorMessage message="Failed to load conversations" onRetry={refresh} />}
@@ -92,11 +100,29 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
             />
           )}
           renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={{
+              backgroundColor: globalStyles.colors.background,
+              paddingVertical: globalStyles.spacing.sm,
+              paddingHorizontal: globalStyles.spacing.md,
+              borderBottomWidth: 1,
+              borderBottomColor: globalStyles.colors.border,
+              marginTop: globalStyles.spacing.xs,
+              marginBottom: globalStyles.spacing.xxs,
+              borderRadius: globalStyles.spacing.xs,
+              shadowColor: globalStyles.colors.shadow,
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}>
+              <Text style={{
+                ...globalStyles.caption,
+                color: globalStyles.colors.primary,
+                letterSpacing: 0.5,
+                textTransform: 'uppercase',
+              }}>{section.title}</Text>
             </View>
           )}
-          keyExtractor={(item) => item.id.toString()}
           onEndReached={loadMore}
           onRefresh={refresh}
           refreshing={loading}
@@ -104,8 +130,19 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
           stickySectionHeadersEnabled={true}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubtitle}>Start a new chat to begin messaging</Text>
+              <Text style={{
+                ...globalStyles.title3,
+                color: globalStyles.colors.textPrimary,
+                marginBottom: globalStyles.spacing.sm,
+              }}>No conversations yet</Text>
+              <Text style={{
+                ...globalStyles.body,
+                color: globalStyles.colors.textSecondary,
+                textAlign: 'center',
+                lineHeight: 24,
+                maxWidth: '80%',
+              }}>
+                Start a new chat to begin messaging</Text>
             </View>
           }
         />
@@ -134,56 +171,17 @@ const MessagingScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E4F0F6',
-  },
+const styles = {
   listContent: {
-    padding: 20,
-    paddingBottom: 100, // Extra padding at bottom for FAB
-  },
-  sectionHeader: {
-    backgroundColor: '#E4F0F6',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#CFCFCF',
-    marginTop: 8,
-    marginBottom: 4,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#002D62',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    padding: globalStyles.spacing.md,
+    paddingBottom: globalStyles.spacing.xxl * 2.5,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 80,
+    padding: globalStyles.spacing.xl,
+    marginTop: globalStyles.spacing.xxl,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    maxWidth: '80%',
-  }
-});
+};
 
 export default MessagingScreen;

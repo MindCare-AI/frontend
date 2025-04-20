@@ -1,12 +1,10 @@
 import React, { useState, useCallback, useRef, memo } from 'react';
 import {
   View,
-  StyleSheet,
-  Platform,
   KeyboardAvoidingView,
   Alert,
   InteractionManager,
-} from 'react-native';
+} from 'react-native';import { globalStyles } from '../../styles/global';
 import Animated, {
   FadeIn,
   Layout,
@@ -85,7 +83,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         onReaction={(messageId, reaction) => {
           // Handle reaction
         }}
-        onEdit={(messageId) => {
+        onEdit={async (messageId, newContent) => {
+          if (typeof newContent === 'string') {
+            await editMessage(messageId, newContent);
+          }
           // Handle edit
         }}
         onDelete={(messageId) => {
@@ -178,31 +179,32 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
       {!netInfo.isConnected && <OfflineNotice />}
 
       <KeyboardAvoidingView
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        style={{
+          flex: 1,
+        }}
+        behavior={'padding'}
+        keyboardVerticalOffset={88}
       >
-        <Animated.View style={styles.listContainer}>
+        <Animated.View style={{
+          flex: 1,
+        }}>
           <FlashList
             ref={listRef}
             data={messages}
             renderItem={renderMessage}
             estimatedItemSize={100}
             inverted
-            onScroll={scrollHandler}
-            onEndReached={hasMore ? loadMore : undefined}
+            onScroll={scrollHandler}            onEndReached={hasMore ? loadMore : undefined}
             onEndReachedThreshold={0.5}
             onRefresh={handleRefresh}
             refreshing={isRefreshing}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
+          contentContainerStyle={{ paddingHorizontal: globalStyles.spacing.md, paddingVertical: globalStyles.spacing.sm }}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
-            removeClippedSubviews={Platform.OS !== 'web'}
-            initialNumToRender={15}
+          initialNumToRender={15}
             maxToRenderPerBatch={10}
             windowSize={21}
-            ListHeaderComponent={hasMore ? LoadingIndicator : null}
           />
         </Animated.View>
 
@@ -215,22 +217,5 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  content: {
-    flex: 1,
-  },
-  listContainer: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-});
 
 export default memo(ChatScreen);

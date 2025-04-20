@@ -3,7 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { TouchableOpacity, StyleSheet } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { NavigationProp } from '@react-navigation/native';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
@@ -15,6 +15,7 @@ import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferences
 import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
 import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
 import { RootStackParamList, SettingsStackParamList, AppointmentStackParamList } from '../types/navigation';
+import { globalStyles } from '../styles/global';
 
 const Tab = createBottomTabNavigator<RootStackParamList>();
 const SettingsStack = createStackNavigator<SettingsStackParamList>();
@@ -26,12 +27,11 @@ interface NotificationBadgeProps {
 
 const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => {
   return (
-    <TouchableOpacity
-      style={styles.notificationBadge}
-      onPress={() => navigation.navigate('Notifications')}
-    >
-      <Ionicons name="notifications-outline" size={24} color="#333" />
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={{ padding: globalStyles.spacing.sm }}
+        onPress={() => navigation.navigate('Notifications')}>
+        <Ionicons name="notifications-outline" size={24} color={globalStyles.colors.textPrimary} />
+      </TouchableOpacity>
   );
 };
 
@@ -140,11 +140,5 @@ const AppNavigator = () => {
     </Tab.Navigator>
   );
 };
-
-const styles = StyleSheet.create({
-  notificationBadge: {
-    padding: 8,
-  },
-});
 
 export default AppNavigator;

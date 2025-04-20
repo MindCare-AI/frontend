@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Calendar, CalendarCheck, Plus } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
-
+import { globalStyles } from '../../styles/global';
+import { format } from 'date-fns';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteProps = {
   params?: {
@@ -76,165 +77,138 @@ const AppointmentManagementScreen: React.FC = () => {
     }
   }, [accessToken, params?.therapistId]);
 
+  if (loading) {
+    return <Text>Loading...</Text>;
+  }
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Your Appointments</Text>
+    <ScrollView style={{
+      flex: 1,
+      backgroundColor: globalStyles.colors.white,
+      paddingHorizontal: globalStyles.spacing.md,
+      paddingTop: globalStyles.spacing.lg,
+    }}>
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: globalStyles.spacing.md,
+      }}>
+        <Text style={{
+          ...globalStyles.title2,
+          color: globalStyles.colors.textPrimary,
+        }}>Your Appointments</Text>
         <TouchableOpacity
-          style={styles.bookButton}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: globalStyles.colors.black,
+            paddingVertical: globalStyles.spacing.xs,
+            paddingHorizontal: globalStyles.spacing.md,
+            borderRadius: globalStyles.spacing.xs,
+          }}
           onPress={() => navigation.navigate('BookAppointment')}
         >
           <Plus size={18} color="white" />
-          <Text style={styles.bookButtonText}>Book Appointment</Text>
+          <Text style={{
+            ...globalStyles.bodyBold,
+            color: globalStyles.colors.white,
+            marginLeft: globalStyles.spacing.xs,
+          }}>Book Appointment</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Appointments List */}
-      {loading ? (
-        <Text>Loading...</Text>
-      ) : appointments.length > 0 ? (
-        appointments.map((appointment) => (
-          <View key={appointment.id} style={styles.card}>
-            <View style={styles.cardContent}>
-              <View>
-                <Text style={styles.therapistName}>
-                  {appointment.therapist?.full_name ||
-                    `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`.trim()}
-                </Text>
-                <View style={styles.infoRow}>
-                  <Calendar size={16} color="#666" />
-                  <Text style={styles.infoText}>
-                    {new Date(appointment.appointment_date).toLocaleString()}
-                  </Text>
-                </View>
-                {appointment.notes ? (
-                  <Text style={styles.infoText}>Notes: {appointment.notes}</Text>
-                ) : null}
-              </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  appointment.status === 'scheduled' || appointment.status === 'pending'
-                    ? styles.upcomingBadge
-                    : styles.completedBadge,
-                ]}
-              >
-                <Text style={styles.statusText}>{appointment.status}</Text>
-              </View>
-            </View>
-          </View>
-        ))
-      ) : (
-        <View style={styles.emptyState}>
-          <CalendarCheck size={48} color="#CCC" />
-          <Text style={styles.emptyStateTitle}>No appointments yet</Text>
-          <Text style={styles.emptyStateText}>
+      {appointments.length === 0 ? (
+        <View style={{
+          alignItems: 'center',
+          marginTop: globalStyles.spacing.xl,
+        }}>
+          <CalendarCheck size={48} color={globalStyles.colors.grey} />
+          <Text style={{
+            ...globalStyles.title3,
+            color: globalStyles.colors.textPrimary,
+            marginTop: globalStyles.spacing.md,
+          }}>No appointments yet</Text>
+          <Text style={{
+            ...globalStyles.body,
+            color: globalStyles.colors.textSecondary,
+            marginTop: globalStyles.spacing.sm,
+            textAlign: 'center',
+          }}>
             {params?.therapistId
-              ? "Schedule your first appointment with this therapist"
-              : "Book your first appointment to get started"}
+              ? 'Schedule your first appointment with this therapist'
+              : 'Book your first appointment to get started'}
           </Text>
         </View>
+      ) : (
+        appointments.map((appointment) => {
+          const formattedDate = format(new Date(appointment.appointment_date), 'MMMM dd, yyyy \'at\' h:mm a');
+          return (
+            <View key={appointment.id} style={{
+              backgroundColor: globalStyles.colors.white,
+              borderRadius: globalStyles.spacing.xs,
+              padding: globalStyles.spacing.md,
+              marginBottom: globalStyles.spacing.md,
+              shadowColor: globalStyles.colors.shadow,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 2,
+              elevation: 2,
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <View>
+                  <Text style={{
+                    ...globalStyles.bodyBold,
+                    fontSize: 18,
+                    color: globalStyles.colors.textPrimary,
+                  }}>
+                    {appointment.therapist?.full_name ||
+                      `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`.trim()}
+                  </Text>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginTop: globalStyles.spacing.xxs,
+                  }}>
+                    <Calendar size={16} color={globalStyles.colors.textSecondary} />
+                    <Text style={{
+                      ...globalStyles.body,
+                      color: globalStyles.colors.textSecondary,
+                      marginLeft: globalStyles.spacing.xxs,
+                    }}>
+                      {formattedDate}
+                    </Text>
+                  </View>
+                  {appointment.notes ? (
+                    <Text style={{
+                      ...globalStyles.body,
+                      color: globalStyles.colors.textSecondary,
+                    }}>Notes: {appointment.notes}</Text>
+                  ) : null}
+                </View>
+                <View style={{
+                  paddingVertical: globalStyles.spacing.xxs,
+                  paddingHorizontal: globalStyles.spacing.xs,
+                  borderRadius: globalStyles.spacing.lg,
+                  backgroundColor: appointment.status === 'scheduled' || appointment.status === 'pending' ? globalStyles.colors.infoLight : globalStyles.colors.successLight,
+                }}>
+                  <Text style={{
+                    ...globalStyles.bodyBold,
+                    fontSize: 12,
+                    color: globalStyles.colors.success,
+                  }}>{appointment.status}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })
       )}
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-    paddingHorizontal: 16,
-    paddingTop: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  bookButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  bookButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  appointmentsContainer: {
-    marginTop: 16,
-  },
-  card: {
-    backgroundColor: '#FFF',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  therapistName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  infoText: {
-    marginLeft: 8,
-    color: '#666',
-  },
-  statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-  },
-  upcomingBadge: {
-    backgroundColor: '#E0F7FA',
-  },
-  completedBadge: {
-    backgroundColor: '#E8F5E9',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#00796B',
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-});
 
 export default AppointmentManagementScreen;

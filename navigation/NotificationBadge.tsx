@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { TouchableOpacity, View, Text, StyleSheet, Animated, Platform } from 'react-native';
+import { TouchableOpacity, View, Text, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { useNotificationCount } from '../hooks/notificationsScreen/useNotificationCount';
-
+import { globalStyles } from '../styles/global';
 interface NotificationBadgeProps {
   navigation: NavigationProp<RootStackParamList>;
 }
@@ -79,14 +79,18 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation
 
   return (
     <TouchableOpacity
-      style={styles.badgeContainer}
-      onPress={() => navigation.navigate('Notifications')}
-    >
-      <Ionicons name="notifications-outline" size={24} color="#333" />
-      <Animated.View
-        style={[
-          styles.container,
-          {
+        style={{ padding: globalStyles.spacing.sm }}
+        onPress={() => navigation.navigate('Notifications')}>
+        <Ionicons name="notifications-outline" size={24} color={globalStyles.colors.textPrimary} />
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: -globalStyles.spacing.xs,
+            right: -globalStyles.spacing.xs,
+            minWidth: globalStyles.spacing.md,
+            height: globalStyles.spacing.md,
+            alignItems: 'center',
+            justifyContent: 'center',
             transform: [
               { scale },
               {
@@ -96,74 +100,42 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation
                 }),
               },
             ],
-          },
-        ]}
-      >
-        <Animated.View
-          style={[
-            styles.pulse,
-            {
+          }}>
+          <Animated.View
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              borderRadius: globalStyles.spacing.xs,
+              backgroundColor: globalStyles.colors.error,
+              opacity: 0.2,
               transform: [{ scale: pulseScale }],
-            },
-          ]}
-        />
-        <View style={styles.badge}>
-          <Text style={styles.text}>
-            {count > 99 ? '99+' : count}
-          </Text>
-        </View>
-      </Animated.View>
-    </TouchableOpacity>
+            }}
+          />
+          <View
+            style={{
+              minWidth: globalStyles.spacing.md,
+              height: globalStyles.spacing.md,
+              borderRadius: globalStyles.spacing.xs,
+              backgroundColor: globalStyles.colors.error,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: globalStyles.spacing.xxs,
+              shadowColor: globalStyles.colors.black,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 2,
+              elevation: 3,
+            }}>
+            <Text
+              style={{
+                ...globalStyles.bodyBold,
+                fontSize: 12,
+                color: globalStyles.colors.white,
+              }}>
+              {count > 99 ? '99+' : count}
+            </Text>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
   );
-};
-
-const styles = StyleSheet.create({
-  badgeContainer: {
-    padding: 8,
-  },
-  container: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pulse: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    borderRadius: 10,
-    backgroundColor: '#EF4444',
-    opacity: 0.2,
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-      },
-    }),
-  },
-  text: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});
