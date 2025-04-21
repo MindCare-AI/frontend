@@ -22,7 +22,8 @@ interface Message {
   sender: string;
   content: string;
   timestamp: string;
-  is_chatbot: boolean;
+  is_chatbot?: boolean;
+  status?: 'sending' | 'sent' | 'failed';
 }
 
 export default function ChatbotScreen() {
@@ -106,69 +107,74 @@ export default function ChatbotScreen() {
   const sendMessage = useCallback(async () => {
     if (!input.trim() || !conversationId) return;
 
-    try {
-      // Use a temporary ID for the optimistic update.
-      const tempId = 'temp-' + Date.now().toString();
-      const userMessage = {
-        id: tempId,
-        sender: 'You',
-        content: input.trim(),
-        timestamp: new Date().toISOString(),
-        is_chatbot: false,
-      };
+    const tempId = Date.now().toString();
+    const tempMessage: Message = {
+      id: tempId,
+      content: input.trim(),
+      sender: 'You',
+      timestamp: new Date().toISOString(),
+      status: 'sending',
+      is_chatbot: false
+    };
 
-      // Optimistically add the user message
-      setMessages((prev) => [...prev, userMessage]);
+    try {
+      setMessages(prev => [...prev, tempMessage]);
       setInput('');
       setIsTyping(true);
 
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/send_message/`, {
+      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: input.trim() }) // updated field key
+        body: JSON.stringify({ message: input.trim() })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        throw new Error(`Failed to send message: ${response.statusText}`);
       }
 
-      // Parse the response immediately
-      const result = await response.json();
-      console.log('Response from chatbot:', result);
-      if (result.bot_response && result.user_message) {
-        const formattedUser = {
-          id: result.user_message.id.toString(),
-          sender: 'You',
-          content: result.user_message.content,
-          timestamp: result.user_message.timestamp,
-          is_chatbot: false,
-        };
+      const data = await response.json();
+      
+      if (data.response) {
         const formattedBot = {
-          id: result.bot_response.id.toString(),
+          id: `bot-${Date.now()}`,
+          content: data.response,
           sender: 'Samantha',
-          content: result.bot_response.content,
-          timestamp: result.bot_response.timestamp,
-          is_chatbot: true,
+          timestamp: new Date().toISOString(),
+          is_chatbot: true
         };
 
-        // Replace the optimistic message with the server response and append the bot message.
-        setMessages((prev) => {
-          const updated = prev.map((msg) => (msg.id === tempId ? formattedUser : msg));
-          return [...updated, formattedBot];
-        });
-        setIsTyping(false);
-      } else {
-        // Fallback: poll for messages
-        setTimeout(() => fetchMessages(), 1500);
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempId ? { ...msg, status: 'sent' } : msg
+        ));
+        
+        setTimeout(() => {
+          setMessages(prev => [...prev, formattedBot]);
+          setIsTyping(false);
+        }, 500);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Message could not be sent');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId ? { ...msg, status: 'failed' } : msg
+      ));
+      setIsTyping(false);
+      
+      Alert.alert('Error', errorMessage, [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Retry',
+          onPress: () => {
+            setMessages(prev => prev.filter(msg => msg.id !== tempId));
+            setInput(tempMessage.content);
+            sendMessage();
+          }
+        }
+      ]);
     }
-  }, [input, conversationId, accessToken, fetchMessages]);
+  }, [input, conversationId, accessToken]);
 
   // Typing animation
   useEffect(() => {

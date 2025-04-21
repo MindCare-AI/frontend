@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message, PaginatedMessagesResponse, ConnectionStatus } from '../../types/chat';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, User } from '../../contexts/AuthContext';
 import chatService from '../../services/chatService';
 import messageQueue from '../../services/messageQueue';
 import { useWebSocket } from '../../services/websocket';
@@ -11,6 +11,25 @@ interface UseChatMessagesProps {
   conversationType: 'one_to_one' | 'group' | 'chatbot';
 }
 
+interface AuthUser {
+  id: number;
+  displayName?: string;
+  photoURL?: string;
+  preferences?: {
+    highlightColor?: string;
+  };
+}
+
+type MessageType = 'text' | 'image' | 'voice' | 'file';
+type MessageStatus = 'sending' | 'sent' | 'failed' | 'delivered' | 'read';
+
+interface SendMessageParams {
+  content: string;
+  conversationId: string;
+  type?: MessageType;
+  metadata?: any;
+}
+
 interface MessagesState {
   items: Message[];
   isLoading: boolean;
@@ -18,6 +37,14 @@ interface MessagesState {
   hasMore: boolean;
   cursor: string | null;
 }
+
+interface MessageResponse {
+  messages: Message[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+type ChatServiceResponse = Message[] | MessageResponse;
 
 const MESSAGES_PER_PAGE = 20;
 
@@ -38,7 +65,7 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // WebSocket connection for real-time updates
-  const { connectionStatus, sendMessage } = useWebSocket(conversationId, handleWebSocketMessage);
+  const { connectionStatus, sendMessage: sendWebSocketMessage } = useWebSocket(conversationId, handleWebSocketMessage);
 
   function handleWebSocketMessage(data: any) {
     switch (data.type) {
@@ -61,7 +88,7 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
   }
 
   const handleTypingStatus = useCallback((userId: string, isTyping: boolean) => {
-    if (userId === user?.id) return;
+    if (userId === user?.id.toString()) return;
 
     setTypingUsers(prev => {
       const next = new Set(prev);
@@ -108,7 +135,7 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
 
   // Handle message updates and optimistic UI updates
   const handleNewMessage = useCallback((message: Message) => {
-    if (message.conversation_id !== conversationId) return;
+    if (message.conversationId !== conversationId) return;
 
     messagesCache.current.set(message.id, message);
     setState(prev => ({
@@ -118,7 +145,7 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
   }, [conversationId]);
 
   const handleMessageUpdate = useCallback((message: Message) => {
-    if (message.conversation_id !== conversationId) return;
+    if (message.conversationId !== conversationId) return;
 
     messagesCache.current.set(message.id, message);
     setState(prev => ({
@@ -141,22 +168,28 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
   const loadMessages = useCallback(async (refresh = false) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
-      const result = await chatService.fetchMessages(conversationId, refresh ? null : state.cursor);
+      const cursor = refresh ? undefined : state.cursor || undefined;
+      const response = await chatService.fetchMessages(conversationId, cursor) as ChatServiceResponse;
       
-      if (result) {
-        setState(prev => ({
-          items: refresh ? result.messages : [...prev.items, ...result.messages],
-          isLoading: false,
-          error: null,
-          hasMore: result.hasMore,
-          cursor: result.nextCursor,
-        }));
+      const result: MessageResponse = {
+        messages: 'messages' in response ? response.messages : response,
+        hasMore: 'hasMore' in response ? response.hasMore : false,
+        nextCursor: 'nextCursor' in response ? response.nextCursor : null,
+      };
+      
+      setState(prev => ({
+        ...prev,
+        items: refresh ? result.messages : [...prev.items, ...result.messages],
+        isLoading: false,
+        error: null,
+        hasMore: result.hasMore,
+        cursor: result.nextCursor,
+      }));
 
-        // Update cache
-        result.messages.forEach(msg => {
-          messagesCache.current.set(msg.id, msg);
-        });
-      }
+      // Update cache
+      result.messages.forEach(msg => {
+        messagesCache.current.set(msg.id, msg);
+      });
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -178,45 +211,48 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
   }, [loadMessages, state.hasMore, state.isLoading]);
 
   // Message sending and status updates
-  const sendMessage = useCallback(async (content: string, type: string = 'text', metadata?: any) => {
+  const sendMessage = useCallback(async (content: string) => {
     if (!user) return;
 
+    const tempId = `temp-${Date.now()}`;
     const tempMessage: Message = {
-      id: `temp-${Date.now()}`,
-      conversation_id: conversationId,
+      id: tempId,
+      conversationId,
       content,
       sender: {
-        id: user.id,
-        name: user.name,
-        avatar: user.avatar,
+        id: user.id.toString(),
+        name: user.username || '',
+        avatar: (user.patient_profile?.profile_pic || user.therapist_profile?.profile_pic) || undefined,
+        highlight_color: undefined,
       },
       timestamp: new Date().toISOString(),
-      message_type: type,
-      status: 'sending',
-      metadata,
+      status: 'sending' as MessageStatus,
+      type: 'text'
     };
 
-    // Optimistic update
     setOptimisticUpdates(prev => [tempMessage, ...prev]);
 
     try {
-      const sentMessage = await chatService.sendMessage({
+      const response = await chatService.sendMessage({
         content,
-        conversation_id: conversationId,
-        message_type: type,
-        metadata,
+        conversationId,
+        type: 'text',
       });
+      
+      const sentMessage: Message = typeof response === 'string' ? {
+        ...tempMessage,
+        id: response,
+        status: 'sent' as MessageStatus
+      } : response;
 
-      // Remove optimistic update and add real message
-      setOptimisticUpdates(prev => prev.filter(msg => msg.id !== tempMessage.id));
+      setOptimisticUpdates(prev => prev.filter(msg => msg.id !== tempId));
       handleNewMessage(sentMessage);
 
       return sentMessage;
     } catch (error) {
-      // Mark message as failed
       setOptimisticUpdates(prev =>
         prev.map(msg =>
-          msg.id === tempMessage.id ? { ...msg, status: 'failed' } : msg
+          msg.id === tempId ? { ...msg, status: 'failed' as MessageStatus } : msg
         )
       );
       throw error;
@@ -248,20 +284,8 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
     const failedMessage = optimisticUpdates.find(msg => msg.id === messageId);
     if (!failedMessage) return;
 
-    // Remove failed message from optimistic updates
     setOptimisticUpdates(prev => prev.filter(msg => msg.id !== messageId));
-
-    // Retry sending
-    try {
-      await sendMessage(
-        failedMessage.content,
-        failedMessage.message_type,
-        failedMessage.metadata
-      );
-    } catch (error) {
-      console.error('Error retrying message:', error);
-      throw error;
-    }
+    await sendMessage(failedMessage.content);
   }, [optimisticUpdates, sendMessage]);
 
   // Combine optimistic updates with actual messages
@@ -269,11 +293,11 @@ export const useChatMessages = ({ conversationId, conversationType }: UseChatMes
 
   // Update typing status
   const setTypingStatus = useCallback((isTyping: boolean) => {
-    sendMessage({
+    sendWebSocketMessage({
       type: isTyping ? 'typing_started' : 'typing_stopped',
       payload: { conversation_id: conversationId }
     });
-  }, [conversationId, sendMessage]);
+  }, [conversationId, sendWebSocketMessage]);
 
   return {
     messages,

@@ -88,14 +88,22 @@ export const useAppointments = () => {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to book appointment');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || 
+          `Failed to book appointment: ${response.statusText}`
+        );
       }
 
       const data = await response.json();
       await fetchAppointments();
       return data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to book appointment');
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Failed to book appointment';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -116,13 +124,21 @@ export const useAppointments = () => {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to cancel appointment');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || 
+          `Failed to cancel appointment: ${response.statusText}`
+        );
       }
 
       await fetchAppointments();
       return true;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to cancel appointment');
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Failed to cancel appointment';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -146,14 +162,22 @@ export const useAppointments = () => {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to update appointment');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || 
+          `Failed to update appointment: ${response.statusText}`
+        );
       }
 
       const data = await response.json();
       await fetchAppointments();
       return data;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to update appointment');
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Failed to update appointment';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 

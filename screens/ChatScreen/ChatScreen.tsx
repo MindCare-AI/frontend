@@ -1,16 +1,7 @@
 import React, { useState, useCallback, useRef, memo } from 'react';
-import {
-  View,
-  KeyboardAvoidingView,
-  Alert,
-  InteractionManager,
-} from 'react-native';import { globalStyles } from '../../styles/global';
-import Animated, {
-  FadeIn,
-  Layout,
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { View, KeyboardAvoidingView, Alert, InteractionManager } from 'react-native';
+import { globalStyles } from '../../styles/global';
+import Animated, { FadeIn, Layout, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { FlashList } from '@shopify/flash-list';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,16 +14,7 @@ import ChatHeader from '../../components/ChatScreen/ChatHeader';
 import OfflineNotice from '../../components/ui/OfflineNotice';
 import LoadingIndicator from '../../components/ui/LoadingIndicator';
 import ErrorRetry from '../../components/ui/ErrorRetry';
-
-interface ChatScreenProps {
-  route: {
-    params: {
-      conversationId: string;
-      conversationType: 'one_to_one' | 'group' | 'chatbot';
-    };
-  };
-  navigation: any;
-}
+import { StyleSheet } from 'react-native';
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const { conversationId, conversationType } = route.params;
@@ -69,6 +51,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
   // Memoized render item for better performance
   const renderMessage = useCallback(({ item, index }: { item: Message; index: number }) => {
+    // normalize any "audio" attachment to "file"
+    const msg: Message = {
+      ...item,
+      attachments: item.attachments?.map(a => ({
+        ...a,
+        type: a.type === 'audio' ? 'file' : a.type,
+      })),
+    };
+
     const isFirstInSequence = index === 0 || 
       messages[index - 1]?.sender.id !== item.sender.id;
     const isLastInSequence = index === messages.length - 1 || 
@@ -76,7 +67,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
 
     return (
       <MessageBubble
-        message={item}
+        message={msg}
         isFirstInSequence={isFirstInSequence}
         isLastInSequence={isLastInSequence}
         showAvatar={isLastInSequence}
@@ -107,6 +98,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
     );
   }, [messages, deleteMessage]);
 
+  const renderItem = ({ item, index }: { item: Message; index: number }) => (
+    <Animated.View entering={FadeIn} layout={Layout}>
+      {renderMessage({ item, index })}
+    </Animated.View>
+  );
+
   // Handle sending new messages
   const handleSend = useCallback(async (content: string, type?: string, metadata?: any) => {
     if (!netInfo.isConnected) {
@@ -122,7 +119,14 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         listRef.current?.scrollToOffset({ offset: 0, animated: true });
       });
     } catch (error) {
-      Alert.alert('Error', 'Failed to send message');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      Alert.alert('Error', errorMessage, [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Retry', 
+          onPress: () => handleSend(content, type, metadata) 
+        }
+      ]);
     }
   }, [netInfo.isConnected, sendMessage]);
 
@@ -191,18 +195,18 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
           <FlashList
             ref={listRef}
             data={messages}
-            renderItem={renderMessage}
+            renderItem={renderItem}
             estimatedItemSize={100}
             inverted
-            onScroll={scrollHandler}            onEndReached={hasMore ? loadMore : undefined}
+            onScroll={scrollHandler}            
+            onEndReached={hasMore ? loadMore : undefined}
             onEndReachedThreshold={0.5}
             onRefresh={handleRefresh}
             refreshing={isRefreshing}
             showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: globalStyles.spacing.md, paddingVertical: globalStyles.spacing.sm }}
+            contentContainerStyle={{ paddingHorizontal: globalStyles.spacing.md, paddingVertical: globalStyles.spacing.sm }}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
-          initialNumToRender={15}
             maxToRenderPerBatch={10}
             windowSize={21}
           />
@@ -211,11 +215,20 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
         <MessageInput
           onSendMessage={handleSend}
           onTypingStatusChange={handleTypingStatus}
+          onSendVoiceMessage={async (uri) => {/* Implement voice message handling */}}
+          onAttachmentsSelected={(attachments) => {/* Implement attachments handling */}}  
           disabled={!netInfo.isConnected}
         />
       </KeyboardAvoidingView>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  }
+});
 
 export default memo(ChatScreen);

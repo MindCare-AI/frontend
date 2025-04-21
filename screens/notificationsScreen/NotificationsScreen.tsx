@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { ScrollView, View, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Text, Appbar, Button, Divider, useTheme } from 'react-native-paper';
 import { NotificationItem } from '../../components/notificationsScreen/NotificationItem';
 import { NotificationTypeFilter } from '../../components/notificationsScreen/NotificationTypeFilter';
@@ -35,13 +35,22 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       await markAllRead();
       refreshNotifications();
     } catch (error) {
-      console.error('Failed to mark all as read:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notifications as read';
+      Alert.alert('Error', errorMessage, [
+        { text: 'OK', style: 'cancel' },
+        { text: 'Retry', onPress: handleMarkAllRead }
+      ]);
     }
   };
 
-  const handleNotificationPress = (notificationId: number) => {
-    markAsRead(notificationId);
-    navigation.navigate('NotificationDetail', { id: notificationId });
+  const handleNotificationPress = async (notificationId: number) => {
+    try {
+      await markAsRead(notificationId);
+      navigation.navigate('NotificationDetail', { id: notificationId });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notification as read';
+      Alert.alert('Error', errorMessage);
+    }
   };
 
   // Use backend types if present, otherwise fallback to static
@@ -80,13 +89,22 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             mode="contained" 
             onPress={refreshNotifications}
             style={styles.retryButton}
+            icon="refresh"
           >
-            Retry
+            Try Again
           </Button>
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No notifications found</Text>
+          <Text style={styles.emptyText}>No notifications yet</Text>
+          <Button 
+            mode="text" 
+            onPress={refreshNotifications}
+            style={styles.refreshButton}
+            icon="refresh"
+          >
+            Refresh
+          </Button>
         </View>
       ) : (
         <ScrollView
@@ -142,6 +160,9 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   retryButton: {
+    marginTop: 16,
+  },
+  refreshButton: {
     marginTop: 16,
   },
 });
