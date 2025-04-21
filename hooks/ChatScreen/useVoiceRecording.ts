@@ -28,7 +28,7 @@ export const useVoiceRecording = ({
     duration: 0,
   });
   const [hasPermission, setHasPermission] = useState(false);
-  const [durationInterval, setDurationInterval] = useState<NodeJS.Timer>();
+  const [durationInterval, setDurationInterval] = useState<NodeJS.Timeout>();
 
   useEffect(() => {
     checkPermissions();
@@ -60,10 +60,10 @@ export const useVoiceRecording = ({
         playsInSilentModeIOS: true,
         ...Platform.select({
           ios: {
-            interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
+            interruptionModeIOS: 2, // Audio.INTERRUPTION_MODE_MIX_WITH_OTHERS
           },
           android: {
-            interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
+            interruptionModeAndroid: 1, // Audio.INTERRUPTION_MODE_DUCK_OTHERS
           },
         }),
       });
@@ -123,7 +123,7 @@ export const useVoiceRecording = ({
         isRecording: false,
         isDurationExceeded: false,
         duration: 0,
-        uri,
+        uri: uri || undefined,
       });
     } catch (error) {
       onError?.(error as Error);

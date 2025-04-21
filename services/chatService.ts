@@ -23,6 +23,32 @@ class ChatService {
   }
 
   private setupWebSocketListeners() {
+    if (!this.isInitialized) return;
+
+    this.ws?.addEventListener('error', (error) => {
+      console.error('WebSocket error:', error);
+      this.messageListeners.forEach(listener => {
+        listener({
+          id: `error-${Date.now()}`,
+          content: 'Connection error. Messages may be delayed.',
+          conversationId: 'system',
+          sender: {
+            id: 'system',
+            name: 'System',
+          },
+          timestamp: new Date().toISOString(),
+          status: 'sent',
+          type: 'system'
+        });
+      });
+      this.reconnect();
+    });
+
+    this.ws?.addEventListener('close', () => {
+      console.log('WebSocket connection closed');
+      setTimeout(() => this.reconnect(), 3000);
+    });
+
     chatWebSocket.on(WebSocketEvent.MESSAGE, (message: Message) => {
       this.messageListeners.forEach(listener => listener(message));
     });
@@ -34,6 +60,28 @@ class ChatService {
     chatWebSocket.on(WebSocketEvent.READ_RECEIPT, (receipt: ReadReceipt) => {
       this.readReceiptListeners.forEach(listener => listener(receipt));
     });
+  }
+
+  private async reconnect() {
+    const maxRetries = 5;
+    let retryCount = 0;
+
+    const attemptReconnect = async () => {
+      try {
+        if (retryCount >= maxRetries) {
+          throw new Error('Max reconnection attempts reached');
+        }
+
+        retryCount++;
+        await this.initialize(await AsyncStorage.getItem('accessToken') || '');
+        console.log('Successfully reconnected to WebSocket');
+      } catch (error) {
+        console.error(`Reconnection attempt ${retryCount} failed:`, error);
+        setTimeout(attemptReconnect, Math.min(1000 * Math.pow(2, retryCount), 30000));
+      }
+    };
+
+    await attemptReconnect();
   }
 
   async initialize(token: string) {
@@ -125,6 +173,49 @@ class ChatService {
       });
     } catch (error) {
       console.error('Error removing reaction:', error);
+    }
+  }
+
+  async editMessage(messageId: string, content: string): Promise<Message> {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await fetch(`${API_URL}/messages/${messageId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to edit message');
+      }
+
+      const updatedMessage = await response.json();
+      return updatedMessage;
+    } catch (error) {
+      console.error('Error editing message:', error);
+      throw error;
+    }
+  }
+
+  async deleteMessage(messageId: string): Promise<void> {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await fetch(`${API_URL}/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete message');
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      throw error;
     }
   }
 

@@ -12,6 +12,8 @@ import {
   LayoutAnimation,
   Text,
   KeyboardAvoidingView,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -28,8 +30,9 @@ import { debounce } from '../../utils/helpers';
 import { useKeyboard } from '@react-native-community/hooks';
 import * as Haptics from 'expo-haptics';
 import { useVoiceRecording } from '../../hooks/ChatScreen/useVoiceRecording';
-import { PanGestureHandler } from 'react-native-gesture-handler';
+import { PanGestureHandler, GestureEvent, PanGestureHandlerEventPayload } from 'react-native-gesture-handler';
 import AttachmentPicker from './AttachmentPicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface MessageInputProps {
   onSendMessage: (content: string, type?: string, metadata?: any) => Promise<void>;
@@ -45,6 +48,13 @@ interface MessageInputProps {
 
 const CANCEL_THRESHOLD = -150;
 
+interface AttachmentType {
+  uri: string;
+  type: 'image' | 'file';
+  name?: string;
+  size?: number;
+}
+
 export const MessageInput: React.FC<MessageInputProps> = memo(({
   onSendMessage,
   onTypingStatusChange,
@@ -57,12 +67,7 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
   onAttachmentsSelected,
 }) => {
   const [text, setText] = useState('');
-  const [attachments, setAttachments] = useState<Array<{
-    uri: string;
-    type: 'image' | 'file';
-    name?: string;
-    size?: number;
-  }>>([]);
+  const [attachments, setAttachments] = useState<AttachmentType[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const { keyboardHeight, keyboardVisible } = useKeyboard();
@@ -142,22 +147,28 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-        allowsMultipleSelection: true,
-        selectionLimit: 10,
+        allowsEditing: true,
+        quality: 1,
       });
 
       if (!result.canceled) {
-        const newAttachments = result.assets.map(asset => ({
+        const asset = result.assets[0];
+        const newAttachment = {
           uri: asset.uri,
-          type: 'image' as const,
-          name: asset.fileName || 'image.jpg',
+          type: 'image',
+          name: asset.uri.split('/').pop() || 'image.jpg',
           size: asset.fileSize,
-        }));
-        setAttachments(prev => [...prev, ...newAttachments]);
+        };
+        setAttachments(prev => [...prev, newAttachment]);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Error selecting image';
+      Alert.alert('Upload Error', errorMessage, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Try Again', onPress: pickImage }
+      ]);
     }
   };
 
@@ -165,21 +176,27 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
-        multiple: true,
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: true
       });
 
-      if (result.type === 'success') {
+      if (!result.canceled) {
+        const document = result.assets[0];
         const newAttachment = {
-          uri: result.uri,
-          type: 'file' as const,
-          name: result.name,
-          size: result.size,
+          uri: document.uri,
+          type: 'file',
+          name: document.name,
+          size: document.size,
         };
         setAttachments(prev => [...prev, newAttachment]);
       }
     } catch (error) {
-      console.error('Error picking document:', error);
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Error selecting document';
+      Alert.alert('Upload Error', errorMessage, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Try Again', onPress: pickDocument }
+      ]);
     }
   };
 
@@ -201,11 +218,20 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
       // Handle attachments first if any
       if (attachments.length > 0) {
         for (const attachment of attachments) {
-          await onSendMessage('', attachment.type, {
-            file_url: attachment.uri,
-            file_name: attachment.name,
-            file_size: attachment.size,
-          });
+          try {
+            await onSendMessage('', attachment.type, {
+              file_url: attachment.uri,
+              file_name: attachment.name,
+              file_size: attachment.size,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? 
+              error.message : 
+              'Failed to upload attachment';
+            Alert.alert('Upload Error', errorMessage);
+            // Continue with other attachments even if one fails
+            continue;
+          }
         }
         setAttachments([]);
       }
@@ -217,7 +243,16 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
         AsyncStorage.removeItem('message_draft').catch(console.error);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Error sending message';
+      Alert.alert('Error', errorMessage, [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Retry',
+          onPress: handleSend
+        }
+      ]);
     } finally {
       setIsUploading(false);
     }
@@ -236,8 +271,8 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
     }
   };
 
-  const handleGestureEvent = ({ translationX }: { translationX: number }) => {
-    if (translationX < CANCEL_THRESHOLD) {
+  const handleGestureEvent = (event: GestureEvent<PanGestureHandlerEventPayload>) => {
+    if (event.nativeEvent.translationX < CANCEL_THRESHOLD) {
       runOnJS(cancelRecording)();
     }
   };
@@ -309,7 +344,7 @@ export const MessageInput: React.FC<MessageInputProps> = memo(({
                 <TouchableOpacity
                   style={[
                     styles.sendButton,
-                    isRecording && styles.recordingButton,
+                    isRecording && styles.recordingActive,
                   ]}
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
@@ -489,6 +524,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 16,
+  },
+  recordingActive: {
+    backgroundColor: '#FFE5E5',
   },
 });
 

@@ -2,17 +2,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import type { AxiosResponse } from 'axios';
 import { API_URL } from '../config';
 import { PatientProfile, TherapistProfile } from '../types/profile';
-
-interface ApiResponse<T> {
-  data: T;
-  status: number;
-  statusText: string;
-  headers: any;
-  config: any;
-}
 
 interface PatientProfileResponse {
   count: number;
@@ -66,7 +57,7 @@ interface TherapistProfileResponse {
   verification_status: 'pending' | 'in_progress' | 'verified' | 'rejected';
 }
 
-interface User {
+export interface User {
   id: number;
   email: string;
   username?: string;
@@ -225,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
           }
 
-          const response: AxiosResponse<User> = await axios.get(`${API_URL}/users/me/`, {
+          const response = await axios.get<User>(`${API_URL}/users/me/`, {
             headers: {
               Authorization: `Bearer ${tokens.access}`,
             },

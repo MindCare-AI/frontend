@@ -54,46 +54,63 @@ export const TherapistVerificationStatus: React.FC<TherapistVerificationStatusPr
   const handleDocumentUpload = async () => {
     try {
       setUploading(true);
+      setProgress(0);
+
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
         copyToCacheDirectory: true
       });
 
-      if (!result.canceled) {
-        const document = result.assets[0];
-        const formData = new FormData();
-        formData.append('verification_documents', {
-          uri: document.uri,
-          name: document.name || 'verification.jpg',
-          type: document.mimeType,
-        } as any);
+      if (result.canceled) {
+        setUploading(false);
+        return;
+      }
 
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener('progress', (event) => {
-          if (event.lengthComputable) {
-            setProgress((event.loaded / event.total) * 100);
-          }
-        });
+      const document = result.assets[0];
+      if (!document) {
+        throw new Error('No document selected');
+      }
 
-        const response = await fetch(`${API_URL}/therapist/profiles/${profile.id}/verify/`, {
+      const formData = new FormData();
+      formData.append('verification_documents', {
+        uri: document.uri,
+        name: document.name || 'verification.jpg',
+        type: document.mimeType,
+      } as any);
+
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = (event.loaded / event.total) * 100;
+          setProgress(progress);
+        }
+      });
+
+      const response = await fetch(
+        `${API_URL}/therapist/profiles/${profile.id}/verify/`, 
+        {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },
           body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
         }
+      );
 
-        // Success animation and feedback
-        setProgress(100);
-        setTimeout(() => {
-          setProgress(0);
-          refetchProfile && refetchProfile();
-        }, 1000);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || 
+          `Upload failed: ${response.statusText}`
+        );
+      }
 
+      setProgress(100);
+      setTimeout(() => {
+        setProgress(0);
+        refetchProfile && refetchProfile();
+
+        // Success animation
         gsap.to(containerRef.current, {
           scale: 1.02,
           duration: 0.2,
@@ -101,12 +118,25 @@ export const TherapistVerificationStatus: React.FC<TherapistVerificationStatusPr
           repeat: 1,
           ease: "power2.inOut"
         });
-      }
+      }, 1000);
+
     } catch (error) {
+      const errorMessage = error instanceof Error ? 
+        error.message : 
+        'Failed to upload verification document';
+      
       console.error('Error uploading verification document:', error);
+      
       Alert.alert(
         'Upload Failed',
-        'Please try again or contact support if the problem persists.'
+        errorMessage,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Try Again',
+            onPress: () => handleDocumentUpload()
+          }
+        ]
       );
     } finally {
       setUploading(false);
