@@ -30,18 +30,22 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 {modes.map((mode) => (
                     <TouchableOpacity
                         key={mode.value}
-                        style={{
-                            ...globalStyles.button.base,
-                            backgroundColor: currentMode === mode.value ? globalStyles.colors.primary : globalStyles.colors.neutralLight,
-                            minWidth: '45%',
-                            marginBottom: globalStyles.spacing.xs,
-                        }}
+                        style={[
+                            globalStyles.button,
+                            {
+                                backgroundColor: currentMode === mode.value ? globalStyles.colors.primary : globalStyles.colors.neutralLight,
+                                minWidth: '45%',
+                                marginBottom: globalStyles.spacing.xs,
+                            }
+                        ]}
                         onPress={() => onSelectMode(mode.value)}
                     >
-                        <Text style={{
-                            ...globalStyles.button.text,
-                            color: currentMode === mode.value ? globalStyles.colors.white : globalStyles.colors.neutralDark,
-                        }}>
+                        <Text style={[
+                            globalStyles.buttonText,
+                            {
+                                color: currentMode === mode.value ? globalStyles.colors.white : globalStyles.colors.neutralDark,
+                            }
+                        ]}>
                             {mode.label}
                         </Text>
                     </TouchableOpacity>
@@ -53,18 +57,22 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 {colorSchemes.map((scheme) => (
                     <TouchableOpacity
                         key={scheme.value}
-                        style={{
-                            ...globalStyles.button.base,
-                            backgroundColor: currentColor === scheme.value ? globalStyles.colors.primary : globalStyles.colors.neutralLight,
-                            minWidth: '45%',
-                            marginBottom: globalStyles.spacing.xs,
-                        }}
+                        style={[
+                            globalStyles.button,
+                            {
+                                backgroundColor: currentColor === scheme.value ? globalStyles.colors.primary : globalStyles.colors.neutralLight,
+                                minWidth: '45%',
+                                marginBottom: globalStyles.spacing.xs,
+                            }
+                        ]}
                         onPress={() => onSelectColor(scheme.value)}
                     >
-                        <Text style={{
-                            ...globalStyles.button.text,
-                            color: currentColor === scheme.value ? globalStyles.colors.white : globalStyles.colors.neutralDark,
-                        }}>
+                        <Text style={[
+                            globalStyles.buttonText,
+                            {
+                                color: currentColor === scheme.value ? globalStyles.colors.white : globalStyles.colors.neutralDark,
+                            }
+                        ]}>
                             {scheme.label}
                         </Text>
                     </TouchableOpacity>

@@ -1,180 +1,202 @@
-//screens/MessagingScreen/components/ConversationItem.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
-import { Avatar } from "../ui/avatar"; 
-import { formatTime } from '../../utils/helpers';
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
+import { Conversation } from '../../types/messaging';
 import { globalStyles } from '../../styles/global';
-// Define interface for component props
-interface Participant {
-  id: string;
-  name: string;
-  avatar?: string;
-}
+import { formatDistanceToNow } from 'date-fns';
 
 interface ConversationItemProps {
-  conversation: {
-    id: string;
-    otherParticipant?: Participant; // Make optional
-    name?: string; // Add name directly for group chats
-    lastMessage: string;
-    timestamp: string;
-    unreadCount: number;
-    isGroup?: boolean; // Add to distinguish between group and individual chats
-  };
+  conversation: Conversation;
   onPress: () => void;
 }
 
-// Enhanced avatar handling, animations and improved styling
-const ConversationItem: React.FC<ConversationItemProps> = ({ conversation, onPress }) => {
-  const displayName = conversation.name || (conversation.otherParticipant?.name) || "Chat";
-  const avatarInitial = (displayName.charAt(0) || "").toUpperCase();
-  const isGroup = conversation.isGroup === true;
-  
-  const [pressed, setPressed] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  
-  // Entry animation
-  useEffect(() => {
-    Animated.timing(opacityAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true
-    }).start();
-  }, []);
-  
-  const handlePressIn = () => {
-    setPressed(true);
-    Animated.spring(scaleAnim, {
-      toValue: 0.98,
-      friction: 8,
-      useNativeDriver: true
-    }).start();
-  };
-  
-  const handlePressOut = () => {
-    setPressed(false);
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 5,
-      useNativeDriver: true
-    }).start();
+export function ConversationItem({ conversation, onPress }: ConversationItemProps) {
+  const {
+    last_message,
+    unread_count,
+  } = conversation;
+
+  const getLastMessagePreview = () => {
+    if (!last_message) return '';
+
+    if (last_message.message_type === 'text') {
+      return last_message.content;
+    }
+
+    if (last_message.message_type === 'image') {
+      return '📷 Photo';
+    }
+
+    if (last_message.message_type === 'file') {
+      return '📎 File';
+    }
+
+    return '';
   };
 
-  const hasUnread = conversation.unreadCount > 0;
+  const getFormattedTime = () => {
+    if (!last_message?.timestamp) return '';
+    return formatDistanceToNow(new Date(last_message.timestamp), { addSuffix: true });
+  };
 
   return (
-    <Animated.View style={{
-      opacity: opacityAnim,
-      transform: [{ scale: scaleAnim }]
-    }}>
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row',
-            padding: globalStyles.spacing.md,
-            backgroundColor: globalStyles.colors.white,
-            borderRadius: globalStyles.spacing.md,
-            marginVertical: globalStyles.spacing.xxs,
-            shadowColor: globalStyles.colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-            ...(hasUnread
-              ? {
-                  backgroundColor: globalStyles.colors.infoLight,
-                  borderLeftWidth: 4,
-                  borderLeftColor: globalStyles.colors.info,
-                }
-              : {}),
-          }}
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          activeOpacity={0.9}
-          delayPressIn={0}>
-          <View style={{ position: 'relative', marginRight: globalStyles.spacing.md }}>
-            <Avatar
-              size="md"
-              nativeSource={
-                !isGroup && conversation.otherParticipant?.avatar
-                  ? { uri: conversation.otherParticipant.avatar }
-                  : undefined
-              }
-              fallback={avatarInitial}
-            />
-            {isGroup && (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: -2,
-                  bottom: -2,
-                  backgroundColor: globalStyles.colors.success,
-                  borderRadius: globalStyles.spacing.xs,
-                  width: 20,
-                  height: 20,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderWidth: 2,
-                  borderColor: globalStyles.colors.white,
-                }}>
-                <Text style={{ ...globalStyles.bodyBold, fontSize: 10, color: globalStyles.colors.white }}>
-                  G
-                </Text>
-              </View>
-            )}
+    <TouchableOpacity
+      style={[
+        styles.container,
+        unread_count > 0 && styles.unreadContainer,
+      ]}
+      onPress={onPress}
+    >
+      <View style={styles.avatarContainer}>
+        {conversation.participants.some(p => p.avatar) ? (
+          <Image
+            source={{ uri: conversation.participants.find(p => p.avatar)?.avatar }}
+            style={styles.avatar}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarText}>
+              {conversation.otherParticipant?.name?.charAt(0).toUpperCase()}
+            </Text>
           </View>
+        )}
+        {conversation.participants.some(p => p.online) && (
+          <View style={styles.onlineIndicator} />
+        )}
+      </View>
 
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: globalStyles.spacing.xxs }}>
-              <Text
-                style={{
-                  ...globalStyles.subtitle,
-                  color: hasUnread ? globalStyles.colors.textPrimary : globalStyles.colors.textSecondary,
-                  flex: 1,
-                  marginRight: globalStyles.spacing.xs,
-                }}
-                numberOfLines={1}>
-                {displayName}
-              </Text>
-              <Text style={{ ...globalStyles.caption, color: globalStyles.colors.textTertiary }}>
-                {formatTime(conversation.timestamp)}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text 
+            style={[
+              styles.name,
+              unread_count > 0 && styles.unreadText,
+            ]}
+            numberOfLines={1}
+          >
+            {conversation.otherParticipant?.name}
+          </Text>
+          <Text style={styles.time}>{getFormattedTime()}</Text>
+        </View>
+
+        <View style={styles.previewContainer}>
+          <Text 
+            style={[
+              styles.preview,
+              unread_count > 0 && styles.unreadText,
+            ]}
+            numberOfLines={1}
+          >
+            {getLastMessagePreview()}
+          </Text>
+          {unread_count > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {unread_count > 99 ? '99+' : unread_count}
               </Text>
             </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text
-                style={{
-                  ...globalStyles.body,
-                  color: hasUnread ? globalStyles.colors.textPrimary : globalStyles.colors.textTertiary,
-                  flex: 1,
-                  marginRight: globalStyles.spacing.xs,
-                }}
-                numberOfLines={1}>
-                {conversation.lastMessage}
-              </Text>
-
-              {hasUnread && (
-                <View
-                  style={{
-                    backgroundColor: globalStyles.colors.info,
-                    borderRadius: globalStyles.spacing.md,
-                    minWidth: 24,
-                    height: 24,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingHorizontal: globalStyles.spacing.xs,
-                  }}>
-                  <Text style={{ ...globalStyles.bodyBold, fontSize: 12, color: globalStyles.colors.white }}>
-                    {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  export default ConversationItem;
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  unreadContainer: {
+    backgroundColor: '#F3F4F6',
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: globalStyles.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#34D399',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  content: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginRight: 8,
+  },
+  time: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  previewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  preview: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+    marginRight: 8,
+  },
+  unreadText: {
+    color: '#000',
+    fontWeight: '500',
+  },
+  badge: {
+    backgroundColor: globalStyles.colors.primary,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+});

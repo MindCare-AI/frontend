@@ -35,8 +35,10 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "border bg-background text-foreground",
-        destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+        destructive: "destructive group border-destructive bg-destructive text-destructive-foreground",
+        success: "border-green-500 bg-green-50 text-green-900",
+        error: "border-red-500 bg-red-50 text-red-900",
+        info: "border-blue-500 bg-blue-50 text-blue-900",
       },
     },
     defaultVariants: {
@@ -45,9 +47,24 @@ const toastVariants = cva(
   }
 );
 
+// Define ToastActionElement with the necessary properties
+interface ToastActionElement {
+  label: string;
+  onPress: () => void;
+}
+
+// Define ToastProps type
+type ToastProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive> & 
+  VariantProps<typeof toastVariants> & {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+    action?: ToastActionElement;
+    onDismiss?: () => void;
+  };
+
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive>,
-  React.ComponentPropsWithoutRef<typeof ToastPrimitive> & VariantProps<typeof toastVariants>
+  ToastProps
 >(({ className, variant, title, description, action, onDismiss, ...props }, ref) => {
   const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -69,7 +86,9 @@ const Toast = React.forwardRef<
     }
 
     // Announce for screen readers
-    const announcement = title ? `${title}: ${description}` : description;
+    const announcement = title 
+      ? `${title.toString()}: ${description?.toString()}` 
+      : description?.toString() || '';
     AccessibilityInfo.announceForAccessibility(announcement);
 
     // Show animation
@@ -156,7 +175,9 @@ const Toast = React.forwardRef<
       ]}
       accessible={true}
       accessibilityRole="alert"
-      accessibilityLabel={title ? `${title}: ${description}` : description}
+      accessibilityLabel={title 
+        ? `${title?.toString() || ''}: ${description?.toString() || ''}` 
+        : description?.toString() || ''}
     >
       <Animated.View
         style={[
@@ -230,7 +251,7 @@ const ToastClose = React.forwardRef<
     toast-close=""
     {...props}
   >
-    <X className="h-4 w-4" />
+    <X size={16} />
   </ToastClosePrimitive>
 ));
 ToastClose.displayName = ToastClosePrimitive.displayName;
@@ -258,10 +279,6 @@ const ToastDescription = React.forwardRef<
   />
 ));
 ToastDescription.displayName = ToastDescriptionPrimitive.displayName;
-
-type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>;
-
-type ToastActionElement = React.ReactElement<typeof ToastAction>;
 
 const styles = StyleSheet.create({
   container: {

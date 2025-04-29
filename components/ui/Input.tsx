@@ -26,7 +26,7 @@ type NativeInputProps = NativeTextInputProps & CommonProps;
 type WebInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'style'> & CommonProps;
 
 // Combined props type that includes both native and web props
-type InputProps = CommonProps & {
+type BaseInputProps = CommonProps & {
   onChangeText?: (text: string) => void;
   onSubmitEditing?: () => void;
   placeholderTextColor?: string;
@@ -69,6 +69,7 @@ export interface InputProps extends NativeTextInputProps {
   rightIcon?: React.ReactNode;
   secureTextEntry?: boolean;
   showPasswordToggle?: boolean;
+  className?: string;
 }
 
 const Input = forwardRef<TextInput, InputProps>(
@@ -190,8 +191,8 @@ const Input = forwardRef<TextInput, InputProps>(
             ref={ref}
             style={[
               styles.input,
-              leftIcon && styles.inputWithLeftIcon,
-              (rightIcon || showPasswordToggle) && styles.inputWithRightIcon,
+              leftIcon ? styles.inputWithLeftIcon : null,
+              (rightIcon || showPasswordToggle) ? styles.inputWithRightIcon : null,
               style,
             ]}
             placeholderTextColor="#9CA3AF"
@@ -200,7 +201,7 @@ const Input = forwardRef<TextInput, InputProps>(
             secureTextEntry={secureTextEntry && !isSecureTextVisible}
             accessibilityLabel={label}
             accessibilityHint={helperText}
-            accessibilityState={{ error: !!error }}
+            accessibilityState={{ disabled: false }}
             {...props}
           />
 

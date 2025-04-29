@@ -1,13 +1,95 @@
+// Modified to fix import errors
 import { Message, MessageRequest, ChatbotConversation } from '../types/chat';
 import { API_URL } from '../config';
 import chatService from './chatService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import websocketService from './websocketService';
 
 class ChatbotService {
   private currentConversation: ChatbotConversation | null = null;
   private messageQueue: MessageRequest[] = [];
   private isProcessing = false;
+  private eventHandlers: Map<string, Set<Function>> = new Map();
+  private socket: WebSocket | null = null;
+
+  constructor() {
+    this.setupEventHandlers();
+  }
+
+  private setupEventHandlers() {
+    this.eventHandlers.set('message_received', new Set());
+    this.eventHandlers.set('typing_started', new Set());
+    this.eventHandlers.set('typing_stopped', new Set());
+  }
+
+  public addEventListener(event: string, handler: Function) {
+    const handlers = this.eventHandlers.get(event) || new Set();
+    handlers.add(handler);
+    this.eventHandlers.set(event, handlers);
+  }
+
+  public removeEventListener(event: string, handler: Function) {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.delete(handler);
+    }
+  }
+
+  private emit(event: string, data: any) {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(data));
+    }
+  }
+
+  private handleMessage = (data: any) => {
+    try {
+      const message = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (message.type === 'message') {
+        this.emit('message_received', message.data);
+        chatService.handleNewMessage(message.data);
+      } else if (message.type === 'typing_started') {
+        this.emit('typing_started', message.data);
+      } else if (message.type === 'typing_stopped') {
+        this.emit('typing_stopped', message.data);
+      }
+    } catch (error) {
+      console.error('Error parsing chatbot WebSocket message:', error);
+    }
+  };
+
+  async connectToWebSocket(): Promise<WebSocket | null> {
+    if (!this.currentConversation) {
+      return null;
+    }
+
+    this.socket = await websocketService.connect(
+      `/chatbot/${this.currentConversation.id}/`,
+      {
+        onOpen: () => {
+          console.log('Chatbot WebSocket connected');
+        },
+        onMessage: this.handleMessage,
+        onError: (error) => {
+          console.error('Chatbot WebSocket error:', error);
+        },
+        onClose: () => {
+          console.log('Chatbot WebSocket closed');
+        }
+      }
+    );
+
+    return this.socket;
+  }
+
+  async disconnectFromWebSocket() {
+    if (this.socket) {
+      websocketService.close();
+      this.socket = null;
+    }
+  }
 
   async initializeConversation(): Promise<ChatbotConversation> {
     try {
@@ -25,6 +107,10 @@ class ChatbotService {
 
       const conversation = await response.json();
       this.currentConversation = conversation;
+      
+      // Connect to the WebSocket for this conversation
+      await this.connectToWebSocket();
+      
       return conversation;
     } catch (error) {
       console.error('Error initializing chatbot conversation:', error);
@@ -52,6 +138,14 @@ class ChatbotService {
         throw new Error('No internet connection');
       }
 
+      // Send typing indicator through WebSocket
+      if (websocketService.isConnected()) {
+        websocketService.send({
+          type: 'typing',
+          is_typing: true
+        });
+      }
+
       const response = await fetch(`${API_URL}/messaging/chatbot/${this.currentConversation!.id}/send_message`, {
         method: 'POST',
         headers: {
@@ -74,6 +168,14 @@ class ChatbotService {
     } catch (error) {
       console.error('Error sending message to chatbot:', error);
       throw error;
+    } finally {
+      // Stop typing indicator
+      if (websocketService.isConnected()) {
+        websocketService.send({
+          type: 'typing',
+          is_typing: false
+        });
+      }
     }
   }
 
@@ -144,6 +246,13 @@ class ChatbotService {
 
   setCurrentConversation(conversation: ChatbotConversation) {
     this.currentConversation = conversation;
+    
+    // Connect to WebSocket with new conversation
+    if (conversation) {
+      this.connectToWebSocket();
+    } else {
+      this.disconnectFromWebSocket();
+    }
   }
 
   getCurrentConversation(): ChatbotConversation | null {
@@ -155,6 +264,11 @@ class ChatbotService {
     NetInfo.addEventListener(state => {
       if (state.isConnected) {
         this.processQueue();
+        
+        // Reconnect to WebSocket if needed
+        if (this.currentConversation && !websocketService.isConnected()) {
+          this.connectToWebSocket();
+        }
       }
     });
   }

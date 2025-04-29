@@ -122,7 +122,7 @@ export default function ChatbotScreen() {
       setInput('');
       setIsTyping(true);
 
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/`, {
+      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/send_message/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -157,22 +157,12 @@ export default function ChatbotScreen() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      console.error('Error sending message:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === tempId ? { ...msg, status: 'failed' } : msg
       ));
       setIsTyping(false);
-      
-      Alert.alert('Error', errorMessage, [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Retry',
-          onPress: () => {
-            setMessages(prev => prev.filter(msg => msg.id !== tempId));
-            setInput(tempMessage.content);
-            sendMessage();
-          }
-        }
-      ]);
+      Alert.alert('Error', errorMessage);
     }
   }, [input, conversationId, accessToken]);
 
@@ -231,8 +221,17 @@ export default function ChatbotScreen() {
         </ScrollView>
 
         <View style={styles.inputContainer}>
-          <TextInput style={styles.input} value={input} onChangeText={setInput} placeholder="Type a message..." />
-          <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={!input.trim()}>
+          <TextInput 
+            style={styles.input} 
+            value={input} 
+            onChangeText={setInput} 
+            placeholder="Type a message..." 
+            onSubmitEditing={sendMessage}  // Add this line
+          />
+          <TouchableOpacity 
+            style={[styles.sendButton, !input.trim() && { opacity: 0.5 }]} 
+            onPress={sendMessage} 
+            disabled={!input.trim()}>
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
         </View>

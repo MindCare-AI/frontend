@@ -23,7 +23,8 @@ const NotificationNavigator: React.FC = () => {
         },
         headerTintColor: globalStyles.colors.white,
         headerTitleStyle: {
-          ...globalStyles.bodyBold,
+          ...globalStyles.subtitle,
+          color: globalStyles.colors.white,
         },
       }}
     >

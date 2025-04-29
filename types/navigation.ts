@@ -38,14 +38,14 @@ export type AuthStackParamList = {
 export type MessagingStackParamList = {
   Messaging: undefined;
   Chat: {
-    conversationId: number; // Changed to only number
+    conversationId: string;
     conversationType: 'one_to_one' | 'group';
     title: string;
     otherParticipantId?: number;
   };
   NewConversation: undefined;
   GroupDetails?: {
-    groupId: number; // Changed to only number
+    groupId: string;
   };
 };
 

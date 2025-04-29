@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { TouchableOpacity, View, Text, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { useNotificationCount } from '../hooks/notificationsScreen/useNotificationCount';
 import { globalStyles } from '../styles/global';
@@ -129,7 +129,7 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation
             }}>
             <Text
               style={{
-                ...globalStyles.bodyBold,
+                ...globalStyles.captionBold,
                 fontSize: 12,
                 color: globalStyles.colors.white,
               }}>
@@ -139,3 +139,4 @@ export const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation
         </Animated.View>
       </TouchableOpacity>
   );
+}

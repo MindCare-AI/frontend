@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { API_URL } from '../../config';
 import { useAuth } from '../../contexts/AuthContext';
-import { globalStyles } from '../../styles/global';
+import { globalStyles, getShadowStyles } from '../../styles/global';
 import { format } from 'date-fns';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteProps = {
@@ -95,8 +95,8 @@ const AppointmentManagementScreen: React.FC = () => {
         marginBottom: globalStyles.spacing.md,
       }}>
         <Text style={{
-          ...globalStyles.title2,
-          color: globalStyles.colors.textPrimary,
+          ...globalStyles.h2,
+          color: globalStyles.colors.neutralDark,
         }}>Your Appointments</Text>
         <TouchableOpacity
           style={{
@@ -111,7 +111,8 @@ const AppointmentManagementScreen: React.FC = () => {
         >
           <Plus size={18} color="white" />
           <Text style={{
-            ...globalStyles.bodyBold,
+            ...globalStyles.body,
+            fontWeight: '600',
             color: globalStyles.colors.white,
             marginLeft: globalStyles.spacing.xs,
           }}>Book Appointment</Text>
@@ -123,15 +124,15 @@ const AppointmentManagementScreen: React.FC = () => {
           alignItems: 'center',
           marginTop: globalStyles.spacing.xl,
         }}>
-          <CalendarCheck size={48} color={globalStyles.colors.grey} />
+          <CalendarCheck size={48} color={globalStyles.colors.neutralMedium} />
           <Text style={{
-            ...globalStyles.title3,
-            color: globalStyles.colors.textPrimary,
+            ...globalStyles.h3,
+            color: globalStyles.colors.neutralDark,
             marginTop: globalStyles.spacing.md,
           }}>No appointments yet</Text>
           <Text style={{
             ...globalStyles.body,
-            color: globalStyles.colors.textSecondary,
+            color: globalStyles.colors.neutralMedium,
             marginTop: globalStyles.spacing.sm,
             textAlign: 'center',
           }}>
@@ -149,11 +150,7 @@ const AppointmentManagementScreen: React.FC = () => {
               borderRadius: globalStyles.spacing.xs,
               padding: globalStyles.spacing.md,
               marginBottom: globalStyles.spacing.md,
-              shadowColor: globalStyles.colors.shadow,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 2,
-              elevation: 2,
+              ...getShadowStyles(2),
             }}>
               <View style={{
                 flexDirection: 'row',
@@ -162,9 +159,10 @@ const AppointmentManagementScreen: React.FC = () => {
               }}>
                 <View>
                   <Text style={{
-                    ...globalStyles.bodyBold,
+                    ...globalStyles.body,
+                    fontWeight: '600',
                     fontSize: 18,
-                    color: globalStyles.colors.textPrimary,
+                    color: globalStyles.colors.neutralDark,
                   }}>
                     {appointment.therapist?.full_name ||
                       `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`.trim()}
@@ -174,10 +172,10 @@ const AppointmentManagementScreen: React.FC = () => {
                     alignItems: 'center',
                     marginTop: globalStyles.spacing.xxs,
                   }}>
-                    <Calendar size={16} color={globalStyles.colors.textSecondary} />
+                    <Calendar size={16} color={globalStyles.colors.neutralMedium} />
                     <Text style={{
                       ...globalStyles.body,
-                      color: globalStyles.colors.textSecondary,
+                      color: globalStyles.colors.neutralMedium,
                       marginLeft: globalStyles.spacing.xxs,
                     }}>
                       {formattedDate}
@@ -186,7 +184,7 @@ const AppointmentManagementScreen: React.FC = () => {
                   {appointment.notes ? (
                     <Text style={{
                       ...globalStyles.body,
-                      color: globalStyles.colors.textSecondary,
+                      color: globalStyles.colors.neutralMedium,
                     }}>Notes: {appointment.notes}</Text>
                   ) : null}
                 </View>
@@ -194,12 +192,13 @@ const AppointmentManagementScreen: React.FC = () => {
                   paddingVertical: globalStyles.spacing.xxs,
                   paddingHorizontal: globalStyles.spacing.xs,
                   borderRadius: globalStyles.spacing.lg,
-                  backgroundColor: appointment.status === 'scheduled' || appointment.status === 'pending' ? globalStyles.colors.infoLight : globalStyles.colors.successLight,
+                  backgroundColor: appointment.status === 'scheduled' || appointment.status === 'pending' ? globalStyles.colors.accent : globalStyles.colors.success,
                 }}>
                   <Text style={{
-                    ...globalStyles.bodyBold,
+                    ...globalStyles.body,
+                    fontWeight: '600',
                     fontSize: 12,
-                    color: globalStyles.colors.success,
+                    color: globalStyles.colors.white,
                   }}>{appointment.status}</Text>
                 </View>
               </View>

@@ -50,8 +50,8 @@ const BookAppointmentScreen = () => {
         padding: globalStyles.spacing.md,
       }}>
         <Text style={{
-          ...globalStyles.title2,
-          color: globalStyles.colors.textPrimary,
+          ...globalStyles.h2,
+          color: globalStyles.colors.neutralDark,
         }}>Available Therapists</Text>
       </View>
       {therapists.length > 0 ? (
@@ -66,7 +66,7 @@ const BookAppointmentScreen = () => {
       ) : (
         <Text style={{
           textAlign: 'center',
-          color: globalStyles.colors.textSecondary,
+          color: globalStyles.colors.neutralMedium,
           marginTop: globalStyles.spacing.md,
           fontSize: 14,
         }}>No therapists available at the moment</Text>
@@ -74,3 +74,5 @@ const BookAppointmentScreen = () => {
     </ScrollView>
   );
 };
+
+export default BookAppointmentScreen;

@@ -20,7 +20,7 @@ type CommonProps = {
 };
 
 // Native props including scroll events
-type NativeScrollProps = ScrollViewProps & CommonProps & {
+type NativeScrollProps = ScrollView & CommonProps & {
   scrollEventThrottle?: number;
   onMomentumScrollEnd?: () => void;
 };
