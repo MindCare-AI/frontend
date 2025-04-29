@@ -15,6 +15,24 @@ const colors = {
   success: '#43a047',
   white: '#fff',
   black: '#000',
+  // Text colors
+  textPrimary: '#333333',
+  textSecondary: '#666666',
+  textTertiary: '#999999',
+  // Background colors
+  backgroundLight: '#f8f8f8',
+  shadow: 'rgba(0, 0, 0, 0.1)',
+};
+
+// Helper function for shadows
+export const getShadowStyles = (elevation: number) => {
+  return {
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: elevation / 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: elevation,
+    elevation,
+  };
 };
 
 // 2. Typography
@@ -22,13 +40,15 @@ const fonts = {
   // Use system fonts
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"',
   headings: {
-    h1: { fontSize: 32, fontWeight: 'bold' },
-    h2: { fontSize: 24, fontWeight: 'bold' },
-    h3: { fontSize: 18, fontWeight: 'bold' },
+    h1: { fontSize: 32, fontWeight: '700' as const },
+    h2: { fontSize: 24, fontWeight: '600' as const },
+    h3: { fontSize: 18, fontWeight: '600' as const },
   },
-  body: { fontSize: 16, fontWeight: 'normal' },
-  label: { fontSize: 14, fontWeight: 'normal' },
-  caption: { fontSize: 12, fontWeight: 'normal', color: colors.neutralDark },
+  body: { fontSize: 16, fontWeight: '400' as const },
+  label: { fontSize: 14, fontWeight: '400' as const },
+  caption: { fontSize: 12, fontWeight: '400' as const, color: colors.neutralDark },
+  captionBold: { fontSize: 12, fontWeight: '600' as const, color: colors.neutralDark },
+  subtitle: { fontSize: 16, fontWeight: '500' as const, color: colors.neutralDark },
 };
 
 // 3. Spacing
@@ -61,7 +81,6 @@ const components = {
       alignItems: 'center',
       justifyContent: 'center',
       minWidth: 100,
-      transition: 'background-color 0.2s ease', // Smooth transition
     },
     primary: {
       backgroundColor: colors.primary,
@@ -225,17 +244,6 @@ const nativeStyleSheet = StyleSheet.create({
   },
 });
 
-// Helper function for shadows
-export const getShadowStyles = (elevation: number) => {
-  return {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: elevation / 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: elevation,
-    elevation,
-  };
-};
-
 // Combined styles (including web-specific)
 export const globalStyles = {
   ...nativeStyleSheet,
@@ -243,6 +251,15 @@ export const globalStyles = {
   spacing,
   borderRadius,
   fonts,
+  card: components.card.base,
+  button: components.button.base,
+  buttonText: components.button.text,
+  h1: fonts.headings.h1,
+  h2: fonts.headings.h2,
+  h3: fonts.headings.h3,
+  subtitle: fonts.subtitle,
+  caption: fonts.caption,
+  captionBold: fonts.captionBold,
   // Web-specific styles (if needed, adapt for React Native Web)
   container: {
     ...nativeStyleSheet.container,

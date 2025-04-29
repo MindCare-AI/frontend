@@ -1,144 +1,92 @@
 //navigation/AppNavigator.tsx
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
-import { TouchableOpacity } from 'react-native';
-import { NavigationProp } from '@react-navigation/native';
-import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
-import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import MessagingNavigator from './MessagingNavigator';
-import AppointmentManagementScreen from '../screens/AppointmentManagementScreen/AppointmentManagementScreen';
-import BookAppointmentScreen from '../screens/AppointmentManagementScreen/BookAppointment';
-import { SettingsHomeScreen } from '../screens/SettingsScreen/SettingsHomeScreen';
-import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
-import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
-import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
-import { RootStackParamList, SettingsStackParamList, AppointmentStackParamList } from '../types/navigation';
+import MoodNavigator from './MoodNavigator';
+import { SettingsStack } from './SettingsStack';
+import { AppStackParamList } from './types';
 import { globalStyles } from '../styles/global';
+import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
+import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
+import ProfileScreen from '../screens/Settings/profilescreen';
 
-const Tab = createBottomTabNavigator<RootStackParamList>();
-const SettingsStack = createStackNavigator<SettingsStackParamList>();
-const AppointmentStack = createStackNavigator<AppointmentStackParamList>();
+const Tab = createBottomTabNavigator<AppStackParamList>();
 
-interface NotificationBadgeProps {
-  navigation: NavigationProp<RootStackParamList>;
-}
+// Ionicons names
+type IconName = 'home' | 'home-outline' | 'chatbubble' | 'chatbubble-outline' | 
+                'notifications' | 'notifications-outline' | 'settings' | 'settings-outline' |
+                'alert';
 
-const NotificationBadge: React.FC<NotificationBadgeProps> = ({ navigation }) => {
-  return (
-      <TouchableOpacity
-        style={{ padding: globalStyles.spacing.sm }}
-        onPress={() => navigation.navigate('Notifications')}>
-        <Ionicons name="notifications-outline" size={24} color={globalStyles.colors.textPrimary} />
-      </TouchableOpacity>
-  );
-};
+// Feather icons names
+type FeatherIconName = 'smile';
 
-const SettingsStackNavigator = () => {
-  return (
-    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
-      <SettingsStack.Screen name="SettingsHome" component={SettingsHomeScreen} />
-      <SettingsStack.Screen 
-        name="UserPreferences" 
-        component={UserPreferencesScreen} 
-        options={{ title: 'Preferences' }} 
-      />
-      <SettingsStack.Screen 
-        name="UserSettings" 
-        component={UserSettingsScreen} 
-        options={{ title: 'Account Settings' }} 
-      />
-      <SettingsStack.Screen 
-        name="UserProfile" 
-        component={UserProfileScreen} 
-        options={{ title: 'Profile' }} 
-      />
-    </SettingsStack.Navigator>
-  );
-};
-
-const AppointmentStackNavigator = () => {
-  return (
-    <AppointmentStack.Navigator>
-      <AppointmentStack.Screen 
-        name="AppointmentManagement" 
-        component={AppointmentManagementScreen}
-        options={{ 
-          title: 'Appointments',
-          headerShown: true
-        }}
-      />
-      <AppointmentStack.Screen 
-        name="BookAppointment" 
-        component={BookAppointmentScreen}
-        options={{ 
-          title: 'Book Appointment',
-          headerShown: true
-        }}
-      />
-    </AppointmentStack.Navigator>
-  );
-};
-
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
-
-const AppNavigator = () => {
+export default function AppNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route, navigation }) => ({
-        headerRight: () => <NotificationBadge navigation={navigation} />,
-        headerRightContainerStyle: { paddingRight: 15 },
-        tabBarIcon: ({ color, size }) => {
-          let iconName: IconName;
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: IconName = 'alert'; // Default icon
+
           switch (route.name) {
-            case 'Home':
-              iconName = 'home-outline';
+            case 'Feeds':
+              iconName = focused ? 'home' : 'home-outline';
               break;
             case 'Chatbot':
-              iconName = 'chatbox-ellipses-outline';
+              iconName = focused ? 'chatbubble' : 'chatbubble-outline';
               break;
-            case 'MessagingTab':
-              iconName = 'chatbubble-outline';
+            case 'Notifications':
+              iconName = focused ? 'notifications' : 'notifications-outline';
               break;
             case 'Settings':
-              iconName = 'person-outline';
+              iconName = focused ? 'settings' : 'settings-outline';
               break;
-            case 'Appointments':
-              iconName = 'calendar-outline';
-              break;
+            case 'MoodTracker':
+              // Use Feather icon for mood tracker
+              return <Feather name="smile" size={size} color={color} />;
             default:
-              iconName = 'help-outline';
+              iconName = 'alert';
           }
+
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-      })}
-    >
-      <Tab.Screen name="Home" component={FeedsScreen} />
-      <Tab.Screen name="Chatbot" component={ChatbotScreen} />
-      <Tab.Screen
-        name="MessagingTab"
-        component={MessagingNavigator}
-        options={{ tabBarLabel: 'Messages' }}
-      />  
+        tabBarActiveTintColor: globalStyles.colors.primary,
+        tabBarInactiveTintColor: globalStyles.colors.neutralMedium,
+      })}>
       <Tab.Screen 
-        name="Settings" 
-        component={SettingsStackNavigator} 
-        options={{ tabBarLabel: 'Settings' }}
-        listeners={({ navigation }) => ({
-          tabPress: () => {
-            // Simply navigate to Settings since it's defined as undefined in RootStackParamList
-            navigation.navigate('Settings');
-          },
-        })}
+        name="Feeds" 
+        component={FeedsScreen} 
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen 
+        name="Chatbot" 
+        component={ChatbotScreen} 
+        options={{ tabBarLabel: 'Chatbot' }}
       />
       <Tab.Screen
-        name="Appointments"
-        component={AppointmentStackNavigator}
-        options={{ tabBarLabel: 'Appointments' }}
+        name="MoodTracker"
+        component={MoodNavigator}
+        options={{ 
+          tabBarLabel: 'Mood',
+          headerShown: false
+        }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={MessagingNavigator}
+        options={{ 
+          tabBarLabel: 'Messages',
+          headerShown: false
+        }}
+      />
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsStack} 
+        options={{ 
+          tabBarLabel: 'Settings',
+          headerShown: false
+        }}
       />
     </Tab.Navigator>
   );
-};
-
-export default AppNavigator;
+}

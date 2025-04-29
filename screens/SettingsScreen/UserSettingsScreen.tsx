@@ -1,9 +1,10 @@
 //screens/SettingsScreen/UserSettingsScreen.tsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Alert, SafeAreaView, TouchableOpacity } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { ScrollView, View, Alert, SafeAreaView, TouchableOpacity, StyleSheet } from 'react-native';
+import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import { ThemeSelector } from './components/common/ThemeSelector';
-import { PrivacySettings } from './components/common/PrivacySettings';import { TimeZoneSelector } from './components/common/TimeZoneSelector';
+import { PrivacySettings } from './components/common/PrivacySettings';
+import { TimeZoneSelector } from './components/common/TimeZoneSelector';
 import { timezones } from './constants';
 import { useSettings } from './hooks/common/useSettings';
 import { useNavigation } from '@react-navigation/native';
@@ -12,7 +13,7 @@ import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { SettingsStackParamList } from '../../types/navigation';
 import { globalStyles } from '../../styles/global';
-import { Separator } from '../../components/common/Separator';
+import { Separator } from '../../components/ui/separator';
 
 type SettingsScreenNavigationProp = StackNavigationProp<SettingsStackParamList, 'UserSettings'>;
 
@@ -142,30 +143,31 @@ export const UserSettingsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={[globalStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={globalStyles.loading}><ActivityIndicator animating={true} color={globalStyles.colors.primary} size="large" /></View>
-        </View>
-        <Text style={{ ...globalStyles.body, marginTop: globalStyles.spacing.md, color: globalStyles.colors.neutralMedium }}>
-          Loading settings...
-        </Text>
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator animating={true} color={globalStyles.colors.primary} size="large" />
+        <Text style={styles.loadingText}>Loading settings...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={[globalStyles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={globalStyles.errorText}>{error}</Text>
-        <TouchableOpacity style={{ ...globalStyles.button, marginTop: globalStyles.spacing.md }} onPress={handleSave}>
-          <Text style={globalStyles.button.text}>Retry</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Button 
+          mode="contained" 
+          onPress={handleSave}
+          style={styles.button}
+        >
+          Retry
+        </Button>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: globalStyles.colors.white }}>
-      <View ref={containerRef} style={globalStyles.container}>
+      <View ref={containerRef} style={styles.mainContainer}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, padding: globalStyles.spacing.md }}>
           <View ref={formRef}>
             <ThemeSelector
@@ -186,6 +188,9 @@ export const UserSettingsScreen: React.FC = () => {
                 }
               } : null)}
             />
+
+            <Separator style={{ marginVertical: globalStyles.spacing.md }} />
+
             <PrivacySettings
               profileVisibility={localSettings?.privacy_settings?.profile_visibility ?? 'public'}
               showOnlineStatus={localSettings?.privacy_settings?.show_online_status ?? true}
@@ -207,23 +212,61 @@ export const UserSettingsScreen: React.FC = () => {
                 }
               } : null)}
             />
+
             <Separator style={{ marginVertical: globalStyles.spacing.md }} />
+
             <TimeZoneSelector
               currentTimezone={localSettings?.timezone ?? ''}
               onTimezoneChange={(timezone: string) => setLocalSettings(prev => prev ? { ...prev, timezone } : null)}
             />
           </View>
-          <TouchableOpacity
-            ref={buttonRef}
+
+          <Button
+            mode="contained"
             onPress={handleSave}
             disabled={isSaving || !hasUnsavedChanges}
-            style={{ ...globalStyles.button, marginTop: globalStyles.spacing.md, backgroundColor: isSaving || !hasUnsavedChanges ? globalStyles.colors.disabled : globalStyles.colors.primary }}><Text style={globalStyles.button.text}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
-            Save Changes
+            style={[
+              styles.button,
+              {
+                backgroundColor: isSaving || !hasUnsavedChanges 
+                  ? globalStyles.colors.neutralLight 
+                  : globalStyles.colors.primary
+              }
+            ]}
+            loading={isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </ScrollView>
       </View>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: globalStyles.colors.white,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: globalStyles.colors.neutralMedium,
+  },
+  errorText: {
+    color: globalStyles.colors.error,
+    marginBottom: 16,
+  },
+  button: {
+    marginTop: 16,
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: globalStyles.colors.white,
+  }
+});
 
 

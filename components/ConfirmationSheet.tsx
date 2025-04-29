@@ -11,6 +11,7 @@ interface ConfirmationSheetProps {
   onCancel: () => void;
   variant?: 'danger' | 'default';
   isVisible: boolean;
+  children?: React.ReactNode;
 }
 
 export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
@@ -22,6 +23,7 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
   onCancel,
   variant = 'default',
   isVisible,
+  children,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const translateY = React.useRef(new Animated.Value(300)).current;
@@ -132,6 +134,8 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
         <View style={styles.handle} />
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
+        
+        {children}
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity

@@ -6,6 +6,8 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgetPasswordScreen';
 import SetNewPasswordScreen from '../screens/auth/SetNewPasswordScreen';
+import ProfileScreen from '../screens/Settings/profilescreen';
+import JournalScreen from '../screens/JournalScreen/JournalScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
 
@@ -30,7 +32,8 @@ const AuthNavigator: React.FC = () => {
       />
       <Stack.Screen 
         name="ForgotPassword" 
-        component={ForgotPasswordScreen} 
+        component={ForgotPasswordScreen}
+        options={{ title: 'Reset Password' }} 
       />
       <Stack.Screen 
         name="SetNewPassword" 

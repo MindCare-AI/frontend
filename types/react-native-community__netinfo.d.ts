@@ -11,9 +11,12 @@ declare module '@react-native-community/netinfo' {
   
   export interface NetInfo {
     addEventListener(listener: (state: NetInfoState) => void): NetInfoSubscription;
-    useNetInfo(): NetInfoState;
+    fetch(): Promise<NetInfoState>;
   }
 
   const NetInfo: NetInfo;
   export default NetInfo;
+  
+  // Add useNetInfo hook
+  export function useNetInfo(): NetInfoState;
 }
