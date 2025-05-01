@@ -6,7 +6,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgetPasswordScreen';
 import SetNewPasswordScreen from '../screens/auth/SetNewPasswordScreen';
-import ProfileScreen from '../screens/Settings/profilescreen';
+import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
 import JournalScreen from '../screens/JournalScreen/JournalScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();

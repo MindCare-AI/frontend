@@ -9,7 +9,7 @@ import { AppStackParamList } from './types';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
-import ProfileScreen from '../screens/Settings/profilescreen';
+import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
 
 const Tab = createBottomTabNavigator<AppStackParamList>();
 

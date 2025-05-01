@@ -4,7 +4,7 @@ import { MedicalHistoryScreen } from '../screens/SettingsScreen/MedicalHistorySc
 import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
 import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
 import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
-import ProfileScreen from '../screens/Settings/profilescreen';
+import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
 import { SettingsStackParamList } from '../types/navigation';
 import { globalStyles } from '../styles/global';
 
