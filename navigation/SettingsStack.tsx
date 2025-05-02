@@ -1,10 +1,10 @@
 import { createStackNavigator } from '@react-navigation/stack';
-import { HealthMetricsScreen } from '../screens/SettingsScreen/HealthMetricsScreen';
-import { MedicalHistoryScreen } from '../screens/SettingsScreen/MedicalHistoryScreen';
-import { UserSettingsScreen } from '../screens/SettingsScreen/UserSettingsScreen';
-import { UserProfileScreen } from '../screens/SettingsScreen/UserProfileScreen';
-import { UserPreferencesScreen } from '../screens/SettingsScreen/UserPreferencesScreen';
-import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
+import HomeSettingsScreen from '../screens/Settings/HomeSettingsScreen';
+import ProfileScreen from '../screens/Settings/ProfileScreen';
+import PatientMedicalInfoScreen from '../screens/Settings/PatientMedicalInfoScreen';
+import TherapistProfileScreen from '../screens/Settings/TherapistProfileScreen';
+import NotificationSettingsScreen from '../screens/Settings/NotificationSettingsScreen';
+import SettingsScreen from '../screens/Settings/SettingsScreen';
 import { SettingsStackParamList } from '../types/navigation';
 import { globalStyles } from '../styles/global';
 
@@ -13,7 +13,7 @@ const Stack = createStackNavigator<SettingsStackParamList>();
 export const SettingsStack = () => {
   return (
     <Stack.Navigator
-      initialRouteName="SettingsHome"
+      initialRouteName="Settings"
       screenOptions={{
         headerStyle: {
           backgroundColor: globalStyles.colors.primary,
@@ -31,34 +31,34 @@ export const SettingsStack = () => {
       }}
     >
       <Stack.Screen 
-        name="SettingsHome" 
-        component={ProfileScreen} 
+        name="Settings" 
+        component={HomeSettingsScreen} 
         options={{ title: 'Settings' }} 
       />
       <Stack.Screen 
-        name="UserSettings" 
-        component={UserSettingsScreen} 
-        options={{ title: 'Account Settings' }} 
+        name="AppSettings" 
+        component={SettingsScreen} 
+        options={{ title: 'App Settings' }} 
       />
       <Stack.Screen 
-        name="UserProfile" 
-        component={UserProfileScreen} 
-        options={{ title: 'Edit Profile' }} 
+        name="Profile" 
+        component={ProfileScreen} 
+        options={{ title: 'Profile' }} 
       />
       <Stack.Screen 
-        name="UserPreferences" 
-        component={UserPreferencesScreen} 
-        options={{ title: 'Preferences' }} 
+        name="NotificationSettings" 
+        component={NotificationSettingsScreen} 
+        options={{ title: 'Notifications' }} 
       />
       <Stack.Screen 
-        name="HealthMetrics" 
-        component={HealthMetricsScreen} 
-        options={{ title: 'Health Metrics' }} 
+        name="PatientMedicalInfo" 
+        component={PatientMedicalInfoScreen} 
+        options={{ title: 'Medical Information' }} 
       />
       <Stack.Screen 
-        name="MedicalHistory" 
-        component={MedicalHistoryScreen} 
-        options={{ title: 'Medical History' }} 
+        name="TherapistProfile" 
+        component={TherapistProfileScreen} 
+        options={{ title: 'Professional Profile' }} 
       />
     </Stack.Navigator>
   );
