@@ -1,18 +1,55 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, Switch, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, Image, TouchableOpacity, Switch, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { SettingsStackParamList } from '../../types/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getUserProfile } from '../../API/settings/user';
+import { getNotificationSettings, updateNotificationSettings } from '../../API/settings/notifications';
 
-const ProfileScreen: React.FC = () => {
+const HomeSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
   const { user, signOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // Fetch user profile data
+        const profileData = await getUserProfile();
+        
+        // Fetch notification settings 
+        const notificationData = await getNotificationSettings();
+        
+        // Update notification state based on push notifications setting
+        if (notificationData && notificationData.push !== undefined) {
+          setNotificationsEnabled(notificationData.push);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, []);
 
-  const toggleNotifications = () => {
-    setNotificationsEnabled(previousState => !previousState);
+  const toggleNotifications = async () => {
+    try {
+      const newValue = !notificationsEnabled;
+      setNotificationsEnabled(newValue);
+      
+      // Update notification settings in the backend
+      await updateNotificationSettings({ push: newValue });
+    } catch (error) {
+      console.error('Error updating notifications:', error);
+      // Revert UI state if API call fails
+      setNotificationsEnabled(!notificationsEnabled);
+    }
   };
 
   const handleLogout = async () => {
@@ -21,7 +58,6 @@ const ProfileScreen: React.FC = () => {
       // Navigation will be handled by the AuthContext's state change
     } catch (error) {
       console.error("Logout error:", error);
-      // Handle error if needed
     }
   };
 
@@ -47,83 +83,155 @@ const ProfileScreen: React.FC = () => {
     return 'User Profile';
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#002D62" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={styles.gradientContainer}>
-        <View style={styles.profileContainer}>
-          <Image
-            source={getProfilePic()}
-            style={styles.avatar}
-            defaultSource={require('../../assets/default-avatar.png')}
-          />
-          <Text style={styles.name}>{getUserFullName()}</Text>
-          <Text style={styles.subtitle}>{user?.user_type || 'Account'}</Text>
-        </View>
+      <ScrollView>
+        <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={styles.gradientContainer}>
+          <View style={styles.profileContainer}>
+            <Image
+              source={getProfilePic()}
+              style={styles.avatar}
+              defaultSource={require('../../assets/default-avatar.png')}
+            />
+            <Text style={styles.name}>{getUserFullName()}</Text>
+            <Text style={styles.subtitle}>{user?.user_type || 'Account'}</Text>
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.buttonGrid}>
-          <TouchableOpacity 
-            style={styles.gridButton}
-            onPress={() => navigation.navigate('UserProfile')}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons name="pencil" size={24} color="#002D62" />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            
+            <TouchableOpacity 
+              style={styles.settingsItem} 
+              onPress={() => navigation.navigate('Profile')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="person-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Profile</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.settingsItem} 
+              onPress={() => navigation.navigate('AppSettings')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="settings-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>App Settings</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.settingsItem}
+              onPress={() => navigation.navigate('NotificationSettings')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="notifications-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Notification Preferences</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            {user?.user_type === 'patient' && (
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                onPress={() => navigation.navigate('PatientMedicalInfo')}
+              >
+                <View style={styles.settingsItemLeft}>
+                  <Ionicons name="medical-outline" size={24} color="#002D62" />
+                  <Text style={styles.settingsItemText}>Medical Information</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#888" />
+              </TouchableOpacity>
+            )}
+            
+            {user?.user_type === 'therapist' && (
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                onPress={() => navigation.navigate('TherapistProfile')}
+              >
+                <View style={styles.settingsItemLeft}>
+                  <Ionicons name="briefcase-outline" size={24} color="#002D62" />
+                  <Text style={styles.settingsItemText}>Professional Profile</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#888" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>General</Text>
+            
+            <TouchableOpacity style={styles.settingsItem}>
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="help-circle-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Help & Support</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingsItem}>
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="shield-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Privacy Policy</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingsItem}>
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="document-text-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Terms of Service</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#888" />
+            </TouchableOpacity>
+            
+            <View style={styles.notificationContainer}>
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="notifications-outline" size={24} color="#002D62" />
+                <Text style={styles.settingsItemText}>Push Notifications</Text>
+              </View>
+              <Switch
+                trackColor={{ false: '#E8E1FF', true: '#002D62' }}
+                thumbColor={notificationsEnabled ? '#FFFFFF' : '#FFFFFF'}
+                ios_backgroundColor="#E8E1FF"
+                onValueChange={toggleNotifications}
+                value={notificationsEnabled}
+              />
             </View>
-            <Text style={styles.buttonText}>Edit Profile</Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity 
-            style={styles.gridButton}
-            onPress={() => navigation.navigate('UserSettings')}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons name="settings" size={24} color="#002D62" />
-            </View>
-            <Text style={styles.buttonText}>Settings</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Text style={styles.logoutText}>Log Out</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.gridButton}
-            onPress={() => navigation.navigate('UserPreferences')}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons name="shield" size={24} color="#002D62" />
-            </View>
-            <Text style={styles.buttonText}>Preferences</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridButton}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="help" size={24} color="#002D62" />
-            </View>
-            <Text style={styles.buttonText}>Help</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.notificationContainer}>
-          <Text style={styles.notificationText}>Receive notifications</Text>
-          <Switch
-            trackColor={{ false: '#E8E1FF', true: '#002D62' }}
-            thumbColor={notificationsEnabled ? '#FFFFFF' : '#FFFFFF'}
-            ios_backgroundColor="#E8E1FF"
-            onValueChange={toggleNotifications}
-            value={notificationsEnabled}
-          />
-        </View>
-
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.deleteButton}>
-            <Text style={styles.deleteText}>Delete Account</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+            <TouchableOpacity style={styles.deleteButton}>
+              <Text style={styles.deleteText}>Delete Account</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -131,6 +239,17 @@ const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#002D62',
+    fontSize: 16,
   },
   gradientContainer: {
     flex: 1,
@@ -142,58 +261,80 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 15,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   name: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     textTransform: 'capitalize',
-  },
-  buttonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  gridButton: {
-    backgroundColor: '#F0EAFF',
-    borderRadius: 16,
-    width: '48%',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
     marginBottom: 15,
-    alignItems: 'center',
   },
-  iconContainer: {
-    marginBottom: 10,
+  editProfileButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#002D62',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
-  buttonText: {
+  editProfileText: {
     color: '#002D62',
     fontWeight: '500',
-    fontSize: 15,
+  },
+  sectionContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingsItemText: {
+    fontSize: 16,
+    color: '#444',
+    marginLeft: 16,
   },
   notificationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
-  },
-  notificationText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    paddingVertical: 15,
   },
   actionButtonsContainer: {
     marginTop: 10,
+    marginBottom: 30,
   },
   logoutButton: {
     backgroundColor: '#002D62',
@@ -220,4 +361,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen;
+export default HomeSettingsScreen;

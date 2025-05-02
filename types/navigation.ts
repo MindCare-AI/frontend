@@ -50,13 +50,16 @@ export type MessagingStackParamList = {
 };
 
 export type SettingsStackParamList = {
+  Settings: undefined;
   SettingsHome: undefined;
-  UserSettings: undefined;
-  UserProfile: undefined;
+  Profile: undefined;
+  AppSettings: undefined;
+  NotificationSettings: undefined;
+  PatientMedicalInfo: undefined;
+  TherapistProfile: undefined;
   UserPreferences: undefined;
-  TherapistAvailability: undefined;
-  HealthMetrics: undefined;  // Added new screen
-  MedicalHistory: undefined; // Added new screen
+  HealthMetrics: undefined;
+  MedicalHistory: undefined;
 };
 
 export type AppointmentStackParamList = {

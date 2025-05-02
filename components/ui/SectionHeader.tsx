@@ -4,30 +4,32 @@ import { globalStyles } from '../../styles/global';
 
 interface SectionHeaderProps {
   title: string;
-  description?: string;
+  subtitle?: string;
 }
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, description }) => {
+const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
-      {description && <Text style={styles.description}>{description}</Text>}
+      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: globalStyles.colors.text,
-    marginBottom: 4,
+    color: globalStyles.colors.primary,
+    marginBottom: subtitle => subtitle ? 4 : 0,
   },
-  description: {
+  subtitle: {
     fontSize: 14,
-    color: globalStyles.colors.textSecondary,
+    color: globalStyles.colors.secondary,
   },
 });
+
+export default SectionHeader;

@@ -32,6 +32,8 @@ export type AuthStackParamList = {
 };
 
 export type SettingsStackParamList = {
+  Settings: undefined;
+  AppSettings: undefined;
   SettingsHome: undefined;
   UserSettings: undefined;
   UserProfile: undefined;

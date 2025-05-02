@@ -6,21 +6,28 @@ const { width } = Dimensions.get('window');
 // 1. Color Palette
 const colors = {
   primary: '#4a90e2', // Calming blue
+  primaryLight: '#a8c7f0', // Lighter shade of primary
   secondary: '#6cc070', // Soft green
   accent: '#f5a623', // Warm orange
   neutralLight: '#f0f0f0',
   neutralMedium: '#c0c0c0',
   neutralDark: '#333',
   error: '#d32f2f',
+  danger: '#d32f2f', // Same as error, used in some components
   success: '#43a047',
   white: '#fff',
   black: '#000',
+  grey: '#9e9e9e', // Medium grey for icons
   // Text colors
+  text: '#333333', // Same as textPrimary for consistent naming
   textPrimary: '#333333',
   textSecondary: '#666666',
   textTertiary: '#999999',
   // Background colors
+  background: '#f8f8f8', // Same as backgroundLight for consistent naming
   backgroundLight: '#f8f8f8',
+  inputBackground: '#ffffff',
+  border: '#e0e0e0',
   shadow: 'rgba(0, 0, 0, 0.1)',
 };
 
