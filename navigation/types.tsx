@@ -34,13 +34,11 @@ export type AuthStackParamList = {
 export type SettingsStackParamList = {
   Settings: undefined;
   AppSettings: undefined;
-  SettingsHome: undefined;
-  UserSettings: undefined;
-  UserProfile: undefined;
-  UserPreferences: undefined;
-  TherapistAvailability: undefined;
-  HealthMetrics: undefined; // Add this
-  MedicalHistory: undefined; // Add this
+  TherapistProfile: undefined;
+  PatientProfile: undefined;
+  NotificationSettings: undefined;
+  PatientMedicalInfo: undefined;
+  Availability: undefined;
 };
 
 export type AppointmentStackParamList = {

@@ -2,21 +2,21 @@ import axios from 'axios';
 import { API_URL } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export interface ThemePreferences {
-  mode: 'LIGHT' | 'DARK' | 'SYSTEM';
-  color_scheme: string;
-}
-
-export interface PrivacySettings {
-  profile_visibility: 'PUBLIC' | 'PRIVATE' | 'CONTACTS_ONLY';
-  show_online_status: boolean;
-}
-
-export interface AppSettings {
+export interface PatientProfile {
   id?: number;
-  timezone?: string;
-  theme_preferences?: ThemePreferences;
-  privacy_settings?: PrivacySettings;
+  user?: number;
+  user_name?: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone_number?: string;
+  profile_pic?: string;
+  blood_type?: string;
+  gender?: 'M' | 'F' | 'O' | 'N';
+  date_of_birth?: string;
+  emergency_contact?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Interface for the user data from /api/v1/users/me/ endpoint
@@ -49,43 +49,45 @@ const getCurrentUserId = async (): Promise<string> => {
 };
 
 /**
- * Fetches the user's application settings
- * @returns Promise with app settings
+ * Fetches the current patient's profile
+ * @returns Promise with patient profile data
  */
-export const getAppSettings = async (): Promise<AppSettings> => {
+export const getPatientProfile = async (): Promise<PatientProfile> => {
   try {
     const token = await AsyncStorage.getItem('accessToken');
-    const id = await getCurrentUserId();
+    const userId = await getCurrentUserId();
     
-    const response = await axios.get<AppSettings>(`${API_URL}/users/settings/${id}/`, {
-      headers: {
-        Authorization: `Bearer ${token}`
+    const response = await axios.get<PatientProfile>(
+      `${API_URL}/patient/profiles/${userId}/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
-    });
-    console.log('Received settings:', response.data);
+    );
+    
     return response.data;
   } catch (error) {
-    console.error('Error fetching app settings:', error);
+    console.error('Error fetching patient profile:', error);
     throw error;
   }
 };
 
 /**
- * Updates the user's application settings
- * @param settings App settings to update
- * @returns Promise with updated app settings
+ * Updates the patient's profile
+ * @param profile The profile data to update
+ * @returns Promise with updated profile data
  */
-export const updateAppSettings = async (
-  settings: AppSettings
-): Promise<AppSettings> => {
+export const updatePatientProfile = async (
+  profile: Partial<PatientProfile>
+): Promise<PatientProfile> => {
   try {
     const token = await AsyncStorage.getItem('accessToken');
     const userId = await getCurrentUserId();
     
-    console.log('Sending settings update:', settings);
-    const response = await axios.put<AppSettings>(
-      `${API_URL}/users/settings/${userId}/`,
-      settings,
+    const response = await axios.put<PatientProfile>(
+      `${API_URL}/patient/profiles/${userId}/`,
+      profile,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -93,10 +95,10 @@ export const updateAppSettings = async (
         }
       }
     );
-    console.log('Update response:', response.data);
+    
     return response.data;
   } catch (error) {
-    console.error('Error updating app settings:', error);
+    console.error('Error updating patient profile:', error);
     throw error;
   }
 };

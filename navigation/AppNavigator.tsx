@@ -10,6 +10,7 @@ import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
+import TherapistProfileScreen from '../screens/Settings/TherapistProfileScreen';
 
 const Tab = createBottomTabNavigator<AppStackParamList>();
 

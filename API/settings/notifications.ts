@@ -10,18 +10,46 @@ interface NotificationSettings {
   marketingUpdates?: boolean;
 }
 
+// Removed unused User interface
+
+interface UserResponse {
+  id: string;
+  [key: string]: any; // For other properties that might be in the response
+}
+
+/**
+ * Gets the current user ID
+ * @returns Promise with the user ID
+ */
+const getUserId = async (): Promise<string> => {
+  try {
+    const response = await axios.get(`${API_URL}/users/me/`, {
+      headers: {
+        Authorization: `Bearer ${await getToken()}`
+      }
+    });
+    // Type assertion for the response data
+    const userData = response.data as UserResponse;
+    return userData.id;
+  } catch (error) {
+    console.error('Error fetching user ID:', error);
+    throw error;
+  }
+};
+
 /**
  * Fetches the user's notification settings
  * @returns Promise with notification settings
  */
 export const getNotificationSettings = async (): Promise<NotificationSettings> => {
   try {
-    const response = await axios.get(`${API_URL}/api/v1/notifications/settings`, {
+    const userId = await getUserId();
+    const response = await axios.get(`${API_URL}/users/preferences/${userId}/`, {
       headers: {
         Authorization: `Bearer ${await getToken()}`
       }
     });
-    return response.data;
+    return response.data as NotificationSettings;
   } catch (error) {
     console.error('Error fetching notification settings:', error);
     throw error;
@@ -37,17 +65,20 @@ export const updateNotificationSettings = async (
   settings: NotificationSettings
 ): Promise<NotificationSettings> => {
   try {
+    const userId = await getUserId();
+    const token = await getToken();
+    
     const response = await axios.put(
-      `${API_URL}/api/v1/notifications/settings`,
-      settings,
+      `${API_URL}/users/preferences/${userId}/`,
+      settings,  // Send settings as the request body
       {
         headers: {
-          Authorization: `Bearer ${await getToken()}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         }
       }
     );
-    return response.data;
+    return response.data as NotificationSettings;
   } catch (error) {
     console.error('Error updating notification settings:', error);
     throw error;

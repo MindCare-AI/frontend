@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { TextInput, Button, Chip, Text } from 'react-native-paper';
 import { SectionHeader } from './SectionHeader';
 import { globalStyles } from '../../styles/global';
-import { MedicalInformation } from '../../API/settings/patient';
+import { MedicalInformation } from '../../API/settings/patient_profile';
 
 interface PatientInfoFormProps {
   initialData: Partial<MedicalInformation>;

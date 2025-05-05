@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Chip, RadioButton } from 'react-native-paper';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Switch } from 'react-native';
+import { Text, RadioButton } from 'react-native-paper';
 import { SectionHeader } from './SectionHeader';
 import { globalStyles } from '../../styles/global';
-import { AppSettings } from '../../API/settings/settings';
+import { AppSettings, ThemePreferences, PrivacySettings } from '../../API/settings/settings';
 
 interface AppearanceSettingsProps {
-  initialData: Partial<AppSettings>;
-  onUpdate: (data: Partial<AppSettings>) => void;
+  initialData: AppSettings;
+  onUpdate: (settings: Partial<AppSettings>) => void;
   loading?: boolean;
 }
 
@@ -16,45 +16,120 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   onUpdate,
   loading = false,
 }) => {
-  const [settings, setSettings] = useState<Partial<AppSettings>>(initialData);
+  // Removed unused state and handleChange function
 
-  useEffect(() => {
-    setSettings(initialData);
-  }, [initialData]);
-
-  const handleChange = <K extends keyof AppSettings>(field: K, value: AppSettings[K]) => {
-    setSettings(prev => {
-      const updated = { ...prev, [field]: value };
-      onUpdate(updated);
-      return updated;
-    });
-  };
+  const visibilityOptions = [
+    { label: 'Public', value: 'PUBLIC' },
+    { label: 'Private', value: 'PRIVATE' },
+    { label: 'Contacts Only', value: 'CONTACTS_ONLY' },
+  ];
 
   const themeOptions = [
-    { label: 'Light', value: 'light' },
-    { label: 'Dark', value: 'dark' },
-    { label: 'System', value: 'system' },
+    { label: 'Light Theme', value: 'LIGHT' },
+    { label: 'Dark Theme', value: 'DARK' },
+    { label: 'Use System Default', value: 'SYSTEM' },
   ];
 
-  const fontSizeOptions = [
-    { label: 'Small', value: 'small' },
-    { label: 'Medium', value: 'medium' },
-    { label: 'Large', value: 'large' },
+  const colorSchemeOptions = [
+    { label: 'Blue', value: 'blue' },
+    { label: 'Green', value: 'green' },
+    { label: 'Purple', value: 'purple' },
+    { label: 'Orange', value: 'orange' },
   ];
+
+  // Get current values or use defaults
+  const currentTheme = initialData.theme_preferences?.mode || 'SYSTEM';
+  const currentColorScheme = initialData.theme_preferences?.color_scheme || 'blue';
+  const currentVisibility = initialData.privacy_settings?.profile_visibility || 'PUBLIC';
+  const showOnlineStatus = initialData.privacy_settings?.show_online_status ?? false;
+
+  const handleThemeChange = (mode: string) => {
+    const updatedThemePrefs: ThemePreferences = {
+      mode: mode as ThemePreferences['mode'],
+      color_scheme: currentColorScheme,
+    };
+    onUpdate({ theme_preferences: updatedThemePrefs });
+  };
+
+  const handleColorSchemeChange = (colorScheme: string) => {
+    const updatedThemePrefs: ThemePreferences = {
+      mode: currentTheme as ThemePreferences['mode'],
+      color_scheme: colorScheme,
+    };
+    onUpdate({ theme_preferences: updatedThemePrefs });
+  };
+
+  const handleVisibilityChange = (visibility: string) => {
+    const updatedPrivacy: PrivacySettings = {
+      profile_visibility: visibility as PrivacySettings['profile_visibility'],
+      show_online_status: showOnlineStatus,
+    };
+    onUpdate({ privacy_settings: updatedPrivacy });
+  };
+
+  const handleOnlineStatusChange = (value: boolean) => {
+    const updatedPrivacy: PrivacySettings = {
+      profile_visibility: currentVisibility as PrivacySettings['profile_visibility'],
+      show_online_status: value,
+    };
+    onUpdate({ privacy_settings: updatedPrivacy });
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container}> 
       <SectionHeader 
         title="Theme" 
         description="Choose your preferred app theme" 
       />
       
+      <RadioButton.Group 
+        onValueChange={(value) => handleThemeChange(value)} 
+        value={currentTheme}
+      >
+        {themeOptions.map((option) => (
+          <View key={option.value} style={styles.option}>
+            <RadioButton.Item
+              label={option.label}
+              value={option.value}
+              disabled={loading}
+              status={currentTheme === option.value ? 'checked' : 'unchecked'}
+            />
+          </View>
+        ))}
+      </RadioButton.Group>
+      
+      <SectionHeader 
+        title="Color Scheme" 
+        description="Choose your preferred color accent" 
+      />
+      
+      <RadioButton.Group 
+        onValueChange={(value) => handleColorSchemeChange(value)} 
+        value={currentColorScheme}
+      >
+        {colorSchemeOptions.map((option) => (
+          <View key={option.value} style={styles.option}>
+            <RadioButton.Item
+              label={option.label}
+              value={option.value}
+              disabled={loading}
+              status={currentColorScheme === option.value ? 'checked' : 'unchecked'}
+            />
+          </View>
+        ))}
+      </RadioButton.Group>
+      
+      <SectionHeader 
+        title="Profile Visibility" 
+        description="Control who can see your profile" 
+      />
+      
       <RadioButton.Group
-        value={settings.theme || 'system'}
-        onValueChange={value => handleChange('theme', value)}
+        value={currentVisibility}
+        onValueChange={(value) => handleVisibilityChange(value)}
       >
         <View style={styles.radioGroup}>
-          {themeOptions.map((option) => (
+          {visibilityOptions.map((option) => (
             <View key={option.value} style={styles.radioItem}>
               <RadioButton.Android 
                 value={option.value} 
@@ -68,108 +143,34 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
       </RadioButton.Group>
       
       <SectionHeader 
-        title="Font Size" 
-        description="Adjust the text size throughout the app" 
+        title="Online Status" 
+        description="Control whether others can see when you're online" 
       />
       
-      <View style={styles.chipGroup}>
-        {fontSizeOptions.map((option) => (
-          <TouchableOpacity
-            key={option.value}
-            onPress={() => handleChange('fontSize', option.value)}
-            disabled={loading}
-          >
-            <Chip
-              selected={settings.fontSize === option.value}
-              style={[
-                styles.chip,
-                settings.fontSize === option.value && styles.selectedChip
-              ]}
-              mode="flat"
-              disabled={loading}
-            >
-              {option.label}
-            </Chip>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.switchContainer}>
+        <Text style={styles.switchLabel}>Show when I'm online</Text>
+        <Switch
+          value={showOnlineStatus}
+          onValueChange={handleOnlineStatusChange}
+          disabled={loading}
+          trackColor={{ false: '#767577', true: globalStyles.colors.primary }}
+        />
       </View>
-      
-      <SectionHeader 
-        title="Media Settings" 
-        description="Control how media content behaves" 
-      />
-      
-      <TouchableOpacity
-        style={styles.toggleOption}
-        onPress={() => handleChange('autoPlayMedia', !(settings.autoPlayMedia ?? true))}
-        disabled={loading}
-      >
-        <Text style={styles.toggleLabel}>Auto-play media</Text>
-        <View style={[
-          styles.toggleTrack, 
-          (settings.autoPlayMedia ?? true) && styles.toggleActive,
-          loading && styles.toggleDisabled
-        ]}>
-          <View style={[
-            styles.toggleThumb,
-            (settings.autoPlayMedia ?? true) && styles.toggleThumbActive
-          ]} />
-        </View>
-      </TouchableOpacity>
-
-      <SectionHeader 
-        title="Data Usage" 
-        description="Control how the app uses your data" 
-      />
-
-      <TouchableOpacity
-        style={styles.toggleOption}
-        onPress={() => handleChange('dataUsage', {
-          ...(settings.dataUsage || {}),
-          wifiOnly: !(settings.dataUsage?.wifiOnly ?? false)
-        })}
-        disabled={loading}
-      >
-        <Text style={styles.toggleLabel}>Download media on Wi-Fi only</Text>
-        <View style={[
-          styles.toggleTrack, 
-          (settings.dataUsage?.wifiOnly ?? false) && styles.toggleActive,
-          loading && styles.toggleDisabled
-        ]}>
-          <View style={[
-            styles.toggleThumb,
-            (settings.dataUsage?.wifiOnly ?? false) && styles.toggleThumbActive
-          ]} />
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.toggleOption}
-        onPress={() => handleChange('dataUsage', {
-          ...(settings.dataUsage || {}),
-          autoDownload: !(settings.dataUsage?.autoDownload ?? true)
-        })}
-        disabled={loading}
-      >
-        <Text style={styles.toggleLabel}>Auto-download media</Text>
-        <View style={[
-          styles.toggleTrack, 
-          (settings.dataUsage?.autoDownload ?? true) && styles.toggleActive,
-          loading && styles.toggleDisabled
-        ]}>
-          <View style={[
-            styles.toggleThumb,
-            (settings.dataUsage?.autoDownload ?? true) && styles.toggleThumbActive
-          ]} />
-        </View>
-      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 16,
+  },
+  option: {
+    marginBottom: 8,
   },
   radioGroup: {
     marginBottom: 16,
@@ -183,49 +184,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 8,
   },
-  chipGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  chip: {
-    margin: 4,
-    backgroundColor: globalStyles.colors.neutralLightest,
-  },
-  selectedChip: {
-    backgroundColor: globalStyles.colors.primaryLight,
-  },
-  toggleOption: {
+  switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: globalStyles.colors.neutralLightest,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
-  toggleLabel: {
+  switchLabel: {
     fontSize: 16,
-  },
-  toggleTrack: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: globalStyles.colors.neutralLight,
-    padding: 3,
-  },
-  toggleActive: {
-    backgroundColor: globalStyles.colors.primaryLight,
-  },
-  toggleDisabled: {
-    opacity: 0.5,
-  },
-  toggleThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: globalStyles.colors.white,
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 22 }],
-  },
+  }
 });

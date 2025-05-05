@@ -107,7 +107,13 @@ const HomeSettingsScreen: React.FC = () => {
             <Text style={styles.subtitle}>{user?.user_type || 'Account'}</Text>
             <TouchableOpacity 
               style={styles.editProfileButton}
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => {
+                if (user?.user_type === 'patient') {
+                  navigation.navigate('PatientProfile');
+                } else if (user?.user_type === 'therapist') {
+                  navigation.navigate('TherapistProfile');
+                }
+              }}
             >
               <Text style={styles.editProfileText}>Edit Profile</Text>
             </TouchableOpacity>
@@ -118,7 +124,13 @@ const HomeSettingsScreen: React.FC = () => {
             
             <TouchableOpacity 
               style={styles.settingsItem} 
-              onPress={() => navigation.navigate('Profile')}
+              onPress={() => {
+                if (user?.user_type === 'patient') {
+                  navigation.navigate('PatientProfile');
+                } else if (user?.user_type === 'therapist') {
+                  navigation.navigate('TherapistProfile');
+                }
+              }}
             >
               <View style={styles.settingsItemLeft}>
                 <Ionicons name="person-outline" size={24} color="#002D62" />
@@ -165,11 +177,11 @@ const HomeSettingsScreen: React.FC = () => {
             {user?.user_type === 'therapist' && (
               <TouchableOpacity 
                 style={styles.settingsItem}
-                onPress={() => navigation.navigate('TherapistProfile')}
+                onPress={() => navigation.navigate('Availability')}
               >
                 <View style={styles.settingsItemLeft}>
                   <Ionicons name="briefcase-outline" size={24} color="#002D62" />
-                  <Text style={styles.settingsItemText}>Professional Profile</Text>
+                  <Text style={styles.settingsItemText}>Availability</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#888" />
               </TouchableOpacity>

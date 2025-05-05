@@ -10,7 +10,7 @@ interface SectionHeaderProps {
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <Text style={[styles.title, { marginBottom: subtitle ? 4 : 0 }]}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </View>
   );
@@ -24,7 +24,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: globalStyles.colors.primary,
-    marginBottom: subtitle => subtitle ? 4 : 0,
+    // Moving the dynamic marginBottom to the component render
   },
   subtitle: {
     fontSize: 14,

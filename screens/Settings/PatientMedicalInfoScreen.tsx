@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMedicalInfo, updateMedicalInfo } from '../../API/settings/patient';
+import { getMedicalInfo, updateMedicalInfo } from '../../API/settings/patient_profile';
 
 interface EmergencyContact {
   name: string;

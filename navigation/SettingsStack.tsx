@@ -1,12 +1,13 @@
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeSettingsScreen from '../screens/Settings/HomeSettingsScreen';
-import ProfileScreen from '../screens/Settings/ProfileScreen';
 import PatientMedicalInfoScreen from '../screens/Settings/PatientMedicalInfoScreen';
 import TherapistProfileScreen from '../screens/Settings/TherapistProfileScreen';
 import NotificationSettingsScreen from '../screens/Settings/NotificationSettingsScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import { SettingsStackParamList } from '../types/navigation';
 import { globalStyles } from '../styles/global';
+import TherapistAvailabilityScreen from '../screens/Settings/TherapistAvailablityScreen';
+import PatientProfileScreen from '../screens/Settings/PatientProfileScreen';
 
 const Stack = createStackNavigator<SettingsStackParamList>();
 
@@ -41,9 +42,14 @@ export const SettingsStack = () => {
         options={{ title: 'App Settings' }} 
       />
       <Stack.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
-        options={{ title: 'Profile' }} 
+        name="TherapistProfile" 
+        component={TherapistProfileScreen} 
+        options={{ title: 'TherapistProfile' }} 
+      />
+      <Stack.Screen 
+        name="PatientProfile" 
+        component={PatientProfileScreen} 
+        options={{ title: 'PatientProfile' }} 
       />
       <Stack.Screen 
         name="NotificationSettings" 
@@ -56,9 +62,9 @@ export const SettingsStack = () => {
         options={{ title: 'Medical Information' }} 
       />
       <Stack.Screen 
-        name="TherapistProfile" 
-        component={TherapistProfileScreen} 
-        options={{ title: 'Professional Profile' }} 
+        name="Availability" 
+        component={TherapistAvailabilityScreen} 
+        options={{ title: 'Availability' }} 
       />
     </Stack.Navigator>
   );

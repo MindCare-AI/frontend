@@ -31,12 +31,12 @@ export interface PasswordChange {
 export const getUserProfile = async (): Promise<UserProfile> => {
   try {
     const token = await AsyncStorage.getItem('accessToken');
-    const response = await axios.get(`${API_URL}/api/v1/users/profile`, {
+    const response = await axios.get(`${API_URL}/users/profile`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
     });
-    return response.data;
+    return response.data as UserProfile;
   } catch (error) {
     console.error('Error fetching user profile:', error);
     throw error;
@@ -54,7 +54,7 @@ export const updateUserProfile = async (
   try {
     const token = await AsyncStorage.getItem('accessToken');
     const response = await axios.put(
-      `${API_URL}/api/v1/users/profile`,
+      `${API_URL}/users/profile`,
       profile,
       {
         headers: {
@@ -63,7 +63,7 @@ export const updateUserProfile = async (
         }
       }
     );
-    return response.data;
+    return response.data as UserProfile;
   } catch (error) {
     console.error('Error updating user profile:', error);
     throw error;
@@ -81,7 +81,7 @@ export const changePassword = async (
   try {
     const token = await AsyncStorage.getItem('accessToken');
     const response = await axios.put(
-      `${API_URL}/api/v1/users/password`,
+      `${API_URL}/users/password`,
       passwordData,
       {
         headers: {
@@ -90,7 +90,7 @@ export const changePassword = async (
         }
       }
     );
-    return response.data;
+    return response.data as { message: string };
   } catch (error) {
     console.error('Error changing password:', error);
     throw error;

@@ -16,12 +16,14 @@ interface NotificationSettings {
 }
 
 const NotificationSettingsScreen: React.FC = () => {
+  const [originalSettings, setOriginalSettings] = useState<NotificationSettings>({});
   const [settings, setSettings] = useState<NotificationSettings>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -33,6 +35,8 @@ const NotificationSettingsScreen: React.FC = () => {
       setError(null);
       const data = await getNotificationSettings();
       setSettings(data);
+      setOriginalSettings(data);
+      setHasChanges(false);
     } catch (err) {
       console.error('Failed to load notification settings:', err);
       setError('Failed to load notification settings. Please try again later.');
@@ -41,19 +45,29 @@ const NotificationSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleToggle = async (key: keyof NotificationSettings) => {
+  const handleToggle = (key: keyof NotificationSettings) => {
+    const updatedSettings = {
+      ...settings,
+      [key]: !settings[key],
+    };
+    
+    setSettings(updatedSettings);
+    
+    // Check if any setting is different from original
+    const hasAnyChange = Object.keys(updatedSettings).some(
+      settingKey => updatedSettings[settingKey as keyof NotificationSettings] !== 
+                    originalSettings[settingKey as keyof NotificationSettings]
+    );
+    
+    setHasChanges(hasAnyChange);
+  };
+
+  const handleSave = async () => {
     try {
       setUpdating(true);
-      const updatedValue = !settings[key];
-      
-      const updatedSettings = {
-        ...settings,
-        [key]: updatedValue,
-      };
-      
-      await updateNotificationSettings({ [key]: updatedValue });
-      setSettings(updatedSettings);
-      
+      await updateNotificationSettings(settings);
+      setOriginalSettings(settings);
+      setHasChanges(false);
       setSnackbarMessage('Notification settings updated');
       setSnackbarVisible(true);
     } catch (err) {
@@ -63,6 +77,11 @@ const NotificationSettingsScreen: React.FC = () => {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleCancel = () => {
+    setSettings(originalSettings);
+    setHasChanges(false);
   };
 
   if (loading) {
@@ -149,6 +168,28 @@ const NotificationSettingsScreen: React.FC = () => {
         )}
       </ScrollView>
       
+      {hasChanges && (
+        <View style={styles.buttonContainer}>
+          <Button 
+            mode="outlined" 
+            onPress={handleCancel} 
+            style={styles.cancelButton} 
+            disabled={updating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            mode="contained" 
+            onPress={handleSave} 
+            style={styles.saveButton} 
+            loading={updating}
+            disabled={updating}
+          >
+            Save Changes
+          </Button>
+        </View>
+      )}
+      
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
@@ -170,6 +211,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 80, // Add padding at the bottom for the buttons
   },
   loadingContainer: {
     flex: 1,
@@ -187,6 +229,27 @@ const styles = StyleSheet.create({
   retryButton: {
     backgroundColor: globalStyles.colors.primary,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: globalStyles.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: globalStyles.colors.border,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  saveButton: {
+    flex: 1,
+    marginLeft: 8,
+    backgroundColor: globalStyles.colors.primary,
+  },
+  cancelButton: {
+    flex: 1,
+    marginRight: 8,
+  }
 });
 
 export default NotificationSettingsScreen;
