@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { TextInput, Button, Chip, IconButton, Text } from 'react-native-paper';
 import { SectionHeader } from './SectionHeader';
 import { globalStyles } from '../../styles/global';
-import { Education, TherapistProfile } from '../../API/settings/therapist';
+import { Education, TherapistProfile } from '../../API/settings/therapist_profile';
 
 interface TherapistInfoFormProps {
   initialData: Partial<TherapistProfile>;

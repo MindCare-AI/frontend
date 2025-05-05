@@ -3,15 +3,19 @@ import { View, StyleSheet, ScrollView, SafeAreaView, Text } from 'react-native';
 import { ActivityIndicator, Snackbar, Button } from 'react-native-paper';
 import { getAppSettings, updateAppSettings, AppSettings } from '../../API/settings/settings';
 import { AppearanceSettings } from '../../components/SettingsScreen/AppearanceSettings';
+import { TimeZoneSettings } from '../../components/SettingsScreen/TimeZoneSettings';
 import { globalStyles } from '../../styles/global';
 
 const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({});
+  const [originalSettings, setOriginalSettings] = useState<AppSettings>({});
+  const [tempSettings, setTempSettings] = useState<AppSettings>({});
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -23,6 +27,9 @@ const SettingsScreen: React.FC = () => {
       setError(null);
       const data = await getAppSettings();
       setSettings(data);
+      setOriginalSettings(data);
+      setTempSettings(data);
+      setHasChanges(false);
     } catch (err) {
       console.error('Failed to load settings:', err);
       setError('Failed to load settings. Please try again later.');
@@ -31,11 +38,25 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const handleUpdateSettings = async (updatedSettings: Partial<AppSettings>) => {
+  const handleUpdateSettings = (updatedSettings: Partial<AppSettings>) => {
+    const newSettings = { ...tempSettings, ...updatedSettings };
+    setTempSettings(newSettings);
+    
+    // Check if any setting is different from original
+    const hasAnyChange = Object.keys(newSettings).some(
+      key => newSettings[key as keyof AppSettings] !== originalSettings[key as keyof AppSettings]
+    );
+    
+    setHasChanges(hasAnyChange);
+  };
+
+  const handleSave = async () => {
     try {
       setUpdating(true);
-      await updateAppSettings(updatedSettings);
-      setSettings(prev => ({ ...prev, ...updatedSettings }));
+      await updateAppSettings(tempSettings);
+      setSettings(tempSettings);
+      setOriginalSettings(tempSettings);
+      setHasChanges(false);
       setSnackbarMessage('Settings updated successfully');
       setSnackbarVisible(true);
     } catch (err) {
@@ -45,6 +66,11 @@ const SettingsScreen: React.FC = () => {
     } finally {
       setUpdating(false);
     }
+  };
+
+  const handleCancel = () => {
+    setTempSettings(originalSettings);
+    setHasChanges(false);
   };
 
   if (loading) {
@@ -69,13 +95,43 @@ const SettingsScreen: React.FC = () => {
             </Button>
           </View>
         ) : (
-          <AppearanceSettings
-            initialData={settings}
-            onUpdate={handleUpdateSettings}
-            loading={updating}
-          />
+          <>
+            <TimeZoneSettings
+              initialData={tempSettings}
+              onUpdate={handleUpdateSettings}
+              loading={updating}
+            />
+            
+            <AppearanceSettings
+              initialData={tempSettings}
+              onUpdate={handleUpdateSettings}
+              loading={updating}
+            />
+          </>
         )}
       </ScrollView>
+      
+      {hasChanges && (
+        <View style={styles.buttonContainer}>
+          <Button 
+            mode="outlined" 
+            onPress={handleCancel} 
+            style={styles.cancelButton} 
+            disabled={updating}
+          >
+            Cancel
+          </Button>
+          <Button 
+            mode="contained" 
+            onPress={handleSave} 
+            style={styles.saveButton} 
+            loading={updating}
+            disabled={updating}
+          >
+            Save Changes
+          </Button>
+        </View>
+      )}
       
       <Snackbar
         visible={snackbarVisible}
@@ -98,6 +154,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 80, // Add padding at the bottom for the buttons
   },
   loadingContainer: {
     flex: 1,
@@ -115,6 +172,27 @@ const styles = StyleSheet.create({
   retryButton: {
     backgroundColor: globalStyles.colors.primary,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: globalStyles.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: globalStyles.colors.border,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  saveButton: {
+    flex: 1,
+    marginLeft: 8,
+    backgroundColor: globalStyles.colors.primary,
+  },
+  cancelButton: {
+    flex: 1,
+    marginRight: 8,
+  }
 });
 
 export default SettingsScreen;
