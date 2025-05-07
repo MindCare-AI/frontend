@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
+import { useNavigation } from "@react-navigation/native"
+import type { StackNavigationProp } from "@react-navigation/stack"
+import type { AppointmentStackParamList } from "../../../navigation/types"
 import { ChevronLeft, Check, X, Loader2 } from "lucide-react"
 import Button from "../../../components/Appointments/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/Appointments/ui/card"
@@ -15,7 +17,6 @@ import {
 } from "../../../API/appointments/waitingList"
 import { WaitingListEntry } from "../../../API/appointments/types"
 import { checkTherapistProfileExists } from "../../../API/settings/therapist_profile"
-import { useRouter } from "next/router"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
 
 export default function TherapistWaitingList() {
@@ -24,7 +25,7 @@ export default function TherapistWaitingList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isTherapist, setIsTherapist] = useState(false)
-  const router = useRouter()
+  const navigation = useNavigation<StackNavigationProp<AppointmentStackParamList>>()
 
   // Check if user is a therapist
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function TherapistWaitingList() {
         setIsTherapist(hasTherapistProfile)
         
         if (!hasTherapistProfile) {
-          router.push('/dashboard') // Redirect non-therapists
+          navigation.navigate("PatientDashboard") // Redirect non-therapists
         }
       } catch (err) {
         console.error("Error verifying therapist access:", err)
@@ -43,7 +44,7 @@ export default function TherapistWaitingList() {
     }
     
     verifyTherapistAccess()
-  }, [router])
+  }, [navigation])
 
   // Fetch waiting list entries
   const fetchWaitingList = useCallback(async () => {
@@ -83,7 +84,7 @@ export default function TherapistWaitingList() {
 
   // Offer a slot to a patient
   const offerSlot = (entryId: number) => {
-    router.push(`/therapist/offer-slot/${entryId}`)
+    navigation.navigate("OfferSlot", { entryId })
   }
 
   // Decline a waiting list request
@@ -158,11 +159,9 @@ export default function TherapistWaitingList() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/therapist/dashboard">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
+        <Button variant="ghost" size="sm" onClick={() => navigation.navigate("TherapistDashboard") }>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
         </Button>
         <h1 className="text-2xl font-bold ml-2">Patient Waiting List</h1>
       </div>
@@ -224,8 +223,8 @@ export default function TherapistWaitingList() {
                         <Button size="sm" onClick={() => offerSlot(entry.id)}>
                           Offer Slot
                         </Button>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/messaging?patientId=${entry.patient.id}`}>Contact Patient</Link>
+                        <Button variant="outline" size="sm" onClick={() => navigation.navigate("Messaging", { patientId: entry.patient.id })}>
+                          Contact Patient
                         </Button>
                         <Button 
                           variant="ghost" 

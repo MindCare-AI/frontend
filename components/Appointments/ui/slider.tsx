@@ -248,4 +248,4 @@ const StyledWrapper = styled.div`
   }
 `;
 
-export { Switch, Slider };
+export { Switch };

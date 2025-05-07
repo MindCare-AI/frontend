@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
-import { Clock, Users, Loader2 } from "lucide-react"
+import { useNavigation } from "@react-navigation/native"
+import { Users, Loader2, CalendarPlus } from "lucide-react"
 import Button from "../../../components/Appointments/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/Appointments/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/Appointments/ui/tabs"
@@ -10,9 +10,11 @@ import { AppointmentCard } from "../../../components/Appointments/appointment-ca
 import { getTherapistAppointments } from "../../../API/appointments/therapist"
 import { checkTherapistProfileExists } from "../../../API/settings/therapist_profile"
 import { Appointment } from "../../../API/appointments/types"
-import { useRouter } from "next/router"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
 import { getWaitingList } from "../../../API/appointments/waitingList"
+import { cancelAppointment } from "../../../API/appointments/appointments"
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { AppointmentStackParamList } from '../../../navigation/types';
 
 export default function TherapistDashboard() {
   const [activeTab, setActiveTab] = useState("upcoming")
@@ -23,7 +25,7 @@ export default function TherapistDashboard() {
   const [todayCount, setTodayCount] = useState(0)
   const [pendingCount, setPendingCount] = useState(0)
   const [waitingListCount, setWaitingListCount] = useState(0)
-  const router = useRouter()
+  const navigation = useNavigation<StackNavigationProp<AppointmentStackParamList>>();
 
   // Check if user is a therapist
   useEffect(() => {
@@ -33,7 +35,7 @@ export default function TherapistDashboard() {
         setIsTherapist(hasTherapistProfile)
         
         if (!hasTherapistProfile) {
-          router.push('/dashboard') // Redirect non-therapists
+          navigation.navigate("PatientDashboard") // Redirect non-therapists
         }
       } catch (err) {
         console.error("Error verifying therapist access:", err)
@@ -42,7 +44,9 @@ export default function TherapistDashboard() {
     }
     
     verifyTherapistAccess()
-  }, [router])
+  }, [
+    navigation
+  ])
 
   // Fetch appointments
   const fetchAppointments = useCallback(async () => {
@@ -117,17 +121,13 @@ export default function TherapistDashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Therapist Dashboard</h1>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/therapist/availability">
-              <Clock className="mr-2 h-4 w-4" />
-              Set Availability
-            </Link>
+          <Button onClick={() => navigation.navigate('TherapistAvailability')} variant="outline">
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Manage Availability
           </Button>
-          <Button asChild>
-            <Link href="/therapist/waiting-list">
-              <Users className="mr-2 h-4 w-4" />
-              Waiting List
-            </Link>
+          <Button onClick={() => navigation.navigate('TherapistWaitingList')}>
+            <Users className="mr-2 h-4 w-4" />
+            View Waiting List
           </Button>
         </div>
       </div>
@@ -193,11 +193,8 @@ export default function TherapistDashboard() {
                     userType="therapist"
                     actions={
                       <div className="flex gap-2 mt-4">
-                        <Button size="sm" asChild>
-                          <Link href={`/therapist/start-session/${appointment.id}`}>Start Session</Link>
-                        </Button>
-                        <Button variant="destructive" size="sm" asChild>
-                          <Link href={`/therapist/cancel/${appointment.id}`}>Cancel</Link>
+                        <Button variant="destructive" size="sm" onClick={() => cancelAppointment(appointment.id)}>
+                          Cancel
                         </Button>
                       </div>
                     }
@@ -219,19 +216,13 @@ export default function TherapistDashboard() {
                     userType="therapist"
                     actions={
                       <div className="flex gap-2 mt-4">
-                        <Button size="sm" onClick={() => {
-                          router.push(`/therapist/confirm/${appointment.id}`)
-                        }}>
-                          Confirm
+                        <Button size="sm" onClick={() => navigation.navigate('ConfirmAppointment', { appointmentId: appointment.id })}>
+                          Accept
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          router.push(`/therapist/suggest-time/${appointment.id}`)
-                        }}>
+                        <Button variant="outline" size="sm" onClick={() => navigation.navigate('SuggestTime', { appointmentId: appointment.id })}>
                           Suggest Time
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => {
-                          router.push(`/therapist/decline/${appointment.id}`)
-                        }}>
+                        <Button variant="destructive" size="sm" onClick={() => navigation.navigate('DeclineAppointment', { appointmentId: appointment.id })}>
                           Decline
                         </Button>
                       </div>

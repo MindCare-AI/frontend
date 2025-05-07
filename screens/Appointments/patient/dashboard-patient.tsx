@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Link from "next/link"
 import { Calendar, Loader2 } from "lucide-react"
 import Button from "../../../components/Appointments/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/Appointments/ui/card"
@@ -9,11 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/Ap
 import { Badge } from "../../../components/Appointments/ui/badge"
 import { AppointmentCard } from "../../../components/Appointments/appointment-card"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
-import { useRouter } from "next/router"
 import { Appointment } from "../../../API/appointments/types"
 import { getAppointmentHistory, getUpcomingAppointments, cancelPatientAppointment } from "../../../API/appointments/patient"
 import { getWaitingList, cancelWaitingListEntry } from "../../../API/appointments/waitingList"
 import { WaitingListEntry } from "../../../API/appointments/types"
+
+// Ensure proper typing for navigation
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { AppointmentStackParamList } from '../../../navigation/types';
+import { useNavigation } from '@react-navigation/native';
 
 export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState("upcoming")
@@ -21,7 +24,7 @@ export default function PatientDashboard() {
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const navigation = useNavigation<StackNavigationProp<AppointmentStackParamList>>()
 
   // Fetch patient data
   const fetchPatientData = useCallback(async () => {
@@ -123,11 +126,9 @@ export default function PatientDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Patient Dashboard</h1>
-        <Button asChild>
-          <Link href="/patient/book-appointment">
-            <Calendar className="mr-2 h-4 w-4" />
-            Book Appointment
-          </Link>
+        <Button onClick={() => navigation.navigate('BookAppointment')}>
+          <Calendar className="mr-2 h-4 w-4" />
+          Book Appointment
         </Button>
       </div>
 
@@ -185,7 +186,7 @@ export default function PatientDashboard() {
           <>
             <TabsContent value="upcoming" className="space-y-4">
               {activeTab === "upcoming" && getFilteredContent().length > 0 ? (
-                getFilteredContent().map((appointment: Appointment) => (
+                (getFilteredContent() as Appointment[]).map((appointment) => (
                   <AppointmentCard
                     key={appointment.id}
                     appointment={appointment}
@@ -196,7 +197,7 @@ export default function PatientDashboard() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => router.push(`/patient/reschedule/${appointment.id}`)}
+                            onClick={() => navigation.navigate('Reschedule', { appointmentId: appointment.id })}
                           >
                             Reschedule
                           </Button>
@@ -216,16 +217,14 @@ export default function PatientDashboard() {
                 <div className="text-center py-10">
                   <h3 className="text-lg font-medium">No upcoming appointments</h3>
                   <p className="text-muted-foreground mt-1">Book a new appointment to get started</p>
-                  <Button className="mt-4" asChild>
-                    <Link href="/patient/book-appointment">Book Now</Link>
-                  </Button>
+                  <Button className="mt-4" onClick={() => navigation.navigate('BookAppointment')}>Book Now</Button>
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="waiting" className="space-y-4">
               {activeTab === "waiting" && getFilteredContent().length > 0 ? (
-                getFilteredContent().map((entry: WaitingListEntry) => (
+                (getFilteredContent() as WaitingListEntry[]).map((entry) => (
                   <Card key={entry.id}>
                     <CardHeader>
                       <div className="flex justify-between items-start">
@@ -268,12 +267,12 @@ export default function PatientDashboard() {
 
             <TabsContent value="past" className="space-y-4">
               {activeTab === "past" && getFilteredContent().length > 0 ? (
-                getFilteredContent().map((appointment: Appointment) => (
-                  <AppointmentCard 
-                    key={appointment.id} 
-                    appointment={appointment} 
-                    userType="patient" 
-                  />
+                (getFilteredContent() as Appointment[]).map((appointment) => (
+                   <AppointmentCard 
+                     key={appointment.id} 
+                     appointment={appointment} 
+                     userType="patient" 
+                   />
                 ))
               ) : (
                 <div className="text-center py-10">

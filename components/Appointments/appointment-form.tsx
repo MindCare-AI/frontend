@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Button from "../Appointments/ui/button"
 import { Card, CardContent } from "../Appointments/ui/card"
 import Input from "../Appointments/ui/input"
@@ -9,7 +8,7 @@ import Label from "../Appointments/ui/Label"
 import Textarea from "../Appointments/ui/Textarea"
 import {Slider} from "../Appointments/ui/slider"
 import { formatDate } from "../../lib/Appointments/utils"
-import { bookAppointment } from "../../API/appointments/patient"
+import { TimeSlot } from "../../API/appointments/types"
 
 // Import necessary types
 import { CreateAppointmentParams } from "../../API/appointments/types"
@@ -25,47 +24,24 @@ interface Therapist {
 
 interface AppointmentFormProps {
   therapist: Therapist;
-  date: Date;
-  time: string;
+  date: string; // ISO date string YYYY-MM-DD
+  timeSlot: TimeSlot;
+  onSubmit: (formData: { notes: string; duration_minutes: number }) => void;
+  isSubmitting: boolean;
 }
 
-export function AppointmentForm({ therapist, date, time }: AppointmentFormProps) {
-  const router = useRouter()
+export function AppointmentForm({ therapist, date, timeSlot, onSubmit, isSubmitting }: AppointmentFormProps) {
   const [painLevel, setPainLevel] = useState(0)
   const [notes, setNotes] = useState("")
   const [insuranceInfo, setInsuranceInfo] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
-    setError(null)
-
-    // Format date and time for the API
-    const appointmentDateTime = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    appointmentDateTime.setHours(hours, minutes, 0, 0);
-    
-    // Create appointment data for the API
-    const appointmentData: Omit<CreateAppointmentParams, 'therapist_id'> = {
-      appointment_date: appointmentDateTime.toISOString(),
-      duration_minutes: 60, // Default duration or make it configurable
-      notes: notes ? `Pain Level: ${painLevel}/10. Insurance: ${insuranceInfo}. ${notes}` : `Pain Level: ${painLevel}/10`,
-      pain_level: painLevel
-    };
-
-    try {
-      // Call the API to book the appointment
-      await bookAppointment(therapist.id, appointmentData);
-      
-      // Redirect to confirmation page on success
-      router.push("/patient/appointment-confirmation");
-    } catch (err) {
-      console.error('Error booking appointment:', err);
-      setError('Failed to book appointment. Please try again.');
-      setIsSubmitting(false);
-    }
+    // Build notes including pain level and insurance
+    const fullNotes = notes
+      ? `Pain Level: ${painLevel}/10. Insurance: ${insuranceInfo}. ${notes}`
+      : `Pain Level: ${painLevel}/10`
+    onSubmit({ notes: fullNotes, duration_minutes: 60 })
   }
 
   const fullName = therapist.full_name || `${therapist.first_name} ${therapist.last_name}`;
@@ -82,16 +58,12 @@ export function AppointmentForm({ therapist, date, time }: AppointmentFormProps)
                 <p className="text-sm text-muted-foreground">{fullName}</p>
               </div>
               <div>
-                <p className="text-sm font-medium">Specialty</p>
-                <p className="text-sm text-muted-foreground">{therapist.specialty}</p>
-              </div>
-              <div>
                 <p className="text-sm font-medium">Date</p>
-                <p className="text-sm text-muted-foreground">{formatDate(date)}</p>
+                <p className="text-sm text-muted-foreground">{formatDate(new Date(date))}</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Time</p>
-                <p className="text-sm text-muted-foreground">{time}</p>
+                <p className="text-sm text-muted-foreground">{timeSlot.start}</p>
               </div>
             </div>
           </div>
@@ -131,11 +103,7 @@ export function AppointmentForm({ therapist, date, time }: AppointmentFormProps)
             />
           </div>
 
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600">
-              {error}
-            </div>
-          )}
+          {/* error handling lifted to parent */}
 
           <div className="pt-4">
             <Button type="submit" className="w-full" disabled={isSubmitting}>

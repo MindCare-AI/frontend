@@ -97,5 +97,3 @@ const StyledCardFooter = styled.div`
   padding: 1.5rem;
   border-top: 1px solid #e5e7eb;
 `;
-
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter };

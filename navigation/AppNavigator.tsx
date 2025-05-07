@@ -9,25 +9,16 @@ import { AppStackParamList } from './types';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
-import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
-import TherapistProfileScreen from '../screens/Settings/TherapistProfileScreen';
+import AppointmentsStack from './AppointmentsStack';
 
 const Tab = createBottomTabNavigator<AppStackParamList>();
-
-// Ionicons names
-type IconName = 'home' | 'home-outline' | 'chatbubble' | 'chatbubble-outline' | 
-                'notifications' | 'notifications-outline' | 'settings' | 'settings-outline' |
-                'alert';
-
-// Feather icons names
-type FeatherIconName = 'smile';
 
 export default function AppNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: IconName = 'alert'; // Default icon
+          let iconName: keyof typeof Ionicons.glyphMap = 'alert'; // Default icon
 
           switch (route.name) {
             case 'Feeds':
@@ -43,7 +34,6 @@ export default function AppNavigator() {
               iconName = focused ? 'settings' : 'settings-outline';
               break;
             case 'MoodTracker':
-              // Use Feather icon for mood tracker
               return <Feather name="smile" size={size} color={color} />;
             default:
               iconName = 'alert';
@@ -53,11 +43,17 @@ export default function AppNavigator() {
         },
         tabBarActiveTintColor: globalStyles.colors.primary,
         tabBarInactiveTintColor: globalStyles.colors.neutralMedium,
-      })}>
+      })}
+    >
       <Tab.Screen 
         name="Feeds" 
         component={FeedsScreen} 
         options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen 
+        name="Appointments" 
+        component={AppointmentsStack} 
+        options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
         name="Chatbot" 

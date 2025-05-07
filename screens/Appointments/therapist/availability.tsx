@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
+import { useNavigation } from "@react-navigation/native"
 import { ChevronLeft, Plus, Save, Trash2, Loader2 } from "lucide-react"
 import Button from "../../../components/Appointments/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/Appointments/ui/card"
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import Separator from "../../../components/Appointments/ui/separator"
 import  Input  from "../../../components/Appointments/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
-import { useRouter } from "next/router"
 import { 
   getTherapistAvailability, 
   updateTherapistAvailability, 
@@ -23,7 +22,7 @@ import { checkTherapistProfileExists } from "../../../API/settings/therapist_pro
 
 export default function TherapistAvailabilityScreen() {
   const daysOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as DayOfWeek[]
-  const router = useRouter()
+  const navigation = useNavigation()
 
   const [isTherapist, setIsTherapist] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -61,7 +60,7 @@ export default function TherapistAvailabilityScreen() {
         setIsTherapist(hasTherapistProfile)
         
         if (!hasTherapistProfile) {
-          router.push('/dashboard') // Redirect non-therapists
+          navigation.navigate('PatientDashboard') // Redirect non-therapists
         }
       } catch (err) {
         console.error("Error verifying therapist access:", err)
@@ -70,7 +69,7 @@ export default function TherapistAvailabilityScreen() {
     }
     
     verifyTherapistAccess()
-  }, [router])
+  }, [navigation])
 
   // Fetch therapist availability
   useEffect(() => {
@@ -218,11 +217,9 @@ export default function TherapistAvailabilityScreen() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/therapist/dashboard">
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
+        <Button variant="ghost" size="sm" onClick={() => navigation.navigate('TherapistDashboard')}>
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
         </Button>
         <h1 className="text-2xl font-bold ml-2">Set Your Availability</h1>
       </div>

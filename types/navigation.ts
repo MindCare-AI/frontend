@@ -13,6 +13,8 @@ export type RootStackParamList = {
   NotificationDetail: { id: number }; // Changed from string to number
   Settings: undefined;
   Appointments: undefined;
+  PatientDashboard: undefined; // Added
+  TherapistDashboard: undefined; // Added
 };
 
 export type AppTabParamList = {
@@ -62,6 +64,12 @@ export type SettingsStackParamList = {
 export type AppointmentStackParamList = {
   AppointmentManagement: undefined;
   BookAppointment: undefined;
+  AppointmentConfirmation: undefined;
+  TherapistProfile: undefined;
+  TherapistAvailability: undefined;
+  TherapistProfileEdit: undefined;
+  TherapistProfileView: undefined;
+  TherapistProfileViewEdit: undefined;
 };
 
 // Update Appointment interface
