@@ -216,5 +216,3 @@ const StyledSelectItem = styled.div`
     background-color: #f3f4f6;
   }
 `;
-
-export { Select, SelectTrigger, SelectValue, SelectContent, SelectItem };

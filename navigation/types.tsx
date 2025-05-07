@@ -22,6 +22,7 @@ export type AppStackParamList = {
   Notifications: undefined;
   Settings: undefined;
   MoodTracker: undefined;
+  Appointments: undefined;
 };
 
 export type AuthStackParamList = {
@@ -44,6 +45,19 @@ export type SettingsStackParamList = {
 export type AppointmentStackParamList = {
   AppointmentManagement: undefined;
   BookAppointment: undefined;
+  PatientDashboard: undefined;
+  TherapistDashboard: undefined;
+  TherapistAvailability: undefined;
+  TherapistWaitingList: undefined;
+  AppointmentConfirmation: undefined;
+  Reschedule: { appointmentId: number };
+  OfferSlot: { entryId: number };
+  Messaging: { patientId: number };
+  StartSession: { appointmentId: number };
+  CancelAppointment: { appointmentId: number };
+  ConfirmAppointment: { appointmentId: number };
+  SuggestTime: { appointmentId: number };
+  DeclineAppointment: { appointmentId: number };
 };
 
 export type MessagingStackParamList = {

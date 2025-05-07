@@ -1,12 +1,12 @@
-import React, { forwardRef } from 'react';
-import styled, { css } from 'styled-components';
+import React, { forwardRef, ReactElement } from 'react';
+import styled from 'styled-components';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'default' | 'outline' | 'ghost' | 'destructive';
   size?: 'default' | 'sm' | 'icon';
   asChild?: boolean;
   className?: string;
-  children?: React.ReactNode;
+  children?: ReactElement | React.ReactNode;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -21,7 +21,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     
     // If asChild is true, clone the first child element and pass props to it
     if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children, {
+      return React.cloneElement(children as ReactElement, {
         ...props,
         className: `button button-${variant} button-${size} ${className} ${children.props.className || ''}`
       });

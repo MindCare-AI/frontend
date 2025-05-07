@@ -1,19 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { CheckCircle2, Loader2 } from "lucide-react"
 import Button from "../../../components/Appointments/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/Appointments/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
-import { useRouter } from "next/router"
 import { Appointment } from "../../../API/appointments/types"
+import { useNavigation } from "@react-navigation/native"
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../../../navigation/types";
 
 export default function AppointmentConfirmation() {
   const [appointment, setAppointment] = useState<Appointment | null>(null)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+
+  // Explicitly type the navigation object
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   // For a real implementation, you would get the appointment details from the API
   // using the ID passed in the URL or from the session storage
@@ -53,11 +55,7 @@ export default function AppointmentConfirmation() {
             </Alert>
           )}
 
-          {loading ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
+          {appointment ? (
             <div className="space-y-4">
               <div className="border-b pb-4">
                 <p className="text-sm font-medium">Therapist</p>
@@ -98,6 +96,10 @@ export default function AppointmentConfirmation() {
                 <p className="text-sm text-muted-foreground">Awaiting therapist confirmation</p>
               </div>
             </div>
+          ) : (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
           )}
 
           <div className="space-y-2 pt-4">
@@ -106,12 +108,8 @@ export default function AppointmentConfirmation() {
             </p>
 
             <div className="flex flex-col gap-2">
-              <Button asChild>
-                <Link href="/patient/dashboard">Return to Dashboard</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/patient/book-appointment">Book Another Appointment</Link>
-              </Button>
+              <Button onClick={() => navigation.navigate('Appointments', { screen: 'AppointmentManagement' })}>Return to Dashboard</Button>
+              <Button variant="outline" onClick={() => navigation.navigate('Appointments', { screen: 'BookAppointment' })}>Book Another Appointment</Button>
             </div>
           </div>
         </CardContent>

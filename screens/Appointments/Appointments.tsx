@@ -1,11 +1,11 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useNavigation } from "@react-navigation/native"
 import Button from "../../components/Appointments/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../components/Appointments/ui/card"
 
 export default function Home() {
-  const router = useRouter()
+  const navigation = useNavigation()
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -23,7 +23,7 @@ export default function Home() {
             </p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push("/patient/dashboard")}>
+            <Button className="w-full" onClick={() => navigation.navigate('PatientDashboard' as never)}>
               Enter as Patient
             </Button>
           </CardFooter>
@@ -38,7 +38,7 @@ export default function Home() {
             <p className="mb-4">Set your availability, confirm appointments, and manage your patient waiting lists.</p>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push("/therapist/dashboard")}>
+            <Button className="w-full" onClick={() => navigation.navigate('TherapistDashboard' as never)}>
               Enter as Therapist
             </Button>
           </CardFooter>

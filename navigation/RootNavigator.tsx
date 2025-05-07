@@ -8,7 +8,6 @@ import AppNavigator from './AppNavigator';
 import OnboardingScreen from '../screens/Onboarding/OnboardingScreen';
 import NotificationNavigator from './NotificationNavigator';
 import ProfileScreen from '../screens/Settings/HomeSettingsScreen';
-
 const Stack = createStackNavigator<RootStackParamList>();
 
 const RootNavigator = () => {

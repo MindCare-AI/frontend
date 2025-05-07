@@ -8,24 +8,22 @@ import { TherapistCard } from "../../../components/Appointments/therapist-card"
 import { AppointmentCalendar } from "../../../components/Appointments/appointment-calendar"
 import { AppointmentForm } from "../../../components/Appointments/appointment-form"
 import { Alert, AlertDescription, AlertTitle } from "../../../components/Appointments/ui/Alert"
-import { useRouter } from "next/router"
 import axios from "axios"
 import { API_URL } from "../../../config"
 import { getAuthToken } from "../../../lib/utils"
 import { getTherapistAvailability, bookAppointment } from "../../../API/appointments/patient"
-import { TimeSlot } from "../../../API/appointments/types"
+import { PaginatedResponse, TimeSlot, UserInfo } from "../../../API/appointments/types"
+import { useNavigation } from "@react-navigation/native";
+import type { StackNavigationProp } from "@react-navigation/stack";
+import type { RootStackParamList } from "../../../navigation/types";
 
-// Interface for therapist data
-interface Therapist {
-  id: number;
-  first_name: string;
-  last_name: string;
-  specializations: string[];
-  years_of_experience: number;
-  profile_picture?: string;
-  bio?: string;
-  hourly_rate?: number;
-  rating?: number;
+// Therapist type matching TherapistCard props
+interface Therapist extends UserInfo {
+  specialty: string;
+  bio: string;
+  tags: string[];
+  availability: 'high' | 'medium' | 'low';
+  image?: string;
 }
 
 export default function BookAppointment() {
@@ -38,7 +36,7 @@ export default function BookAppointment() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'Appointments'>>();
 
   // Fetch therapists
   useEffect(() => {
@@ -46,14 +44,16 @@ export default function BookAppointment() {
       try {
         setLoading(true)
         const token = await getAuthToken()
-        
-        const response = await axios.get(`${API_URL}/therapist/profiles/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Accept': 'application/json'
+        // Expect paginated response with Therapist items
+        const response = await axios.get<PaginatedResponse<Therapist>>(
+          `${API_URL}/therapist/profiles/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Accept': 'application/json'
+            }
           }
-        })
-        
+        )
         setTherapists(response.data.results)
       } catch (err) {
         console.error("Error fetching therapists:", err)
@@ -71,21 +71,19 @@ export default function BookAppointment() {
     setBookingStep(2)
   }
 
-  const handleDateSelect = async (date: string) => {
+  const handleDateSelect = async (date: Date) => {
+    // Convert Date to YYYY-MM-DD string
+    const dateStr = date.toISOString().split('T')[0]
     try {
       setLoading(true)
-      setSelectedDate(date)
-      
+      setSelectedDate(dateStr)
       if (selectedTherapist) {
-        // Fetch available time slots for the selected date and therapist
         const availabilityResponse = await getTherapistAvailability(
-          selectedTherapist.id, 
-          date
+          selectedTherapist.id,
+          dateStr
         )
-        
         setAvailableSlots(availabilityResponse.available_slots)
       }
-      
       setBookingStep(3)
     } catch (err) {
       console.error("Error fetching available time slots:", err)
@@ -128,7 +126,7 @@ export default function BookAppointment() {
       })
       
       // Redirect to confirmation page
-      router.push('/patient/appointment-confirmation')
+      navigation.navigate('Appointments', { screen: 'AppointmentConfirmation' })
     } catch (err) {
       console.error("Error booking appointment:", err)
       setError("Failed to book appointment. Please try again.")
@@ -140,7 +138,12 @@ export default function BookAppointment() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" onClick={handleBack} disabled={bookingStep === 1}>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          disabled={bookingStep === 1}
+          onClick={handleBack}
+        >
           <ChevronLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
