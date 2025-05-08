@@ -39,7 +39,7 @@ export default function ChatbotScreen() {
   // Initialize chatbot conversation
   const initializeChatbotConversation = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/`, {
+      const response = await fetch(`${API_URL}/chatbot/`, { // changed endpoint
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -65,7 +65,7 @@ export default function ChatbotScreen() {
     if (!conversationId) return;
 
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/`, {
+      const response = await fetch(`${API_URL}/chatbot/${conversationId}/`, { // changed endpoint
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -122,7 +122,7 @@ export default function ChatbotScreen() {
       setInput('');
       setIsTyping(true);
 
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/send_message/`, {
+      const response = await fetch(`${API_URL}/chatbot/${conversationId}/send_message/`, { // changed endpoint
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

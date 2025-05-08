@@ -7,6 +7,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { ToastProvider } from './components/ui/ToastContext';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { MoodProvider } from './contexts/moodContext';  // added import
 
 LogBox.ignoreLogs(['Warning: ...']);
 
@@ -15,11 +16,13 @@ export default function App() {
     <ErrorBoundary>
       <PaperProvider>
         <AuthProvider>
-          <ToastProvider>
-            <NavigationContainer>
-              <RootNavigator />
-            </NavigationContainer>
-          </ToastProvider>
+          <MoodProvider> {/* wrap with MoodProvider */}
+            <ToastProvider>
+              <NavigationContainer>
+                <RootNavigator />
+              </NavigationContainer>
+            </ToastProvider>
+          </MoodProvider>
         </AuthProvider>
       </PaperProvider>
     </ErrorBoundary>

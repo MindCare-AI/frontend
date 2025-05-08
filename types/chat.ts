@@ -3,9 +3,12 @@ import { MessageType, MessageAttachment, MessageReaction } from './messaging';
 
 export interface Message {
   id: string;
+  conversation_id: string;
+  sender: {
+    id: string;
+    name: string;
+  };
   content: string;
-  sender_id: string;
-  sender_name: string;
   timestamp: string;
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   message_type: 'text' | 'image' | 'file';

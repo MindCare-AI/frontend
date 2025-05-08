@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image } from 'react-native';
 import { mockPosts } from '../../constants/mockFeeds';
 import PostCard from '../../components/FeedsScreen/PostCard';
 import CreatePostCard from '../../components/FeedsScreen/CreatePostCard';
@@ -60,6 +60,10 @@ const FeedsScreen = () => {
                   <View style={[styles.loadingText, { width: '20%', height: 8 }]} />
                 </View>
               </View>
+              <Image 
+                source={require('../../assets/images/placeholder.png')} 
+                style={{ width: '100%', height: 100, borderRadius: 8 }}
+              />
               <View style={[styles.loadingText, { width: '75%' }]} />
               <View style={[styles.loadingText, { width: '100%' }]} />
               <View style={[styles.loadingText, { width: '60%' }]} />

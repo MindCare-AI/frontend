@@ -93,12 +93,13 @@ class ChatbotService {
 
   async initializeConversation(): Promise<ChatbotConversation> {
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/conversation`, {
+      const response = await fetch(`${API_URL}/chatbot/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ initial_message: "Hello, I need help." })
       });
 
       if (!response.ok) {
@@ -146,13 +147,13 @@ class ChatbotService {
         });
       }
 
-      const response = await fetch(`${API_URL}/messaging/chatbot/${this.currentConversation!.id}/send_message`, {
+      const response = await fetch(`${API_URL}/chatbot/${this.currentConversation!.id}/send_message/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(messageRequest),
+        body: JSON.stringify({ message: content }),
       });
 
       if (!response.ok) {
@@ -208,7 +209,7 @@ class ChatbotService {
 
   async getChatHistory(conversationId: string): Promise<Message[]> {
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/history`, {
+      const response = await fetch(`${API_URL}/chatbot/${conversationId}/`, {
         headers: {
           'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,
         },
@@ -228,7 +229,7 @@ class ChatbotService {
 
   async clearHistory(conversationId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/clear`, {
+      const response = await fetch(`${API_URL}/chatbot/${conversationId}/clear/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,

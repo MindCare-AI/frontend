@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message, ChatbotConversation } from '../../types/chat';
 import chatbotService from '../../services/chatbotService';
-import { useChat } from '../../contexts/ChatContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetInfo } from '@react-native-community/netinfo';
+
+// Dummy hook to replace missing ChatContext
+const useChat = () => ({ setActiveConversation: (id: string) => {} });
 
 interface UseChatbotReturn {
   messages: Message[];
@@ -71,8 +73,13 @@ export const useChatbot = () => {
       conversation_id: conversation.id,
       content,
       sender: {
-        id: user.id,
-        name: user.name,
+        id: user.id.toString(), // convert number to string
+        // Compute sender name:
+        name: user.therapist_profile
+          ? `${user.therapist_profile.first_name} ${user.therapist_profile.last_name}`
+          : user.patient_profile
+          ? `${user.patient_profile.first_name} ${user.patient_profile.last_name}`
+          : user.email || 'User',
       },
       timestamp: new Date().toISOString(),
       message_type: 'text',
@@ -133,7 +140,7 @@ export const useChatbot = () => {
     }
   }, [conversation]);
 
-  // Update active conversation in ChatContext when conversation changes
+  // Update active conversation in dummy ChatContext when conversation changes
   useEffect(() => {
     if (conversation) {
       setActiveConversation(conversation.id);
@@ -146,7 +153,7 @@ export const useChatbot = () => {
       if (message.conversation_id === conversation?.id) {
         setMessages(prev => [...prev, message]);
         // Clear typing indicator when bot responds
-        if (message.sender.id !== user?.id) {
+        if (message.sender.id !== user?.id.toString()) {
           setIsTyping(false);
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);

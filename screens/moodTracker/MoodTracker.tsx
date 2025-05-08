@@ -208,7 +208,7 @@ const MoodTracker: React.FC = () => {
       );
     }
 
-    if (moodLogs.length === 0) {
+    if (!moodLogs || moodLogs.length === 0) {
       return (
         <View style={styles.emptyLogsContainer}>
           <Text style={styles.emptyLogsText}>
@@ -218,8 +218,8 @@ const MoodTracker: React.FC = () => {
       );
     }
 
-    // Display the most recent 3 logs
-    const recentLogs = moodLogs.slice(0, 3);
+    // Ensure moodLogs is an array before using slice
+    const recentLogs = Array.isArray(moodLogs) ? moodLogs.slice(0, 3) : [];
 
     return (
       <View style={styles.recentLogsContainer}>
