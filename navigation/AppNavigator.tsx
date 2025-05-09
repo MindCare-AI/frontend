@@ -10,6 +10,7 @@ import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import FeedsScreen from '../screens/FeedsScreen/FeedsScreen';
 import AppointmentsNavigator from './AppointmentsNavigator'; // Updated import
+import DashboardScreen from '../screens/Appointments/DashboardScreen';
 
 const Tab = createBottomTabNavigator<AppStackParamList>();
 
@@ -52,7 +53,7 @@ export default function AppNavigator() {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={AppointmentsNavigator} // Use the updated navigator
+        component={DashboardScreen} // Use the updated navigator
         options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
