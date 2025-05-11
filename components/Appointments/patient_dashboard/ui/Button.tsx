@@ -37,6 +37,9 @@ interface ButtonProps {
   textStyle?: any
   fullWidth?: boolean
   borderRadius?: number
+  accessibilityLabel?: string
+  accessibilityHint?: string
+  testID?: string
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -52,7 +55,10 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
   fullWidth = false,
-  borderRadius = 4,
+  borderRadius = 999,
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
 }) => {
   const nbTheme = useNativeBase()
   const { isDarkMode, colors } = useTheme()
@@ -100,19 +106,21 @@ export const Button: React.FC<ButtonProps> = ({
     return "transparent"
   }
   const getPadding = () => {
-    // Adjust padding based on screen size for responsive design
-    const basePadding: Record<ButtonSize, { paddingVertical: number, paddingHorizontal: number }> = {
-      xs: { paddingVertical: 4, paddingHorizontal: 8 },
-      sm: { paddingVertical: 6, paddingHorizontal: 12 },
-      md: { paddingVertical: 8, paddingHorizontal: 16 },
-      lg: { paddingVertical: 12, paddingHorizontal: 24 }
+    // Ensure minimum touch target size of 48px
+    const minHeight = 48;
+    const basePadding: Record<ButtonSize, { paddingVertical: number, paddingHorizontal: number, minHeight: number }> = {
+      xs: { paddingVertical: 12, paddingHorizontal: 16, minHeight },
+      sm: { paddingVertical: 14, paddingHorizontal: 20, minHeight },
+      md: { paddingVertical: 16, paddingHorizontal: 24, minHeight },
+      lg: { paddingVertical: 20, paddingHorizontal: 32, minHeight }
     }
     
-    // For small screens, reduce padding slightly
+    // For small screens, maintain minimum touch target while adjusting padding
     if (isSmallScreen) {
       return {
-        paddingVertical: basePadding[size].paddingVertical * 0.9,
-        paddingHorizontal: basePadding[size].paddingHorizontal * 0.9
+        paddingVertical: Math.max(basePadding[size].paddingVertical * 0.9, 12),
+        paddingHorizontal: basePadding[size].paddingHorizontal * 0.9,
+        minHeight
       }
     }
     
@@ -139,9 +147,27 @@ export const Button: React.FC<ButtonProps> = ({
   const getInteractionStyles = (pressed: boolean) => {
     if (isDisabled || isLoading) return {}
     
+    const baseScale = 1;
+    const pressedScale = 0.98;
+    const baseOpacity = 1;
+    const pressedOpacity = 0.8;
+    
     return {
-      opacity: pressed ? 0.8 : 1,
-      transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+      opacity: pressed ? pressedOpacity : baseOpacity,
+      transform: pressed ? [{ scale: pressedScale }] : [{ scale: baseScale }],
+      ...Platform.select({
+        web: {
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            opacity: 0.9,
+            transform: [{ scale: 1.02 }],
+          },
+          '&:active': {
+            opacity: pressedOpacity,
+            transform: [{ scale: pressedScale }],
+          },
+        },
+      }),
     }
   }
 
@@ -165,12 +191,16 @@ export const Button: React.FC<ButtonProps> = ({
         disabled={isDisabled || isLoading}
         accessibilityRole="button"
         accessibilityState={{ disabled: isDisabled || isLoading }}
+        accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
+        accessibilityHint={accessibilityHint}
+        testID={testID}
       >
         {isLoading && (
           <ActivityIndicator 
             size={size === "xs" ? "small" : "small"} 
             color={getTextColor()} 
             style={styles.loadingIndicator} 
+            accessibilityLabel="Loading"
           />
         )}
         {!isLoading && leftIcon && (
@@ -186,6 +216,8 @@ export const Button: React.FC<ButtonProps> = ({
               fontSize: getFontSize(),
               marginLeft: leftIcon && !isLoading ? 8 : 0,
               marginRight: rightIcon ? 8 : 0,
+              opacity: isLoading ? 0.7 : 1,
+              fontWeight: '700',
             },
             textStyle,
           ]}
@@ -207,9 +239,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 4,
     overflow: 'hidden',
-    minWidth: 64, // Ensures button has minimum touch target size
+    minWidth: 64,
+    minHeight: 48, // Ensure minimum touch target size
     ...Platform.select({
       web: {
         cursor: "pointer",
@@ -218,6 +250,10 @@ const styles = StyleSheet.create({
         transition: "all 0.2s ease",
         WebkitTapHighlightColor: "transparent",
         touchAction: "manipulation" as any,
+        '&:focus-visible': {
+          outline: '2px solid #007AFF',
+          outlineOffset: '2px',
+        },
       },
       ios: {
         shadowColor: "#000",

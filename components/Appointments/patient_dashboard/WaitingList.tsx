@@ -1,5 +1,5 @@
 import type React from "react"
-import { View, Text } from "react-native"
+import { View, Text, AccessibilityInfo, StyleSheet } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAppointments } from "../../../contexts/AppointmentContext"
 import type { WaitingListEntryType } from "../../../types/appointmentTypes"
@@ -14,8 +14,27 @@ const WaitingList: React.FC = () => {
         return "warning"
       case "Notified":
         return "purple"
+      case "Confirmed":
+        return "success"
+      case "Cancelled":
+        return "error"
       default:
         return "gray"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Pending":
+        return "time-outline"
+      case "Notified":
+        return "notifications-outline"
+      case "Confirmed":
+        return "checkmark-circle-outline"
+      case "Cancelled":
+        return "close-circle-outline"
+      default:
+        return "help-circle-outline"
     }
   }
 
@@ -35,12 +54,15 @@ const WaitingList: React.FC = () => {
   return (
     <Card style={{ flex: 1 }}>
       <CardHeader>
-        <Text style={{ fontSize: 18, fontWeight: "600" }}>Waiting List</Text>
-        <Text style={{ color: "#718096" }}>Manage your waiting list entries for preferred appointments</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Ionicons name="list-outline" size={24} color="#4A5568" />
+          <Text style={{ fontSize: 20, fontWeight: "600" }}>Waiting List</Text>
+        </View>
+        <Text style={{ color: "#718096", marginTop: 4 }}>Manage your waiting list entries for preferred appointments</Text>
       </CardHeader>
       <CardContent>
-        <ScrollView>
-          <View style={{ gap: 16 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, padding: 24, gap: 28 }}>
+          <View style={{ gap: 16, paddingBottom: 16 }}>
             {waitingListEntries.map((entry) => (
               <WaitingListCard key={entry.id} entry={entry} onCancel={() => cancelWaitingListEntry(entry.id)} />
             ))}
@@ -63,33 +85,117 @@ const WaitingListCard: React.FC<WaitingListCardProps> = ({ entry, onCancel }) =>
         return "warning"
       case "Notified":
         return "purple"
+      case "Confirmed":
+        return "success"
+      case "Cancelled":
+        return "error"
       default:
         return "gray"
     }
   }
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Pending":
+        return "time-outline"
+      case "Notified":
+        return "notifications-outline"
+      case "Confirmed":
+        return "checkmark-circle-outline"
+      case "Cancelled":
+        return "close-circle-outline"
+      default:
+        return "help-circle-outline"
+    }
+  }
+
+  const styles = StyleSheet.create({
+    card: {
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      borderRadius: 20,
+      backgroundColor: '#fff',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.10,
+      shadowRadius: 12,
+      elevation: 4,
+      marginBottom: 20,
+      overflow: 'hidden',
+      padding: 0,
+    },
+    cardContent: {
+      padding: 24,
+    },
+    statusBadge: {
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      fontWeight: '700',
+      fontSize: 15,
+      marginLeft: 8,
+    },
+    timeSlotBadge: {
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      fontWeight: '600',
+      fontSize: 14,
+      marginLeft: 6,
+      backgroundColor: '#F3F4F6',
+    },
+    actionButton: {
+      minWidth: 120,
+      borderRadius: 999,
+      paddingVertical: 12,
+      fontWeight: '700',
+      fontSize: 16,
+      marginTop: 8,
+    },
+  })
+
   return (
-    <Card>
+    <Card style={styles.card}>
       <CardHeader>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 18, fontWeight: "600" }}>{entry.therapist}</Text>
-          <Badge colorScheme={getStatusColor(entry.status)} variant="subtle">
-            {entry.status}
-          </Badge>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="person-outline" size={20} color="#4A5568" />
+            <Text style={{ fontSize: 18, fontWeight: "600" }}>{entry.therapist}</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            <Ionicons name={getStatusIcon(entry.status)} size={16} color="#4A5568" />
+            <Badge colorScheme={getStatusColor(entry.status)} variant="subtle" style={styles.statusBadge}>
+              {entry.status}
+            </Badge>
+          </View>
         </View>
-        <Text style={{ color: "#718096", marginTop: 4 }}>Requested Date: {entry.requestedDate}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <Ionicons name="calendar-outline" size={16} color="#718096" />
+          <Text style={{ color: "#718096" }}>Requested Date: {entry.requestedDate}</Text>
+        </View>
       </CardHeader>
-      <CardContent>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-          <Text style={{ color: "#718096", marginRight: 8 }}>Preferred times:</Text>
+      <CardContent style={styles.cardContent}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <Text style={{ color: "#718096" }}>Preferred times:</Text>
           {entry.preferredTimeSlots.map((slot) => (
-            <Badge key={slot} variant="outline" style={{ marginRight: 4, marginBottom: 4 }}>
+            <Badge 
+              key={slot} 
+              variant="outline" 
+              style={styles.timeSlotBadge}
+            >
               {slot}
             </Badge>
           ))}
         </View>
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-          <Button variant="outline" colorScheme="primary" size="sm" onPress={onCancel}>
+          <Button 
+            variant="outline" 
+            colorScheme="primary" 
+            size="sm" 
+            onPress={onCancel}
+            style={styles.actionButton}
+          >
+            <Ionicons name="close-circle-outline" size={16} color="#4A5568" />
             Cancel Entry
           </Button>
         </View>

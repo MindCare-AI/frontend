@@ -15,13 +15,15 @@ interface CardDividerProps {
 export const CardDivider: React.FC<CardDividerProps> = ({ style }) => {
   const { isDarkMode } = useTheme()
   const nbTheme = useNativeBase()
+  const responsive = useResponsiveValues()
   
   return (
     <View 
       style={[
         styles.divider, 
         { 
-          backgroundColor: isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200]
+          backgroundColor: isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200],
+          marginVertical: responsive.isSmallScreen ? 8 : 12,
         },
         style
       ]} 
@@ -45,6 +47,7 @@ export const CardImage: React.FC<CardImageProps> = ({
   resizeMode = 'cover' 
 }) => {
   const responsive = useResponsiveValues()
+  const { isDarkMode } = useTheme()
   
   return (
     <Image 
@@ -53,8 +56,9 @@ export const CardImage: React.FC<CardImageProps> = ({
       style={[
         styles.image,
         {
-          height: height || (responsive.isSmallScreen ? 180 : 220),
+          height: height || (responsive.isSmallScreen ? 160 : 200),
           aspectRatio: aspectRatio,
+          backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f5f5',
         },
         style
       ]}
@@ -86,6 +90,7 @@ export const CardButton: React.FC<CardButtonProps> = ({
 }) => {
   const { isDarkMode, colors } = useTheme()
   const nbTheme = useNativeBase()
+  const responsive = useResponsiveValues()
   const [isPressed, setIsPressed] = React.useState(false)
   const [isHovered, setIsHovered] = React.useState(false)
 
@@ -154,6 +159,9 @@ export const CardButton: React.FC<CardButtonProps> = ({
           opacity: isPressed && !disabled ? 0.8 : 1,
           transform: isPressed && !disabled ? [{ scale: 0.98 }] : [],
           cursor: disabled ? 'not-allowed' : 'pointer',
+          paddingVertical: responsive.isSmallScreen ? 6 : 8,
+          paddingHorizontal: responsive.isSmallScreen ? 12 : 16,
+          borderRadius: responsive.isSmallScreen ? 4 : 6,
         },
         style
       ]}
@@ -164,13 +172,20 @@ export const CardButton: React.FC<CardButtonProps> = ({
     >
       {loading ? (
         <View style={styles.loadingContainer}>
-          {/* Simple loading indicator */}
           <View style={[styles.loadingDot, { backgroundColor: variantStyle.color }]} />
         </View>
       ) : (
         <View style={[styles.buttonContent, { flexDirection: iconPosition === 'left' ? 'row' : 'row-reverse' }]}>
           {icon && <View style={iconPosition === 'left' ? styles.leftIcon : styles.rightIcon}>{icon}</View>}
-          <Text style={[styles.buttonText, { color: variantStyle.color }]}>{title}</Text>
+          <Text style={[
+            styles.buttonText, 
+            { 
+              color: variantStyle.color,
+              fontSize: responsive.isSmallScreen ? 13 : 14,
+            }
+          ]}>
+            {title}
+          </Text>
         </View>
       )}
     </Pressable>
@@ -241,21 +256,21 @@ export const CardBadge: React.FC<CardBadgeProps> = ({
         return {
           paddingVertical: responsive.isSmallScreen ? 2 : 3,
           paddingHorizontal: responsive.isSmallScreen ? 6 : 8,
-          borderRadius: 4,
+          borderRadius: responsive.isSmallScreen ? 3 : 4,
           fontSize: responsive.isSmallScreen ? 10 : 11,
         }
       case 'medium':
         return {
           paddingVertical: responsive.isSmallScreen ? 3 : 4,
           paddingHorizontal: responsive.isSmallScreen ? 8 : 10,
-          borderRadius: 6,
+          borderRadius: responsive.isSmallScreen ? 4 : 6,
           fontSize: responsive.isSmallScreen ? 12 : 13,
         }
       case 'large':
         return {
           paddingVertical: responsive.isSmallScreen ? 4 : 5,
           paddingHorizontal: responsive.isSmallScreen ? 10 : 12,
-          borderRadius: 8,
+          borderRadius: responsive.isSmallScreen ? 6 : 8,
           fontSize: responsive.isSmallScreen ? 14 : 15,
         }
       default:
@@ -291,6 +306,7 @@ export const CardBadge: React.FC<CardBadgeProps> = ({
           { 
             color: variantStyle.color,
             fontSize: sizeStyle.fontSize,
+            fontWeight: '600',
           }
         ]}
         numberOfLines={1}
@@ -333,14 +349,16 @@ export const CardGrid: React.FC<CardGridProps> = ({
   }
   
   const columnsCount = getColumnsCount()
+  const adjustedSpacing = responsive.isSmallScreen ? spacing * 0.75 : spacing
   
   return (
     <View 
       style={[
         styles.grid,
         {
-          gap: spacing,
+          gap: adjustedSpacing,
           gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
+          margin: -adjustedSpacing / 2,
         },
         style
       ]}
@@ -357,23 +375,34 @@ interface CardGridItemProps {
 }
 
 export const CardGridItem: React.FC<CardGridItemProps> = ({ children, style }) => {
-  return <View style={[styles.gridItem, style]}>{children}</View>
+  const responsive = useResponsiveValues()
+  
+  return (
+    <View 
+      style={[
+        styles.gridItem, 
+        {
+          padding: responsive.isSmallScreen ? 8 : 12,
+          minWidth: responsive.isSmallScreen ? 120 : 150,
+        },
+        style
+      ]}
+    >
+      {children}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
   divider: {
     height: 1,
     width: '100%',
-    marginVertical: 12,
   },
   image: {
     width: '100%',
     backgroundColor: '#f0f0f0',
   },
   button: {
-    borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
     minWidth: 80,
     justifyContent: 'center',
     alignItems: 'center',
@@ -419,16 +448,16 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    margin: -4, // Compensate for item margins
     ...(Platform.OS === 'web' && {
-      display: 'grid',
+      display: 'flex',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
     }),
   },
   gridItem: {
     ...(Platform.OS !== 'web' && {
       flex: 1,
       margin: 4,
-      minWidth: 150, // Ensure items have reasonable width on mobile
     }),
   },
 });

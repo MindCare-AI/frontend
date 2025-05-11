@@ -114,7 +114,7 @@ export const Card: React.FC<CardProps> = ({
     minHeight: minHeight,
     margin: margin !== undefined ? margin : (responsive.isSmallScreen ? 8 : 16),
     borderRadius: borderRadius !== undefined ? borderRadius : (responsive.isSmallScreen ? 8 : 12),
-    padding: padding,
+    padding: padding !== undefined ? padding : (responsive.isSmallScreen ? 12 : 16),
     borderWidth: noBorder ? 0 : 1,
     ...centered && { justifyContent: 'center', alignItems: 'center' },
     // Platform-specific shadows
@@ -164,6 +164,21 @@ export const Card: React.FC<CardProps> = ({
   const animationStyle = animateOnPress ? { 
     transform: [{ scale: scaleAnim }] 
   } : {}
+
+  // Responsive content styles
+  const contentStyles = {
+    cardHeader: {
+      padding: responsive.isSmallScreen ? 12 : 16,
+      paddingBottom: responsive.isSmallScreen ? 8 : 12,
+    },
+    cardContent: {
+      padding: responsive.isSmallScreen ? 12 : 16,
+    },
+    cardFooter: {
+      padding: responsive.isSmallScreen ? 12 : 16,
+      paddingTop: responsive.isSmallScreen ? 8 : 12,
+    }
+  }
   
   return (
     <CardComponent
@@ -187,7 +202,6 @@ export const Card: React.FC<CardProps> = ({
         accessibilityRole: 'button', 
         accessibilityHint: 'Double tap to activate',
         accessibilityState: { 
-          pressed: isPressed,
           disabled: false
         }
       })}
@@ -381,48 +395,64 @@ export const CardDescription: React.FC<CardDescriptionProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    // Enable hardware acceleration on web for smoother animations
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 4,
+    backgroundColor: '#fff',
+    alignSelf: 'center',
+    maxWidth: 520,
+    width: '100%',
     ...(Platform.OS === 'web' && {
       backfaceVisibility: 'hidden',
       WebkitBackfaceVisibility: 'hidden',
       WebkitTapHighlightColor: 'transparent',
-      outline: 'none',
+      transition: 'all 0.3s ease-in-out',
     }),
   },
   cardHeader: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: 24,
+    paddingBottom: 12,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+    backgroundColor: '#fff',
   },
   cardContent: {
-    padding: 16,
-    flex: 1, // Allow content to expand to fill available space
+    padding: 24,
+    flex: 1,
+    backgroundColor: '#fff',
   },
   cardFooter: {
-    padding: 16,
-    paddingTop: 8,
+    padding: 24,
+    paddingTop: 12,
     flexDirection: "row",
     justifyContent: "flex-end",
-    flexWrap: "wrap", // Allow buttons to wrap on small screens
-    rowGap: 8, // Spacing between wrapped items
-    columnGap: 8,
+    flexWrap: "wrap",
+    rowGap: 12,
+    columnGap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: '#fff',
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 4,
-    flexWrap: "wrap", // Allow text to wrap properly
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+    flexWrap: "wrap",
+    letterSpacing: -0.5,
   },
   cardDescription: {
-    fontSize: 14,
-    flexWrap: "wrap", // Allow text to wrap properly
-    lineHeight: 20, // Improve readability with better line height
+    fontSize: 15,
+    flexWrap: "wrap",
+    lineHeight: 22,
+    letterSpacing: -0.2,
   },
 })
