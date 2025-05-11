@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text } from "react-native"
+import { View, Text, StyleSheet, useWindowDimensions, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { format } from "date-fns"
 import { useAppointments } from "../../../contexts/AppointmentContext"
@@ -19,6 +19,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
   const [therapist, setTherapist] = useState("")
   const [timeSlot, setTimeSlot] = useState("")
   const [noSlotsAvailable, setNoSlotsAvailable] = useState(false)
+  const { width } = useWindowDimensions()
 
   const { addAppointment } = useAppointments()
 
@@ -41,7 +42,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
     setDate(selectedDate)
 
     // Simulate checking availability - in a real app, this would be an API call
-    // For demo purposes, we'll show no slots available if the day is odd
     if (selectedDate && selectedDate.getDate() % 2 === 1) {
       setNoSlotsAvailable(true)
       setTimeSlot("")
@@ -52,7 +52,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
 
   const handleSubmit = () => {
     if (therapist && date && (noSlotsAvailable || timeSlot)) {
-      // In a real app, this would submit the appointment request to an API
       if (!noSlotsAvailable) {
         const selectedTherapist = therapists.find((t) => t.value === therapist)?.label || ""
         const selectedTime = timeSlots.find((t) => t.value === timeSlot)?.label || ""
@@ -77,9 +76,12 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
   }
 
   const footer = (
-    <>
+    <View style={styles.footerContainer}>
       {date && noSlotsAvailable ? (
-        <Button onPress={onJoinWaitingList} colorScheme="primary">
+        <Button 
+          onPress={onJoinWaitingList} 
+          colorScheme="primary"
+        >
           Join Waiting List
         </Button>
       ) : (
@@ -91,52 +93,93 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
           Book Appointment
         </Button>
       )}
-    </>
+    </View>
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Book New Appointment" footer={footer}>
-      <View style={{ gap: 16 }}>
-        <Text style={{ marginBottom: 8 }}>Select a therapist, date, and time slot to book your appointment.</Text>
+    <Modal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Book New Appointment" 
+      footer={footer}
+    >
+      <ScrollView style={{ width: '100%' }} contentContainerStyle={[styles.container, { maxWidth: width > 600 ? 500 : '100%' }]}> 
+        <Text style={styles.description}>
+          Select a therapist, date, and time slot to book your appointment.
+        </Text>
 
-        <Select
-          label="Therapist"
-          options={therapists}
-          value={therapist}
-          onValueChange={setTherapist}
-          placeholder="Select a therapist"
-        />
-
-        <DatePicker
-          label="Date"
-          value={date}
-          onChange={handleDateChange}
-          placeholder="Select a date"
-          minimumDate={new Date()}
-        />
-
-        {date && !noSlotsAvailable && (
+        <View style={styles.formContainer}>
           <Select
-            label="Time Slot"
-            options={timeSlots}
-            value={timeSlot}
-            onValueChange={setTimeSlot}
-            placeholder="Select a time slot"
+            label="Therapist"
+            options={therapists}
+            value={therapist}
+            onValueChange={setTherapist}
+            placeholder="Select a therapist"
+            style={styles.select}
           />
-        )}
 
-        {date && noSlotsAvailable && (
-          <Alert
-            status="info"
-            title="No Available Slots"
-            icon={<Ionicons name="time-outline" size={20} color="#3182CE" />}
-          >
-            No available slots for the selected date. Would you like to join the waiting list?
-          </Alert>
-        )}
-      </View>
+          <DatePicker
+            label="Date"
+            value={date}
+            onChange={handleDateChange}
+            placeholder="Select a date"
+            minimumDate={new Date()}
+            style={styles.datePicker}
+          />
+
+          {date && !noSlotsAvailable && (
+            <Select
+              label="Time Slot"
+              options={timeSlots}
+              value={timeSlot}
+              onValueChange={setTimeSlot}
+              placeholder="Select a time slot"
+              style={styles.select}
+            />
+          )}
+
+          {date && noSlotsAvailable && (
+            <Alert
+              status="info"
+              title="No Available Slots"
+              icon={<Ionicons name="time-outline" size={20} color="#3182CE" />}
+            >
+              No available slots for the selected date. Would you like to join the waiting list?
+            </Alert>
+          )}
+        </View>
+      </ScrollView>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    width: '100%',
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#4A5568',
+    marginBottom: 24,
+  },
+  formContainer: {
+    gap: 20,
+  },
+  select: {
+    width: '100%',
+  },
+  datePicker: {
+    width: '100%',
+  },
+  footerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+})
 
 export default BookAppointmentModal

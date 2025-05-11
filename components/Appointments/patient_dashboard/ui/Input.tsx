@@ -1,8 +1,9 @@
 "use client"
 
 import type React from "react"
-import { TextInput, View, Text, StyleSheet, Platform } from "react-native"
+import { TextInput, View, Text, StyleSheet, Platform, Animated, AccessibilityInfo } from "react-native"
 import { useTheme } from "native-base"
+import { useEffect, useRef, useState } from "react"
 
 interface InputProps {
   value: string
@@ -20,6 +21,9 @@ interface InputProps {
   rightIcon?: React.ReactNode
   style?: any
   inputStyle?: any
+  required?: boolean
+  disabled?: boolean
+  helperText?: string
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -38,47 +42,121 @@ export const Input: React.FC<InputProps> = ({
   rightIcon,
   style,
   inputStyle,
+  required = false,
+  disabled = false,
+  helperText,
 }) => {
   const theme = useTheme()
+  const [isFocused, setIsFocused] = useState(false)
+  const labelAnimation = useRef(new Animated.Value(value ? 1 : 0)).current
+  const [isScreenReaderEnabled, setIsScreenReaderEnabled] = useState(false)
+
+  useEffect(() => {
+    const checkScreenReader = async () => {
+      const isEnabled = await AccessibilityInfo.isScreenReaderEnabled()
+      setIsScreenReaderEnabled(isEnabled)
+    }
+    checkScreenReader()
+  }, [])
+
+  useEffect(() => {
+    Animated.timing(labelAnimation, {
+      toValue: (isFocused || value) ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start()
+  }, [isFocused, value])
+
+  const labelStyle = {
+    transform: [{
+      translateY: labelAnimation.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -25],
+      }),
+    }],
+    fontSize: labelAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [16, 12],
+    }),
+    color: error 
+      ? theme.colors.red[500]
+      : isFocused 
+        ? theme.colors.primary[500]
+        : theme.colors.gray[600],
+  }
+
+  const getBorderColor = () => {
+    if (error) return theme.colors.red[500]
+    if (isFocused) return theme.colors.primary[500]
+    if (disabled) return theme.colors.gray[300]
+    return theme.colors.gray[300]
+  }
 
   return (
     <View style={[styles.container, style]}>
-      {label && <Text style={[styles.label, { color: theme.colors.gray[700] }]}>{label}</Text>}
       <View
         style={[
           styles.inputContainer,
           {
-            borderColor: error ? theme.colors.red[500] : theme.colors.gray[300],
+            borderColor: getBorderColor(),
+            backgroundColor: disabled ? theme.colors.gray[100] : "white",
             minHeight: multiline ? 100 : undefined,
           },
         ]}
       >
         {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
-        <TextInput
-          style={[
-            styles.input,
-            {
-              color: theme.colors.gray[900],
-              paddingLeft: leftIcon ? 0 : 12,
-              paddingRight: rightIcon ? 0 : 12,
-              textAlignVertical: multiline ? "top" : "center",
-            },
-            inputStyle,
-          ]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.gray[400]}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={autoCorrect}
-          multiline={multiline}
-          numberOfLines={multiline ? numberOfLines : undefined}
-        />
+        <View style={styles.inputWrapper}>
+          {label && (
+            <Animated.Text
+              style={[styles.label, labelStyle]}
+              accessibilityRole="text"
+            >
+              {label}{required && " *"}
+            </Animated.Text>
+          )}
+          <TextInput
+            style={[
+              styles.input,
+              {
+                color: theme.colors.gray[900],
+                paddingLeft: leftIcon ? 0 : 12,
+                paddingRight: rightIcon ? 0 : 12,
+                textAlignVertical: multiline ? "top" : "center",
+                opacity: disabled ? 0.7 : 1,
+              },
+              inputStyle,
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={!label ? placeholder : isFocused ? placeholder : ""}
+            placeholderTextColor={theme.colors.gray[400]}
+            secureTextEntry={secureTextEntry}
+            keyboardType={keyboardType}
+            autoCapitalize={autoCapitalize}
+            autoCorrect={autoCorrect}
+            multiline={multiline}
+            numberOfLines={multiline ? numberOfLines : undefined}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            editable={!disabled}
+            accessibilityLabel={label}
+            accessibilityHint={helperText}
+            accessibilityState={{ disabled }}
+            importantForAccessibility={required ? "yes" : "no"}
+          />
+        </View>
         {rightIcon && <View style={styles.iconContainer}>{rightIcon}</View>}
       </View>
-      {error && <Text style={[styles.error, { color: theme.colors.red[500] }]}>{error}</Text>}
+      {(error || helperText) && (
+        <Text 
+          style={[
+            styles.helperText,
+            { color: error ? theme.colors.red[500] : theme.colors.gray[600] }
+          ]}
+        >
+          {error || helperText}
+        </Text>
+      )}
     </View>
   )
 }
@@ -87,11 +165,6 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 6,
-  },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -99,6 +172,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: "white",
     overflow: "hidden",
+    position: "relative",
+  },
+  inputWrapper: {
+    flex: 1,
+    position: "relative",
+  },
+  label: {
+    position: "absolute",
+    left: 12,
+    top: 12,
+    backgroundColor: "transparent",
+    zIndex: 1,
+    fontWeight: "500",
   },
   input: {
     flex: 1,
@@ -117,7 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  error: {
+  helperText: {
     fontSize: 12,
     marginTop: 4,
   },

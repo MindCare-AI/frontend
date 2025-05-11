@@ -1,5 +1,5 @@
 import type React from "react"
-import { TextInput, View, Text, StyleSheet, Platform } from "react-native"
+import { TextInput, View, Text, StyleSheet, Platform, Dimensions } from "react-native"
 import { useTheme } from "native-base"
 
 interface TextAreaProps {
@@ -32,6 +32,8 @@ export const TextArea: React.FC<TextAreaProps> = ({
   inputStyle,
 }) => {
   const theme = useTheme()
+  const { width } = Dimensions.get('window')
+  const isSmallScreen = width < 375
 
   return (
     <View style={[styles.container, style]}>
@@ -41,7 +43,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
           styles.inputContainer,
           {
             borderColor: error ? theme.colors.red[500] : theme.colors.gray[300],
-            height: 24 * numberOfLines + 16, // Approximate height based on line height
+            height: 24 * numberOfLines + 16,
             opacity: isDisabled ? 0.5 : 1,
           },
         ]}
@@ -52,6 +54,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
             {
               color: theme.colors.gray[900],
               height: "100%",
+              fontSize: isSmallScreen ? 14 : 16,
             },
             inputStyle,
           ]}
@@ -76,23 +79,32 @@ export const TextArea: React.FC<TextAreaProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
+    width: '100%',
   },
   label: {
     fontSize: 14,
     fontWeight: "500",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   inputContainer: {
     borderWidth: 1,
-    borderRadius: 4,
+    borderRadius: 8,
     backgroundColor: "white",
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   input: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    lineHeight: 24,
     ...Platform.select({
       web: {
         outlineStyle: "none",
@@ -101,6 +113,6 @@ const styles = StyleSheet.create({
   },
   error: {
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 6,
   },
 })
