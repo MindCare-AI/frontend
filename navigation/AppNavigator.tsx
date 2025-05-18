@@ -13,7 +13,6 @@ import MoodNavigator from './MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
-import AppointmentsNavigator from './AppointmentsNavigator';
 import DashboardScreen from '../screens/Appointments/DashboardScreen';
 import JournalNavigator from './Journal';
 
