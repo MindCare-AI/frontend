@@ -86,6 +86,10 @@ export type MoodTrackerParamList = {
       activities?: string;
     } 
   };
+  MainTabs: undefined;
+  NewEntry: undefined;
+  EditEntry: { entry: any };
+  Details: { entry: any };
 };
 
 export type DrawerParamList = {
