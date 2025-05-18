@@ -1,68 +1,155 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { format } from 'date-fns';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 
-interface AppointmentSlotsProps {
-  slots: string[];
-  selectedSlot: string | null;
-  onSelectSlot: (slot: string) => void;
+interface TimeSlot {
+  id: string;
+  startTime: Date;
+  endTime: Date;
+  isAvailable: boolean;
 }
 
-const AppointmentSlots: React.FC<AppointmentSlotsProps> = ({
+interface AppointmentSlotsProps {
+  slots: TimeSlot[];
+  selectedSlot?: string;
+  onSelectSlot: (slotId: string) => void;
+  isLoading?: boolean;
+}
+
+export const AppointmentSlots: React.FC<AppointmentSlotsProps> = ({
   slots,
   selectedSlot,
-  onSelectSlot
+  onSelectSlot,
+  isLoading = false,
 }) => {
+  const handleSlotPress = (slotId: string) => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync();
+    }
+    onSelectSlot(slotId);
+  };
+
+  const formatTimeRange = (start: Date, end: Date) => {
+    return `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#002D62" />
+        <Text style={styles.loadingText}>Loading available slots...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+    >
       {slots.map((slot) => (
-        <TouchableOpacity
-          key={slot}
-          onPress={() => onSelectSlot(slot)}
-          style={[
-            styles.slot,
-            selectedSlot === slot ? styles.selectedSlot : styles.unselectedSlot
-          ]}
+        <Animated.View
+          key={slot.id}
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(300)}
+          layout={Layout.springify()}
         >
-          <Text style={[
-            styles.slotText,
-            selectedSlot === slot && styles.selectedSlotText
-          ]}>
-            {slot}
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.slot,
+              selectedSlot === slot.id && styles.selectedSlot,
+              !slot.isAvailable && styles.unavailableSlot,
+            ]}
+            onPress={() => handleSlotPress(slot.id)}
+            disabled={!slot.isAvailable}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.time,
+                selectedSlot === slot.id && styles.selectedText,
+                !slot.isAvailable && styles.unavailableText,
+              ]}
+            >
+              {formatTimeRange(slot.startTime, slot.endTime)}
+            </Text>
+            
+            {!slot.isAvailable && (
+              <Text style={styles.unavailableLabel}>
+                Booked
+              </Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
       ))}
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 12,
+  },
+  loadingContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
   },
   slot: {
-    width: '33.33%',
-    padding: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    minWidth: 150,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+      },
+    }),
   },
   selectedSlot: {
-    backgroundColor: 'black',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: '#002D62',
+    transform: [{ scale: 1.05 }],
   },
-  unselectedSlot: {
+  unavailableSlot: {
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
+    opacity: 0.6,
   },
-  slotText: {
-    textAlign: 'center',
-    color: '#374151',
-    fontSize: 14,
+  time: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
   },
-  selectedSlotText: {
-    color: 'white',
+  selectedText: {
+    color: '#FFFFFF',
+  },
+  unavailableText: {
+    color: '#9CA3AF',
+  },
+  unavailableLabel: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
+    fontWeight: '500',
   },
 });
-
-export default AppointmentSlots;

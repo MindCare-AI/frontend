@@ -1,68 +1,94 @@
 "use client";
 
-import * as React from "react";
-import { Platform, View, Image, Text, StyleSheet } from "react-native";
+import React, { useState } from 'react';
+import { Platform, View, Image, Text, StyleSheet, Animated, ActivityIndicator } from "react-native";
 import clsx from "clsx";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
+import { globalStyles } from '../../styles/global';
 
-export interface AvatarProps extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root> {
-  // Additional native props:
-  nativeSource?: { uri: string } | number; 
-  fallback?: string;
+interface AvatarProps {
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  source?: { uri: string };
+  fallback: string;
   style?: any;
-  className?: string;
 }
 
-export const Avatar = React.forwardRef<any, AvatarProps>((props, ref) => {
-  const { nativeSource, fallback, className, style, children, ...rest } = props;
-  if (Platform.OS === "web") {
-    return (
-      <AvatarPrimitive.Root
-        ref={ref}
-        className={clsx("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className)}
-        style={style}
-        {...rest}
-      >
-        {children}
-      </AvatarPrimitive.Root>
-    );
-  } else {
-    // Remove web-specific props before passing to the native View.
-    const { tabIndex, onTouchStart, onTouchEnd, onTouchCancel, ...viewProps } = rest as any;
-    return (
-      <View ref={ref} style={[styles.avatar, style]} {...(viewProps as React.ComponentProps<typeof View>)}>
-        {nativeSource ? (
-          <Image source={nativeSource} style={styles.image} />
-        ) : (
-          <Text style={styles.fallbackText}>{fallback}</Text>
-        )}
-        {children}
-      </View>
-    );
-  }
-});
-Avatar.displayName = "Avatar";
+export const Avatar: React.FC<AvatarProps> = ({ 
+  size = 'md', 
+  source, 
+  fallback,
+  style 
+}) => {
+  const [hasError, setHasError] = useState(!source);
 
-const styles = StyleSheet.create({
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: "#ccc",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  fallbackText: {
-    fontSize: 16,
-    color: "#fff",
-  },
-});
+  const getSize = () => {
+    switch (size) {
+      case 'sm': return 32;
+      case 'lg': return 64;
+      case 'xl': return 96;
+      default: return 48; // md
+    }
+  };
+
+  const containerSize = getSize();
+  
+  const styles = StyleSheet.create({
+    container: {
+      width: containerSize,
+      height: containerSize,
+      borderRadius: containerSize / 2,
+      overflow: 'hidden',
+      backgroundColor: globalStyles.colors.neutralLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: globalStyles.colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    fallbackContainer: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: globalStyles.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fallbackText: {
+      color: globalStyles.colors.white,
+      fontWeight: 'bold',
+      fontSize: size === 'sm' ? 14 : size === 'lg' ? 24 : size === 'xl' ? 32 : 18,
+    }
+  });
+
+  return (
+    <View style={[styles.container, style]}>
+      {!hasError && source ? (
+        <Image
+          source={source}
+          style={styles.image}
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        <View style={styles.fallbackContainer}>
+          <Text style={styles.fallbackText}>
+            {fallback.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export interface AvatarImageProps extends React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image> {}
 

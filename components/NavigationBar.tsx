@@ -1,131 +1,187 @@
-import React from 'react';
-import { View, StyleSheet, Platform, ViewStyle } from 'react-native';
-import { useNavigation, useRoute, NavigationProp, ParamListBase } from '@react-navigation/native';
-import NavigationButton from './NavigationButton';
+import React, { useEffect } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
-
-interface NavItem {
-  title: string;
-  screenName: string;
-  icon: IoniconsName;
-  activeIcon: IoniconsName;
-}
-
 interface NavigationBarProps {
-  items?: NavItem[];
-  position?: 'top' | 'bottom';
-  currentScreen?: string;
+  routes: {
+    name: string;
+    icon: React.ReactNode;
+    label: string;
+  }[];
 }
 
-export default function NavigationBar({ 
-  items, 
-  position = 'bottom',
-  currentScreen 
-}: NavigationBarProps) {
-  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
+  const navigation = useNavigation();
   const route = useRoute();
-  
-  const defaultNavItems: NavItem[] = [
-    { title: 'Feeds', screenName: 'Feeds', icon: 'home-outline', activeIcon: 'home' },
-    { title: 'Chatbot', screenName: 'Chatbot', icon: 'chatbubble-ellipses-outline', activeIcon: 'chatbubble-ellipses' },
-    { title: 'Notifications', screenName: 'Notifications', icon: 'notifications-outline', activeIcon: 'notifications' },
-    { title: 'Settings', screenName: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
-    { title: 'Messaging', screenName: 'Messaging', icon: 'mail-outline', activeIcon: 'mail' }, // New item added here
-  ];
-  
-  const navItems = items || defaultNavItems;
-  const activeScreen = currentScreen || route.name;
+  const fadeAnims = React.useRef(
+    routes.map(() => new Animated.Value(0))
+  ).current;
+  const scaleAnims = React.useRef(
+    routes.map(() => new Animated.Value(1))
+  ).current;
+
+  useEffect(() => {
+    // Animate the initial active tab
+    const activeIndex = routes.findIndex(r => r.name === route.name);
+    if (activeIndex >= 0) {
+      Animated.spring(fadeAnims[activeIndex], {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 8,
+      }).start();
+    }
+  }, []);
+
+  const handlePress = (routeName: string, index: number) => {
+    // Reset all animations
+    fadeAnims.forEach((anim, i) => {
+      if (i !== index) {
+        Animated.spring(anim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    });
+
+    // Animate the pressed tab
+    Animated.sequence([
+      Animated.spring(scaleAnims[index], {
+        toValue: 0.9,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.spring(scaleAnims[index], {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 8,
+        }),
+        Animated.spring(fadeAnims[index], {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 80,
+          friction: 8,
+        }),
+      ]),
+    ]).start();
+
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    navigation.navigate(routeName);
+  };
 
   return (
-    <View style={[
-      styles.container, 
-      position === 'top' ? styles.top : styles.bottom,
-      getContainerShadowStyle(position)
-    ]}>
-      {navItems.map((item, index) => {
-        const isActive = activeScreen === item.screenName;
-        
+    <View style={styles.container}>
+      {routes.map((route, index) => {
+        const isActive = route.name === route.name;
+
         return (
-          <View key={index} style={styles.buttonContainer}>
-            <NavigationButton 
-              title={item.title} 
-              screenName={item.screenName} 
-              icon={
-                <Ionicons
-                  name={isActive ? item.activeIcon : item.icon}
-                  size={24}
-                  color={isActive ? '#002D62' : '#7A869A'}
-                />
-              }
-              isActive={isActive}
-              onPress={() => {
-                if (item.screenName) {
-                  navigation.navigate(item.screenName);
-                }
-              }}
-            />
-            {isActive && <View style={styles.activeIndicator} />}
-          </View>
+          <TouchableOpacity
+            key={route.name}
+            onPress={() => handlePress(route.name, index)}
+            style={styles.tab}
+            accessibilityRole="button"
+            accessibilityLabel={route.label}
+            accessibilityState={{ selected: isActive }}
+          >
+            <Animated.View
+              style={[
+                styles.iconContainer,
+                {
+                  transform: [{ scale: scaleAnims[index] }],
+                },
+              ]}
+            >
+              {route.icon}
+              <Animated.View
+                style={[
+                  styles.activeDot,
+                  {
+                    opacity: fadeAnims[index],
+                    transform: [
+                      {
+                        scale: fadeAnims[index].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.5, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </Animated.View>
+            <Animated.Text
+              style={[
+                styles.label,
+                {
+                  color: fadeAnims[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['#6B7280', '#002D62'],
+                  }),
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {route.label}
+            </Animated.Text>
+          </TouchableOpacity>
         );
       })}
     </View>
   );
-}
-
-const getContainerShadowStyle = (position: 'top' | 'bottom'): ViewStyle => {
-  if (Platform.OS === 'android') {
-    return { elevation: 8 };
-  }
-  
-  if (Platform.OS === 'ios') {
-    return {
-      shadowColor: '#000',
-      shadowOffset: { 
-        width: 0, 
-        height: position === 'top' ? 2 : -2 
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 6,
-    };
-  }
-  
-  return {
-    boxShadow: position === 'top' 
-      ? '0px 2px 6px rgba(0,0,0,0.1)' 
-      : '0px -2px 6px rgba(0,0,0,0.1)'
-  };
 };
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    paddingTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 -2px 4px rgba(0,0,0,0.1)',
+      },
+    }),
   },
-  top: {
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  bottom: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  buttonContainer: {
+  tab: {
     flex: 1,
     alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'center',
   },
-  activeIndicator: {
+  iconContainer: {
+    position: 'relative',
+    padding: 8,
+    marginBottom: 2,
+  },
+  activeDot: {
     position: 'absolute',
-    bottom: -12,
-    width: '30%',
-    height: 3,
+    bottom: -4,
+    left: '50%',
+    marginLeft: -3,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#002D62',
-    borderRadius: 1.5,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });

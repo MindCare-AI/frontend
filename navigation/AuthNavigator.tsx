@@ -1,5 +1,5 @@
 //navigation/AuthNavigator.tsx
-import React from 'react';
+import React from 'react';import { globalStyles } from '../styles/global';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthStackParamList } from '../types/navigation';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -15,7 +15,7 @@ const AuthNavigator: React.FC = () => {
       initialRouteName="Login"
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: '#FFFFFF' },
+        cardStyle: { backgroundColor: globalStyles.colors.white },
         gestureEnabled: true,
       }}
     >
@@ -30,7 +30,8 @@ const AuthNavigator: React.FC = () => {
       />
       <Stack.Screen 
         name="ForgotPassword" 
-        component={ForgotPasswordScreen} 
+        component={ForgotPasswordScreen}
+        options={{ title: 'Reset Password' }} 
       />
       <Stack.Screen 
         name="SetNewPassword" 

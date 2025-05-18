@@ -1,176 +1,108 @@
-//screens/MessagingScreen/MessagingScreen.tsx
-import React from 'react';
-import { View, StyleSheet, SectionList, Text, Alert, StatusBar } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { MessagingStackParamList } from '../../navigation/MessagingNavigator'; // Adjust path as needed
-import useConversations from './hooks/useConversations';
-import ConversationItem from './components/ConversationItem';
-import SearchBar from './components/SearchBar';
-import NewChatButton from './components/NewChatButton';
-import { LoadingIndicator, ErrorMessage } from '../../components/ui';
-import { API_URL } from '../../config'; // Ensure correct API_URL
-import { useAuth } from '../../contexts/AuthContext';
-import TypingIndicator from '../ChatScreen/components/TypingIndicator';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import ConversationList from '../../components/MessagingScreen/ConversationList';
+import { useMessaging } from '../../contexts/MessagingContext';
+import { globalStyles } from '../../styles/global';
+import { Conversation } from '../../types/messaging';
+import { UserPlus } from 'lucide-react-native';
+import { NavigationProp } from '@react-navigation/native';
+import { MessagingStackParamList } from '../../types/navigation';
 
-type MessagingScreenNavigationProp = StackNavigationProp<MessagingStackParamList, 'Messaging'>;
+export default function MessagingScreen() {
+  const navigation = useNavigation<NavigationProp<MessagingStackParamList>>();
+  const messaging = useMessaging();
+  const { conversations } = messaging.state;
+  const [refreshing, setRefreshing] = useState(false);
 
-interface Props {
-  navigation: MessagingScreenNavigationProp;
-}
+  // Initial load
+  useEffect(() => {
+    loadConversations();
+  }, []);
 
-interface TypingIndicatorProps {
-  visible: boolean;
-  conversationId: string;
-}
-
-const MessagingScreen: React.FC<Props> = ({ navigation }) => {
-  const { accessToken } = useAuth();
-  const { conversations, loading, error, searchQuery, handleSearch, loadMore, refresh, typingIndicators } = useConversations();
-
-  const createNewConversation = async () => {
-    try {
-      const response = await fetch(`${API_URL}/messaging/one_to_one/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to create conversation');
-      }
-      const data = await response.json();
-      return data.id.toString();
-    } catch (error) {
-      console.error('Create conversation error:', error);
-      Alert.alert('Error', 'Could not create conversation');
-      return null;
-    }
+  const loadConversations = async () => {
+    // Implementation would be in messaging context
   };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadConversations();
+    setRefreshing(false);
+  };
+
+  const handleConversationPress = (conversation: Conversation) => {
+    navigation.navigate('Chat', {
+      conversationId: conversation.id,
+      conversationType: conversation.type,
+      title: conversation.type === 'group' 
+        ? (conversation.name || 'Group Chat')
+        : (conversation.otherParticipant?.name || 'Chat'),
+      otherParticipantId: conversation.otherParticipant?.id 
+        ? parseInt(conversation.otherParticipant.id) 
+        : undefined
+    });
+  };
+
+  const handleNewChat = () => {
+    navigation.navigate('NewConversation');
+  };
+
+  if (!refreshing && !conversations.length) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={globalStyles.colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#007BFF" barStyle="light-content" />
-      <SearchBar value={searchQuery} onChangeText={handleSearch} />
-      
-      {error && <ErrorMessage message="Failed to load conversations" onRetry={refresh} />}
-      
-      {loading && conversations.length === 0 ? (
-        <LoadingIndicator />
-      ) : (
-        <SectionList
-          sections={[
-            { 
-              title: 'Direct Messages', 
-              data: conversations.filter(c => c.conversation_type === 'one_to_one') 
-            },
-            { 
-              title: 'Group Chats', 
-              data: conversations.filter(c => c.conversation_type === 'group') 
-            }
-          ]}
-          renderItem={({ item }) => (
-            <ConversationItem 
-              conversation={{
-                ...item,
-                lastMessage: item.lastMessage || '',
-                timestamp: item.timestamp || '',
-                unreadCount: item.unreadCount ?? 0,
-              }}
-              onPress={() => navigation.navigate('Chat', {
-                conversationId: String(item.id),
-                conversationType: (item.conversation_type === 'direct' || item.conversation_type === 'chatbot')
-                  ? 'one_to_one'
-                  : item.conversation_type,
-                title: item.name || item.otherParticipant?.name || 'Chat',
-              })}
-            />
-          )}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            </View>
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          onEndReached={loadMore}
-          onRefresh={refresh}
-          refreshing={loading}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={true}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubtitle}>Start a new chat to begin messaging</Text>
-            </View>
-          }
-        />
-      )}
-      
-      {typingIndicators && (
-        <TypingIndicator 
-          visible={typingIndicators.length > 0} 
-          conversationId={conversations[0]?.id || ''} 
-        />
-      )}
-      
-      <NewChatButton
-        onPress={async () => {
-          const newId = await createNewConversation();
-          if (newId) {
-            navigation.navigate('Chat', {
-              conversationId: newId,
-              conversationType: 'one_to_one',
-              title: 'New Chat',
-            });
-          }
-        }}
+      <ConversationList
+        conversations={conversations}
+        onConversationPress={handleConversationPress}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
       />
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={handleNewChat}
+      >
+        <UserPlus size={24} color="#FFF" />
+      </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA', // Lighter, modern background color
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
-  listContent: {
-    padding: 12,
-    paddingBottom: 80, // Extra padding at bottom for FAB
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
-  sectionHeader: {
-    backgroundColor: 'rgba(245, 247, 250, 0.95)', // Semi-transparent background
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E9EEF6',
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#667892', // More subdued color for section headers
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  emptyContainer: {
+  floatingButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: globalStyles.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 40,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#3A4B66',
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#667892',
-    textAlign: 'center',
-    lineHeight: 20,
-  }
 });
-
-export default MessagingScreen;

@@ -9,8 +9,9 @@ import {
   Close as ToastClosePrimitive,
 } from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from "react-native";
-import { X } from "lucide-react-native";
+import { View, Text, TouchableOpacity, Animated, StyleSheet, AccessibilityInfo, Platform } from "react-native";
+import { X, Check, AlertCircle, Info } from "lucide-react-native";
+import * as Haptics from 'expo-haptics';
 import { cn } from "../../lib/utils";
 
 const ToastViewport = React.forwardRef<
@@ -34,8 +35,10 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "border bg-background text-foreground",
-        destructive:
-          "destructive group border-destructive bg-destructive text-destructive-foreground",
+        destructive: "destructive group border-destructive bg-destructive text-destructive-foreground",
+        success: "border-green-500 bg-green-50 text-green-900",
+        error: "border-red-500 bg-red-50 text-red-900",
+        info: "border-blue-500 bg-blue-50 text-blue-900",
       },
     },
     defaultVariants: {
@@ -44,38 +47,89 @@ const toastVariants = cva(
   }
 );
 
+// Define ToastActionElement with the necessary properties
+interface ToastActionElement {
+  label: string;
+  onPress: () => void;
+}
+
+// Define ToastProps type
+type ToastProps = React.ComponentPropsWithoutRef<typeof ToastPrimitive> & 
+  VariantProps<typeof toastVariants> & {
+    title?: React.ReactNode;
+    description?: React.ReactNode;
+    action?: ToastActionElement;
+    onDismiss?: () => void;
+  };
+
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitive>,
-  React.ComponentPropsWithoutRef<typeof ToastPrimitive> & VariantProps<typeof toastVariants>
+  ToastProps
 >(({ className, variant, title, description, action, onDismiss, ...props }, ref) => {
-  const translateY = useRef(new Animated.Value(-100)).current;
+  const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Trigger haptic feedback based on variant
+    if (Platform.OS !== 'web') {
+      switch (variant) {
+        case 'success':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          break;
+        case 'error':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          break;
+        default:
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }
+
+    // Announce for screen readers
+    const announcement = title 
+      ? `${title.toString()}: ${description?.toString()}` 
+      : description?.toString() || '';
+    AccessibilityInfo.announceForAccessibility(announcement);
+
+    // Show animation
     Animated.parallel([
-      Animated.timing(translateY, {
+      Animated.spring(translateY, {
         toValue: 0,
-        duration: 300,
         useNativeDriver: true,
+        tension: 80,
+        friction: 10,
       }),
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 300,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start();
+
+    // Progress animation
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: 3000,
+      useNativeDriver: false,
+    }).start();
+
+    // Auto hide
+    const timer = setTimeout(() => {
+      handleDismiss();
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleDismiss = () => {
     Animated.parallel([
-      Animated.timing(translateY, {
-        toValue: -100,
-        duration: 300,
+      Animated.spring(translateY, {
+        toValue: 100,
         useNativeDriver: true,
       }),
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 300,
+        duration: 200,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -83,50 +137,87 @@ const Toast = React.forwardRef<
     });
   };
 
+  const getIcon = () => {
+    switch (variant) {
+      case 'success':
+        return <Check size={20} color="#059669" />;
+      case 'error':
+        return <AlertCircle size={20} color="#DC2626" />;
+      case 'info':
+        return <Info size={20} color="#2563EB" />;
+      default:
+        return null;
+    }
+  };
+
+  const getBackgroundColor = () => {
+    switch (variant) {
+      case 'success':
+        return '#ECFDF5';
+      case 'error':
+        return '#FEF2F2';
+      case 'info':
+        return '#EFF6FF';
+      default:
+        return '#FFFFFF';
+    }
+  };
+
   return (
     <Animated.View
       style={[
         styles.container,
-        variant === "destructive" && styles.destructive,
         {
           transform: [{ translateY }],
           opacity,
+          backgroundColor: getBackgroundColor(),
         },
       ]}
+      accessible={true}
+      accessibilityRole="alert"
+      accessibilityLabel={title 
+        ? `${title?.toString() || ''}: ${description?.toString() || ''}` 
+        : description?.toString() || ''}
     >
+      <Animated.View
+        style={[
+          styles.progressBar,
+          {
+            width: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: ['0%', '100%'],
+            }),
+          },
+        ]}
+      />
+
       <View style={styles.content}>
-        {title && (
-          <Text
-            style={[
-              styles.title,
-              variant === "destructive" && styles.destructiveText,
-            ]}
-          >
-            {title}
-          </Text>
-        )}
-        {description && (
-          <Text
-            style={[
-              styles.description,
-              variant === "destructive" && styles.destructiveText,
-            ]}
-          >
+        <View style={styles.iconContainer}>{getIcon()}</View>
+        <View style={styles.textContainer}>
+          {title && (
+            <Text style={styles.title} numberOfLines={1}>
+              {title}
+            </Text>
+          )}
+          <Text style={styles.message} numberOfLines={2}>
             {description}
           </Text>
-        )}
-        {action && (
-          <TouchableOpacity
-            onPress={action.onPress}
-            style={styles.actionButton}
-          >
-            <Text style={styles.actionText}>{action.label}</Text>
-          </TouchableOpacity>
-        )}
+        </View>
+        <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
+          <X size={20} color={variant === "destructive" ? "#fff" : "#000"} />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
-        <X size={20} color={variant === "destructive" ? "#fff" : "#000"} />
-      </TouchableOpacity>
+
+      {action && (
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={action.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+        >
+          <Text style={styles.actionText}>{action.label}</Text>
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 });
@@ -160,7 +251,7 @@ const ToastClose = React.forwardRef<
     toast-close=""
     {...props}
   >
-    <X className="h-4 w-4" />
+    <X size={16} />
   </ToastClosePrimitive>
 ));
 ToastClose.displayName = ToastClosePrimitive.displayName;
@@ -189,62 +280,62 @@ const ToastDescription = React.forwardRef<
 ));
 ToastDescription.displayName = ToastDescriptionPrimitive.displayName;
 
-type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>;
-
-type ToastActionElement = React.ReactElement<typeof ToastAction>;
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    margin: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  destructive: {
-    backgroundColor: "#dc2626",
+  progressBar: {
+    height: 3,
+    backgroundColor: '#002D62',
+    opacity: 0.2,
   },
   content: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  iconContainer: {
     marginRight: 12,
+  },
+  textContainer: {
+    flex: 1,
+    marginRight: 8,
   },
   title: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
   },
-  description: {
+  message: {
     fontSize: 14,
-    color: "#666",
-  },
-  destructiveText: {
-    color: "#fff",
+    color: '#4B5563',
   },
   closeButton: {
     padding: 4,
   },
   actionButton: {
-    marginTop: 8,
-    padding: 8,
-    borderRadius: 4,
-    backgroundColor: "#f3f4f6",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   actionText: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#000",
-    textAlign: "center",
+    fontWeight: '500',
+    color: '#002D62',
+    textAlign: 'center',
   },
 });
 
