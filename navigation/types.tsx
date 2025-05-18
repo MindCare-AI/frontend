@@ -14,6 +14,7 @@ export type RootStackParamList = {
     otherParticipantId?: number;
   };
   MoodTracker: { screen?: keyof MoodTrackerParamList; params?: object };
+  Main: undefined;
 };
 
 export type AppStackParamList = {
@@ -23,6 +24,7 @@ export type AppStackParamList = {
   Settings: undefined;
   MoodTracker: undefined;
   Appointments: undefined;
+  Journal: undefined; // Add this line
 };
 
 export type AuthStackParamList = {
@@ -84,4 +86,11 @@ export type MoodTrackerParamList = {
       activities?: string;
     } 
   };
+};
+
+export type DrawerParamList = {
+  Home: undefined;
+  Profile: undefined;
+  Settings: undefined;
+  Appointments: undefined;
 };

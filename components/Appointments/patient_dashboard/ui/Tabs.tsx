@@ -143,7 +143,7 @@ interface TabContentProps {
 
 export const TabContent: React.FC<TabContentProps> = ({ tabKey, activeTab, children, style }) => {
   if (tabKey !== activeTab) return null
-  return <View style={[styles.tabContent, style]}>{children}</View>
+  return <View style={[styles.tabContent, style, { flex: 1 }]}>{children}</View>
 }
 
 const styles = StyleSheet.create({

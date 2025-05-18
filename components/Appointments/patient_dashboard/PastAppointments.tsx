@@ -2,18 +2,18 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, Pressable, StyleSheet } from "react-native"
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useAppointments } from "../../../contexts/AppointmentContext"
 import type { AppointmentType } from "../../../types/appointmentTypes"
 import { Card, CardHeader, CardContent, Badge, Button, ScrollView } from "./ui"
 
 type PastAppointmentsProps = {
+  appointments: AppointmentType[];
+  loading: boolean;
   onOpenFeedback: (appointment: AppointmentType) => void
 }
 
-const PastAppointments: React.FC<PastAppointmentsProps> = ({ onOpenFeedback }) => {
-  const { pastAppointments } = useAppointments()
+const PastAppointments: React.FC<PastAppointmentsProps> = ({ appointments, loading, onOpenFeedback }) => {
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   const toggleExpand = (id: number) => {
@@ -31,45 +31,16 @@ const PastAppointments: React.FC<PastAppointmentsProps> = ({ onOpenFeedback }) =
     }
   }
 
-  const styles = StyleSheet.create({
-    card: {
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-      borderRadius: 20,
-      backgroundColor: '#fff',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.10,
-      shadowRadius: 12,
-      elevation: 4,
-      marginBottom: 20,
-      overflow: 'hidden',
-    },
-    cardContent: {
-      padding: 24,
-    },
-    feedbackButton: {
-      minWidth: 120,
-      borderRadius: 999,
-      paddingVertical: 12,
-      fontWeight: '700',
-      fontSize: 16,
-    },
-    feedbackSubmittedRow: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      alignItems: 'center',
-      marginTop: 12,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: '#E2E8F0',
-      backgroundColor: '#F0FFF4',
-      borderBottomLeftRadius: 16,
-      borderBottomRightRadius: 16,
-    },
-  })
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Loading appointment history...</Text>
+      </View>
+    );
+  }
 
-  if (pastAppointments.length === 0) {
+  if (appointments.length === 0) {
     return (
       <Card style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
         <CardContent style={{ alignItems: "center" }}>
@@ -91,9 +62,16 @@ const PastAppointments: React.FC<PastAppointmentsProps> = ({ onOpenFeedback }) =
         </Text>
       </CardHeader>
       <CardContent style={{ padding: 0 }}>
-        <ScrollView style={{ height: 400 }} contentContainerStyle={{ paddingBottom: 120, padding: 24, gap: 28 }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ 
+            padding: 16, 
+            paddingBottom: 120 // Extra padding for FAB
+          }}
+          showsVerticalScrollIndicator={true}
+        >
           <View style={{ padding: 16, gap: 16 }}>
-            {pastAppointments.map((appointment) => (
+            {appointments.map((appointment) => (
               <Card
                 key={appointment.id}
                 style={styles.card}
@@ -191,5 +169,53 @@ const PastAppointments: React.FC<PastAppointmentsProps> = ({ onOpenFeedback }) =
     </Card>
   )
 }
+
+const styles = StyleSheet.create({
+  card: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 4,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  cardContent: {
+    padding: 24,
+  },
+  feedbackButton: {
+    minWidth: 120,
+    borderRadius: 999,
+    paddingVertical: 12,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  feedbackSubmittedRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#F0FFF4',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#4A5568',
+  },
+})
 
 export default PastAppointments

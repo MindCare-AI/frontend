@@ -2,9 +2,9 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, StyleSheet, Platform, ScrollView } from "react-native"
+import { View, Text, StyleSheet, Platform, ScrollView, ActivityIndicator } from "react-native"
 import { format } from "date-fns"
-import { useAppointments } from "../../../contexts/AppointmentContext"
+import { joinWaitingList } from "../../../API/appointments/waitingList" // Import API
 import { Modal, Button, DatePicker, Select, Checkbox } from "./ui"
 
 type WaitingListModalProps = {
@@ -42,13 +42,12 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
   const [date, setDate] = useState<Date | null>(null)
   const [therapist, setTherapist] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [timePreferences, setTimePreferences] = useState({
     morning: false,
     afternoon: false,
     evening: false,
   })
-
-  const { addToWaitingList } = useAppointments()
 
   // Sample data - in a real app, this would come from an API
   const therapists = [
@@ -60,22 +59,23 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
   const handleSubmit = async () => {
     if (therapist && date && (timePreferences.morning || timePreferences.afternoon || timePreferences.evening)) {
       setIsSubmitting(true)
+      setError(null)
+      
       try {
         // Prepare preferred time slots array
-        const preferredSlots: string[] = []
-        if (timePreferences.morning) preferredSlots.push("Morning")
-        if (timePreferences.afternoon) preferredSlots.push("Afternoon")
-        if (timePreferences.evening) preferredSlots.push("Evening")
+        const preferredTimes: string[] = []
+        if (timePreferences.morning) preferredTimes.push("morning")
+        if (timePreferences.afternoon) preferredTimes.push("afternoon")
+        if (timePreferences.evening) preferredTimes.push("evening")
 
-        // Get therapist name
-        const selectedTherapist = therapists.find((t) => t.value === therapist)?.label || ""
+        // Format date
+        const formattedDate = format(date, 'yyyy-MM-dd');
 
         // Add to waiting list
-        await addToWaitingList({
-          therapist: selectedTherapist,
-          requestedDate: format(date, "MMMM d, yyyy"),
-          preferredTimeSlots: preferredSlots,
-        })
+        await joinWaitingList({
+          preferred_days: [formattedDate],
+          preferred_times: preferredTimes,
+        });
 
         // Close modal and reset form
         onClose()
@@ -88,6 +88,7 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
         })
       } catch (error) {
         console.error("Error adding to waiting list:", error)
+        setError("Failed to join waiting list. Please try again.")
       } finally {
         setIsSubmitting(false)
       }
@@ -99,13 +100,25 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
   }
 
   const footer = (
-    <Button 
-      onPress={handleSubmit} 
-      isDisabled={!isFormValid() || isSubmitting} 
-      colorScheme="primary"
-    >
-      {isSubmitting ? "Adding to List..." : "Join Waiting List"}
-    </Button>
+    <View>
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
+      <Button 
+        onPress={handleSubmit} 
+        isDisabled={!isFormValid() || isSubmitting} 
+        colorScheme="primary"
+      >
+        {isSubmitting ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={{ color: "#FFFFFF" }}>Joining List...</Text>
+          </View>
+        ) : (
+          "Join Waiting List"
+        )}
+      </Button>
+    </View>
   )
 
   return (
@@ -221,6 +234,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#1F2937',
+  },
+  errorText: {
+    color: "#E53E3E",
+    marginBottom: 12,
+    textAlign: "center",
   },
 })
 

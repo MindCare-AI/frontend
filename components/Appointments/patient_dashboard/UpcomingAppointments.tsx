@@ -1,29 +1,40 @@
-import type React from "react"
-import { View, Text, StyleSheet, Platform } from "react-native"
+"use client"
+
+import React from "react"
+import { StyleSheet, ScrollView, View, Text, ActivityIndicator } from "react-native"
+import { cancelAppointment } from "../../../API/appointments/appointments" // Import API
+import { Badge, Button, Card } from "./ui"
 import { Ionicons } from "@expo/vector-icons"
-import { useAppointments } from "../../../contexts/AppointmentContext"
 import type { AppointmentType } from "../../../types/appointmentTypes"
-import { Card, CardHeader, CardContent, CardFooter, Badge, Button, ScrollView } from "./ui"
+import { CardContent, CardFooter, CardHeader } from "../../ui/card"
 
-const UpcomingAppointments: React.FC = () => {
-  const { upcomingAppointments, cancelAppointment } = useAppointments()
+type UpcomingAppointmentsProps = {
+  appointments: AppointmentType[];
+  loading: boolean;
+}
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Confirmed":
-        return "success"
-      case "Pending":
-        return "warning"
-      case "Scheduled":
-        return "info"
-      case "Cancelled":
-        return "error"
-      default:
-        return "gray"
+const UpcomingAppointments: React.FC<UpcomingAppointmentsProps> = ({ appointments, loading }) => {
+  const handleCancelAppointment = async (id: number) => {
+    try {
+      await cancelAppointment(id);
+      // You could use a context or prop function to refresh data
+      // For now just log success
+      console.log(`Appointment ${id} cancelled successfully`);
+    } catch (error) {
+      console.error(`Error cancelling appointment ${id}:`, error);
     }
   }
 
-  if (upcomingAppointments.length === 0) {
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Loading appointments...</Text>
+      </View>
+    );
+  }
+
+  if (appointments.length === 0) {
     return (
       <Card 
         style={styles.emptyStateCard}
@@ -42,15 +53,18 @@ const UpcomingAppointments: React.FC = () => {
 
   return (
     <ScrollView 
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        padding: 16,
+        paddingBottom: 120, // Add extra padding at the bottom for FAB
+      }}
+      showsVerticalScrollIndicator={true}
     >
-      {upcomingAppointments.map((appointment) => (
+      {appointments.map((appointment) => (
         <AppointmentCard
           key={appointment.id}
           appointment={appointment}
-          onCancel={() => cancelAppointment(appointment.id)}
+          onCancel={() => handleCancelAppointment(appointment.id)}
         />
       ))}
     </ScrollView>
@@ -163,9 +177,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
-    gap: 28,
-    paddingBottom: 120,
+    padding: 16,
+    gap: 16,
+    paddingBottom: 120, // Extra padding to account for the FAB
   },
   emptyStateCard: {
     flex: 1,
@@ -259,6 +273,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontWeight: '700',
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#4A5568',
   },
 })
 

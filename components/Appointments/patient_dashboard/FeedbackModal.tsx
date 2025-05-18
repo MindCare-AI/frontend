@@ -5,6 +5,7 @@ import { useState } from "react"
 import { View, Text, Pressable, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAppointments } from "../../../contexts/AppointmentContext"
+import { submitFeedback } from "../../../API/appointments/appointments" // Import API
 import { Modal, Button, TextArea } from "./ui"
 
 type FeedbackModalProps = {
@@ -19,7 +20,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const { selectedAppointment, submitFeedback } = useAppointments()
+  const { selectedAppointment } = useAppointments()
 
   const handleSubmit = async () => {
     if (!selectedAppointment) return
@@ -33,7 +34,12 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
       setIsSubmitting(true)
       setError(null)
       
-      await submitFeedback(selectedAppointment.id, rating, comment)
+      await submitFeedback({
+        appointment_id: selectedAppointment.id,
+        rating,
+        comments: comment
+      })
+      
       setSuccess(true)
       
       // Reset form and close modal after a short delay

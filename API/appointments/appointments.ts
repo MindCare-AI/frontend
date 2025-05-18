@@ -6,7 +6,9 @@ import {
   Appointment, 
   AppointmentFilterParams,
   PaginatedResponse,
-  CreateAppointmentParams
+  CreateAppointmentParams,
+  Feedback,
+  FeedbackParams
 } from './types';
 
 /**
@@ -216,6 +218,60 @@ export const completeAppointment = async (id: number): Promise<Appointment> => {
     return response.data as Appointment;
   } catch (error) {
     console.error(`Error completing appointment ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Submit feedback for an appointment
+ * @param params The feedback parameters
+ * @returns Promise with submitted feedback
+ */
+export const submitFeedback = async (params: FeedbackParams): Promise<Feedback> => {
+  try {
+    const token = await getAuthToken();
+    
+    const response = await axios.post(
+      `${API_URL}/appointments/${params.appointment_id}/feedback/`, 
+      { rating: params.rating, comments: params.comments },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    return response.data as Feedback;
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get feedback for a specific appointment
+ * @param appointmentId The appointment ID
+ * @returns Promise with feedback data
+ */
+export const getFeedback = async (appointmentId: number): Promise<Feedback> => {
+  try {
+    const token = await getAuthToken();
+    
+    const response = await axios.get(
+      `${API_URL}/appointments/${appointmentId}/feedback/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    return response.data as Feedback;
+  } catch (error) {
+    console.error(`Error fetching feedback for appointment ${appointmentId}:`, error);
     throw error;
   }
 };

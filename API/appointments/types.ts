@@ -78,3 +78,20 @@ export interface PaginatedResponse<T> {
   previous: string | null;
   results: T[];
 }
+
+// Add to API/appointments/types.ts
+export interface FeedbackParams {
+  appointment_id: number;
+  rating: number;
+  comments: string;
+}
+
+export interface Feedback {
+  id: number;
+  appointment_id: number;
+  patient_id: number;
+  therapist_id: number;
+  rating: number;
+  comments: string;
+  created_at: string;
+}

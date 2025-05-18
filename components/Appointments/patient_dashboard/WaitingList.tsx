@@ -1,12 +1,26 @@
 import type React from "react"
-import { View, Text, AccessibilityInfo, StyleSheet } from "react-native"
+import { View, Text, ActivityIndicator, StyleSheet, Platform } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useAppointments } from "../../../contexts/AppointmentContext"
+import { removeFromWaitingList } from "../../../API/appointments/waitingList" // Import API
 import type { WaitingListEntryType } from "../../../types/appointmentTypes"
 import { Card, CardHeader, CardContent, Badge, Button, ScrollView } from "./ui"
 
-const WaitingList: React.FC = () => {
-  const { waitingListEntries, cancelWaitingListEntry } = useAppointments()
+type WaitingListProps = {
+  entries: WaitingListEntryType[];
+  loading: boolean;
+}
+
+const WaitingList: React.FC<WaitingListProps> = ({ entries, loading }) => {
+  const handleCancelEntry = async (id: number) => {
+    try {
+      await removeFromWaitingList(id);
+      // For now just log success - in a real app you'd update state or trigger a refresh
+      console.log(`Waiting list entry ${id} cancelled successfully`);
+    } catch (error) {
+      console.error(`Error cancelling waiting list entry ${id}:`, error);
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -38,7 +52,16 @@ const WaitingList: React.FC = () => {
     }
   }
 
-  if (waitingListEntries.length === 0) {
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Loading waiting list...</Text>
+      </View>
+    );
+  }
+
+  if (entries.length === 0) {
     return (
       <Card style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
         <CardContent style={{ alignItems: "center" }}>
@@ -61,10 +84,21 @@ const WaitingList: React.FC = () => {
         <Text style={{ color: "#718096", marginTop: 4 }}>Manage your waiting list entries for preferred appointments</Text>
       </CardHeader>
       <CardContent>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, padding: 24, gap: 28 }}>
-          <View style={{ gap: 16, paddingBottom: 16 }}>
-            {waitingListEntries.map((entry) => (
-              <WaitingListCard key={entry.id} entry={entry} onCancel={() => cancelWaitingListEntry(entry.id)} />
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ 
+            padding: 16, 
+            paddingBottom: 150 // Increased padding
+          }}
+          showsVerticalScrollIndicator={Platform.OS === 'web'}
+        >
+          <View style={{ gap: 16 }}>
+            {entries.map((entry) => (
+              <WaitingListCard 
+                key={entry.id} 
+                entry={entry} 
+                onCancel={() => handleCancelEntry(entry.id)} 
+              />
             ))}
           </View>
         </ScrollView>
@@ -151,6 +185,16 @@ const WaitingListCard: React.FC<WaitingListCardProps> = ({ entry, onCancel }) =>
       fontWeight: '700',
       fontSize: 16,
       marginTop: 8,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: '#4A5568',
     },
   })
 
