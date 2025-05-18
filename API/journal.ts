@@ -1,98 +1,62 @@
 import axios from 'axios';
-import { JournalEntry, JournalFilterParams, JournalStatistics, ShareResponse } from '../types/journal';
+import type { Journal, JournalEntry } from '../types/Journal/index';
 
-const API_URL = '/api/journal';
+import { API_URL } from '../config';
+const JOURNAL_URL = `${API_URL}/journal`;
 
-// List all journal entries with optional filtering
-export const fetchJournalEntries = async (filters?: JournalFilterParams): Promise<JournalEntry[]> => {
-  try {
-    const params = new URLSearchParams();
-    
-    if (filters?.start_date) params.append('start_date', filters.start_date);
-    if (filters?.end_date) params.append('end_date', filters.end_date);
-    if (filters?.shared !== undefined) params.append('shared', String(filters.shared));
-    if (filters?.search) params.append('search', filters.search);
-    
-    const response = await axios.get(`${API_URL}/entries/`, { params });
-    return response.data as JournalEntry[];
-  } catch (error) {
-    console.error('Error fetching journal entries:', error);
-    throw error;
-  }
+// Journal Category (Journal) endpoints
+export const fetchJournalCategories = async (): Promise<Journal[]> => {
+  const response = await axios.get<Journal[]>(`${JOURNAL_URL}/categories/`);
+  return response.data;
 };
 
-// Get a specific journal entry
+export const createJournalCategory = async (category: Omit<Journal, "id" | "created_at" | "updated_at" | "user">): Promise<Journal> => {
+  const response = await axios.post<Journal>(`${JOURNAL_URL}/categories/`, category);
+  return response.data;
+};
+
+export const updateJournalCategory = async (id: number, category: Partial<Journal>): Promise<Journal> => {
+  const response = await axios.patch<Journal>(`${JOURNAL_URL}/categories/${id}/`, category);
+  return response.data;
+};
+
+export const deleteJournalCategory = async (id: number): Promise<void> => {
+  await axios.delete(`${JOURNAL_URL}/categories/${id}/`);
+};
+
+// Journal Entry endpoints
+export const fetchJournalEntries = async (): Promise<JournalEntry[]> => {
+  const response = await axios.get<JournalEntry[]>(`${JOURNAL_URL}/entries/`);
+  return response.data;
+};
+
 export const fetchJournalEntry = async (id: number): Promise<JournalEntry> => {
-  try {
-    const response = await axios.get(`${API_URL}/entries/${id}/`);
-    return response.data as JournalEntry;
-  } catch (error) {
-    console.error(`Error fetching journal entry ${id}:`, error);
-    throw error;
-  }
+  const response = await axios.get<JournalEntry>(`${JOURNAL_URL}/entries/${id}/`);
+  return response.data;
 };
 
-// Create a new journal entry
-export const createJournalEntry = async (entry: Partial<JournalEntry>): Promise<JournalEntry> => {
-  try {
-    const response = await axios.post(`${API_URL}/entries/`, entry);
-    return response.data as JournalEntry;
-  } catch (error) {
-    console.error('Error creating journal entry:', error);
-    throw error;
-  }
+export const createJournalEntry = async (entry: Omit<JournalEntry, "id" | "date" | "created_at" | "updated_at" | "user" | "word_count">): Promise<JournalEntry> => {
+  const response = await axios.post<JournalEntry>(`${JOURNAL_URL}/entries/`, entry);
+  return response.data;
 };
 
-// Update an existing journal entry
 export const updateJournalEntry = async (id: number, entry: Partial<JournalEntry>): Promise<JournalEntry> => {
-  try {
-    const response = await axios.put(`${API_URL}/entries/${id}/`, entry);
-    return response.data as JournalEntry;
-  } catch (error) {
-    console.error(`Error updating journal entry ${id}:`, error);
-    throw error;
-  }
+  const response = await axios.patch<JournalEntry>(`${JOURNAL_URL}/entries/${id}/`, entry);
+  return response.data;
 };
 
-// Partially update an existing journal entry
-export const patchJournalEntry = async (id: number, fields: Partial<JournalEntry>): Promise<JournalEntry> => {
-  try {
-    const response = await axios.patch(`${API_URL}/entries/${id}/`, fields);
-    return response.data as JournalEntry;
-  } catch (error) {
-    console.error(`Error patching journal entry ${id}:`, error);
-    throw error;
-  }
-};
-
-// Delete a journal entry
 export const deleteJournalEntry = async (id: number): Promise<void> => {
-  try {
-    await axios.delete(`${API_URL}/entries/${id}/`);
-  } catch (error) {
-    console.error(`Error deleting journal entry ${id}:`, error);
-    throw error;
-  }
+  await axios.delete(`${JOURNAL_URL}/entries/${id}/`);
 };
 
-// Share a journal entry with therapist
-export const shareJournalEntry = async (id: number): Promise<ShareResponse> => {
-  try {
-    const response = await axios.post(`${API_URL}/entries/share/${id}/`);
-    return response.data as ShareResponse;
-  } catch (error) {
-    console.error(`Error sharing journal entry ${id}:`, error);
-    throw error;
-  }
+// Share entry with therapist
+export const shareJournalEntry = async (id: number) => {
+  const response = await axios.post(`${API_URL}/entries/${id}/share/`);
+  return response.data;
 };
 
 // Get journal statistics
-export const fetchJournalStatistics = async (): Promise<JournalStatistics> => {
-  try {
-    const response = await axios.get(`${API_URL}/entries/statistics/`);
-    return response.data as JournalStatistics;
-  } catch (error) {
-    console.error('Error fetching journal statistics:', error);
-    throw error;
-  }
+export const fetchJournalStatistics = async () => {
+  const response = await axios.get(`${API_URL}/entries/statistics/`);
+  return response.data;
 };

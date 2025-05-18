@@ -1,17 +1,32 @@
 "use client"
 
-import { createContext, useState, useContext, type ReactNode } from "react"
+import { createContext, useState, useContext, useCallback, useEffect, type ReactNode } from "react"
 import type { Journal, JournalEntry } from "../../types/Journal/index"
+import {
+  fetchJournalEntries,
+  fetchJournalEntry,
+  createJournalEntry,
+  updateJournalEntry,
+  deleteJournalEntry,
+  fetchJournalCategories,
+  createJournalCategory,
+  updateJournalCategory,
+  deleteJournalCategory
+} from "../../API/journal"
 
 type JournalContextType = {
   journals: Journal[]
   entries: JournalEntry[]
-  addJournal: (journal: Omit<Journal, "id">) => void
-  updateJournal: (journal: Journal) => void
-  deleteJournal: (id: number) => void
-  addEntry: (entry: Omit<JournalEntry, "id" | "date">) => void
-  updateEntry: (entry: JournalEntry) => void
-  deleteEntry: (id: number) => void
+  loading: boolean
+  error: string | null
+  addJournal: (journal: Omit<Journal, "id" | "created_at" | "updated_at" | "user">) => Promise<Journal>
+  updateJournal: (id: number, journal: Partial<Journal>) => Promise<Journal>
+  deleteJournal: (id: number) => Promise<void>
+  addEntry: (entry: Omit<JournalEntry, "id" | "date" | "created_at" | "updated_at" | "user" | "word_count">) => Promise<JournalEntry>
+  updateEntry: (id: number, entry: Partial<JournalEntry>) => Promise<JournalEntry>
+  deleteEntry: (id: number) => Promise<void>
+  fetchEntries: () => Promise<void>
+  fetchCategories: () => Promise<void>
 }
 
 const JournalContext = createContext<JournalContextType | undefined>(undefined)
@@ -25,137 +40,164 @@ export const useJournal = () => {
 }
 
 export const JournalProvider = ({ children }: { children: ReactNode }) => {
-  const [journals, setJournals] = useState<Journal[]>([
-    {
-      id: 1,
-      title: "Wish Journal",
-      entries: 13,
-      color: "#4287f5",
-    },
-    {
-      id: 2,
-      title: "Emotions Journal",
-      entries: 24,
-      color: "#43d9b8",
-      icon: "💭",
-    },
-    {
-      id: 3,
-      title: "Fear Journal",
-      entries: 9,
-      color: "#f54242",
-    },
-    {
-      id: 4,
-      title: "Gratitude Journal",
-      entries: 36,
-      color: "#f5a742",
-    },
-    {
-      id: 5,
-      title: "Questions Journal",
-      entries: 7,
-      color: "#424242",
-    },
-  ])
+  const [journals, setJournals] = useState<Journal[]>([])
+  const [entries, setEntries] = useState<JournalEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [initialized, setInitialized] = useState(false)
 
-  const [entries, setEntries] = useState<JournalEntry[]>([
-    {
-      id: 101,
-      journalId: 1,
-      content: "I wish I could travel to Japan next year.",
-      date: new Date(2023, 5, 15),
-    },
-    {
-      id: 102,
-      journalId: 1,
-      content: "I hope to learn a new language this year.",
-      date: new Date(2023, 6, 20),
-    },
-    {
-      id: 201,
-      journalId: 2,
-      content: "Today I felt really happy about my progress on the project.",
-      date: new Date(2023, 7, 5),
-    },
-    {
-      id: 301,
-      journalId: 3,
-      content: "I'm worried about the upcoming presentation.",
-      date: new Date(2023, 8, 10),
-    },
-    {
-      id: 401,
-      journalId: 4,
-      content: "I'm grateful for my supportive friends and family.",
-      date: new Date(2023, 9, 12),
-    },
-  ])
-
-  const addJournal = (journal: Omit<Journal, "id">) => {
-    const newJournal = {
-      ...journal,
-      id: Date.now(),
+  const fetchCategories = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetchJournalCategories()
+      setJournals(response)
+      setError(null)
+    } catch (err) {
+      setError("Failed to fetch categories")
+      console.error("Error fetching categories:", err)
+    } finally {
+      setLoading(false)
     }
-    setJournals([...journals, newJournal])
-  }
+  }, [])
 
-  const updateJournal = (updatedJournal: Journal) => {
-    setJournals(journals.map((journal) => (journal.id === updatedJournal.id ? updatedJournal : journal)))
-  }
-
-  const deleteJournal = (id: number) => {
-    setJournals(journals.filter((journal) => journal.id !== id))
-    setEntries(entries.filter((entry) => entry.journalId !== id))
-  }
-
-  const addEntry = (entry: Omit<JournalEntry, "id" | "date">) => {
-    const newEntry = {
-      ...entry,
-      id: Date.now(),
-      date: new Date(),
+  const fetchEntries = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await fetchJournalEntries()
+      // Ensure response is an array before setting the state
+      setEntries(Array.isArray(response) ? response : [])
+      setError(null)
+    } catch (err) {
+      setError("Failed to fetch entries")
+      console.error("Error fetching entries:", err)
+    } finally {
+      setLoading(false)
     }
-    setEntries([...entries, newEntry])
+  }, [])
 
-    // Update journal entry count
-    setJournals(
-      journals.map((journal) =>
-        journal.id === entry.journalId ? { ...journal, entries: journal.entries + 1 } : journal,
-      ),
-    )
-  }
-
-  const updateEntry = (updatedEntry: JournalEntry) => {
-    setEntries(entries.map((entry) => (entry.id === updatedEntry.id ? updatedEntry : entry)))
-  }
-
-  const deleteEntry = (id: number) => {
-    const entryToDelete = entries.find((entry) => entry.id === id)
-    if (entryToDelete) {
-      setEntries(entries.filter((entry) => entry.id !== id))
-
-      // Update journal entry count
-      setJournals(
-        journals.map((journal) =>
-          journal.id === entryToDelete.journalId ? { ...journal, entries: journal.entries - 1 } : journal,
-        ),
-      )
+  const addJournal = useCallback(async (journal: Omit<Journal, "id" | "created_at" | "updated_at" | "user">) => {
+    try {
+      setLoading(true)
+      const response = await createJournalCategory(journal)
+      setJournals(prev => Array.isArray(prev) ? [...prev, response] : [response])
+      setError(null)
+      return response
+    } catch (err) {
+      setError("Failed to add journal")
+      console.error("Error adding journal:", err)
+      throw err
+    } finally {
+      setLoading(false)
     }
+  }, [])
+
+  const updateJournal = useCallback(async (id: number, journal: Partial<Journal>) => {
+    try {
+      setLoading(true)
+      const response = await updateJournalCategory(id, journal)
+      setJournals(prev => Array.isArray(prev) 
+        ? prev.map(j => j.id === id ? { ...j, ...response } : j)
+        : [response])
+      setError(null)
+      return response
+    } catch (err) {
+      setError("Failed to update journal")
+      console.error("Error updating journal:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const deleteJournal = useCallback(async (id: number) => {
+    try {
+      setLoading(true)
+      await deleteJournalCategory(id)
+      setJournals(prev => Array.isArray(prev) ? prev.filter(j => j.id !== id) : [])
+      setError(null)
+    } catch (err) {
+      setError("Failed to delete journal")
+      console.error("Error deleting journal:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const addEntry = useCallback(async (entry: Omit<JournalEntry, "id" | "date" | "created_at" | "updated_at" | "user" | "word_count">) => {
+    try {
+      setLoading(true)
+      const response = await createJournalEntry(entry)
+      setEntries(prev => Array.isArray(prev) ? [...prev, response] : [response])
+      setError(null)
+      return response
+    } catch (err) {
+      setError("Failed to add entry")
+      console.error("Error adding entry:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const updateEntry = useCallback(async (id: number, entry: Partial<JournalEntry>) => {
+    try {
+      setLoading(true)
+      const response = await updateJournalEntry(id, entry)
+      setEntries(prev => Array.isArray(prev) 
+        ? prev.map(e => e.id === id ? { ...e, ...response } : e) 
+        : [response])
+      setError(null)
+      return response
+    } catch (err) {
+      setError("Failed to update entry")
+      console.error("Error updating entry:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const deleteEntry = useCallback(async (id: number) => {
+    try {
+      setLoading(true)
+      await deleteJournalEntry(id)
+      setEntries(prev => Array.isArray(prev) ? prev.filter(e => e.id !== id) : [])
+      setError(null)
+    } catch (err) {
+      setError("Failed to delete entry")
+      console.error("Error deleting entry:", err)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!initialized) {
+      Promise.all([fetchCategories(), fetchEntries()])
+        .then(() => setInitialized(true))
+        .catch(console.error)
+    }
+  }, [initialized, fetchCategories, fetchEntries])
+
+  const value = {
+    journals,
+    entries,
+    loading,
+    error,
+    addJournal,
+    updateJournal,
+    deleteJournal,
+    addEntry,
+    updateEntry,
+    deleteEntry,
+    fetchEntries,
+    fetchCategories
   }
 
   return (
-    <JournalContext.Provider
-      value={{
-        journals,
-        entries,
-        addJournal,
-        updateJournal,
-        deleteJournal,
-        addEntry,
-        updateEntry,
-        deleteEntry,
-      }}
-    >
+    <JournalContext.Provider value={value}>
       {children}
     </JournalContext.Provider>
   )
