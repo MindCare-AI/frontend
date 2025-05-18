@@ -9,7 +9,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Existing imports
 import MessagingNavigator from './MessagingNavigator';
-import MoodNavigator from './MoodNavigator';
+import MoodNavigator from './mood/MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
