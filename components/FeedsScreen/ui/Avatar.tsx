@@ -75,7 +75,7 @@ const Avatar: React.FC<AvatarProps> = ({ source, name = "", size = "medium", sty
       ]}
     >
       {source ? (
-        <Image source={{ uri: source }} style={[getSizeStyle(), styles.image]} />
+        <Image source={{ uri: source }} style={[getSizeStyle()]} resizeMode="cover" />
       ) : (
         <Text style={[styles.initials, { fontSize: getFontSize(), color: colors.text }]}>{getInitials(name)}</Text>
       )}
@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   image: {
-    resizeMode: "cover",
+    // resizeMode moved to Image component prop
   },
   initials: {
     fontWeight: "500",
