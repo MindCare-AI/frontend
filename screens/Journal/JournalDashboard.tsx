@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions, Platform } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useJournal } from "../../contexts/Journal/JournalContext"
@@ -29,7 +29,7 @@ const numColumns = Platform.OS === "web" && width > 768 ? 3 : 2
 const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns
 
 export default function JournalDashboard() {
-  const { journals, entries, addJournal, updateJournal, deleteJournal, addEntry, updateEntry, deleteEntry } =
+  const { journals, entries, addJournal, updateJournal, deleteJournal, addEntry, updateEntry, deleteEntry, fetchEntries, fetchCategories } =
     useJournal()
 
   const [selectedJournal, setSelectedJournal] = useState<Journal | null>(null)
@@ -38,6 +38,11 @@ export default function JournalDashboard() {
   const [newJournalTitle, setNewJournalTitle] = useState("")
   const [newJournalColor, setNewJournalColor] = useState(colors.primary)
   const [newEntryContent, setNewEntryContent] = useState("")
+
+  useEffect(() => {
+    fetchCategories()
+    fetchEntries()
+  }, [])
 
   const [isEntryModalVisible, setIsEntryModalVisible] = useState(false)
   const [isNewJournalModalVisible, setIsNewJournalModalVisible] = useState(false)
@@ -68,8 +73,8 @@ export default function JournalDashboard() {
   const handleJournalLongPress = (journal: Journal) => {
     console.log("Journal long pressed:", journal.title) // Add this for debugging
     setEditingJournal(journal)
-    setNewJournalTitle(journal.title)
-    setNewJournalColor(journal.color)
+    setNewJournalTitle(journal.title || '')
+    setNewJournalColor(journal.color || colors.primary)
     setIsEditJournalModalVisible(true)
   }
 
@@ -89,8 +94,7 @@ export default function JournalDashboard() {
   const handleAddJournal = () => {
     if (newJournalTitle.trim()) {
       addJournal({
-        title: newJournalTitle,
-        entries: 0,
+        name: newJournalTitle,
         color: newJournalColor,
         icon: null,
       })
@@ -100,61 +104,61 @@ export default function JournalDashboard() {
     }
   }
 
-  const handleUpdateJournal = () => {
+  const handleEditJournal = () => {
     if (editingJournal && newJournalTitle.trim()) {
-      updateJournal({
-        ...editingJournal,
-        title: newJournalTitle,
-        color: newJournalColor,
+      updateJournal(editingJournal.id, {
+        name: newJournalTitle,
+        color: newJournalColor || undefined
       })
       setIsEditJournalModalVisible(false)
-    } else {
-      Alert.alert("Error", "Journal title cannot be empty")
+      setEditingJournal(null)
     }
   }
 
-  const handleDeleteJournalConfirm = () => {
+  const handleDeleteJournal = () => {
     if (editingJournal) {
       deleteJournal(editingJournal.id)
       setIsDeleteJournalModalVisible(false)
-      setIsEditJournalModalVisible(false)
+      setEditingJournal(null)
+      setSelectedJournal(null)
+      setIsEntryModalVisible(false)
     }
   }
 
   const handleAddEntry = () => {
     if (selectedJournal && newEntryContent.trim()) {
       addEntry({
-        journalId: selectedJournal.id,
         content: newEntryContent,
+        category: selectedJournal.id,
+        is_private: true,
+        shared_with_therapist: false,
+        title: ''
       })
       setNewEntryContent("")
       setIsAddingEntry(false)
-    } else {
-      Alert.alert("Error", "Entry content cannot be empty")
     }
   }
 
   const handleUpdateEntry = () => {
-    if (editingEntry && newEntryContent.trim()) {
-      updateEntry({
-        ...editingEntry,
-        content: newEntryContent,
-      })
+    if (editingEntry) {
+      updateEntry(editingEntry.id, { content: newEntryContent })
       setIsEditEntryModalVisible(false)
-    } else {
-      Alert.alert("Error", "Entry content cannot be empty")
+      setEditingEntry(null)
+      setNewEntryContent("")
     }
   }
 
-  const handleDeleteEntryConfirm = () => {
+  const handleDeleteEntry = () => {
     if (editingEntry) {
       deleteEntry(editingEntry.id)
       setIsDeleteEntryModalVisible(false)
-      setIsEditEntryModalVisible(false)
+      setEditingEntry(null)
     }
   }
 
-  const entriesForSelectedJournal = entries.filter((entry) => selectedJournal && entry.journalId === selectedJournal.id)
+  const entriesForSelectedJournal = Array.isArray(entries) ? 
+    entries.filter((entry) => selectedJournal && entry.category === selectedJournal.id) 
+    : []
 
   const renderJournalItem = ({ item }: { item: Journal }) => (
     <JournalItem
@@ -212,7 +216,7 @@ export default function JournalDashboard() {
           <View style={styles.entryModalHeader}>
             <View style={[styles.colorDot, { backgroundColor: selectedJournal?.color }]} />
             <Text style={styles.entryCount}>
-              {selectedJournal?.entries} {selectedJournal?.entries === 1 ? "entry" : "entries"}
+              {selectedJournal?.entries_count ?? 0} {selectedJournal?.entries_count === 1 ? "entry" : "entries"}
             </Text>
             <Button variant="outline" size="sm" onPress={() => setIsAddingEntry(!isAddingEntry)}>
               {isAddingEntry ? "View Entries" : "Add Entry"}
@@ -309,7 +313,7 @@ export default function JournalDashboard() {
               <Button variant="outline" onPress={() => setIsEditJournalModalVisible(false)} style={styles.cancelButton}>
                 Cancel
               </Button>
-              <Button onPress={handleUpdateJournal}>Save Changes</Button>
+              <Button onPress={handleEditJournal}>Save Changes</Button>
             </View>
           </View>
         }
@@ -344,7 +348,7 @@ export default function JournalDashboard() {
             <Button variant="outline" onPress={() => setIsDeleteJournalModalVisible(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onPress={handleDeleteJournalConfirm}>
+            <Button variant="destructive" onPress={handleDeleteJournal}>
               Delete Journal
             </Button>
           </View>
@@ -401,7 +405,7 @@ export default function JournalDashboard() {
             <Button variant="outline" onPress={() => setIsDeleteEntryModalVisible(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onPress={handleDeleteEntryConfirm}>
+            <Button variant="destructive" onPress={handleDeleteEntry}>
               Delete Entry
             </Button>
           </View>

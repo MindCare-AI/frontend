@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
+  Pressable,
   ScrollView,
   Dimensions,
   Platform,
@@ -28,9 +28,9 @@ export function Dialog({ visible, onClose, title, children, footer }: DialogProp
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+      <Pressable onPress={onClose}>
         <View style={styles.overlay}>
-          <TouchableWithoutFeedback>
+          <Pressable onPress={() => {}}>
             <SafeAreaView style={styles.safeArea}>
               <View style={styles.container}>
                 {title && (
@@ -53,9 +53,9 @@ export function Dialog({ visible, onClose, title, children, footer }: DialogProp
                 {footer && <View style={styles.footer}>{footer}</View>}
               </View>
             </SafeAreaView>
-          </TouchableWithoutFeedback>
+          </Pressable>
         </View>
-      </TouchableWithoutFeedback>
+      </Pressable>
     </Modal>
   )
 }

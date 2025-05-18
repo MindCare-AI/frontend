@@ -7,21 +7,25 @@ interface JournalItemProps {
   onJournalPress: (journal: Journal) => void
   onJournalLongPress: (journal: Journal) => void
   width: number
+  color?: string
+  entries_count?: number
 }
 
-export function JournalItem({ journal, onJournalPress, onJournalLongPress, width }: JournalItemProps) {
+export function JournalItem({ journal, onJournalPress, onJournalLongPress, width, color = colors.primary }: JournalItemProps) {
   return (
     <TouchableOpacity
-      style={[styles.journalCard, { width, height: width, backgroundColor: journal.color }]}
+      style={[styles.journalCard, { width, height: width, backgroundColor: color }]}
       activeOpacity={0.7}
       onPress={() => onJournalPress(journal)}
       onLongPress={() => onJournalLongPress(journal)}
-      delayLongPress={500} // 500ms is a good default for long press
+      delayLongPress={500}
     >
       <View style={styles.journalCardContent}>
         {journal.icon && <Text style={styles.journalIcon}>{journal.icon}</Text>}
-        <Text style={styles.journalTitle}>{journal.title}</Text>
-        <Text style={styles.journalEntries}>{journal.entries} entries</Text>
+        <Text style={styles.journalTitle}>{journal.name}</Text>
+        {journal.entries_count !== undefined && (
+          <Text style={styles.journalEntries}>{journal.entries_count} entries</Text>
+        )}
       </View>
     </TouchableOpacity>
   )
