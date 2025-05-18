@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Platform, ScrollView, View } from "react-native"
 import { Box, Fab, Icon, useBreakpointValue, VStack, HStack, useSafeArea } from "native-base"
 import { Ionicons } from "@expo/vector-icons"
@@ -11,12 +11,12 @@ import BookAppointmentModal from "../../components/Appointments/patient_dashboar
 import WaitingListModal from "../../components/Appointments/patient_dashboard/WaitingListModal"
 import FeedbackModal from "../../components/Appointments/patient_dashboard/FeedbackModal"
 import Header from "../../components/Appointments/patient_dashboard/Header"
-import { ThemeToggle } from "../../components/Appointments/patient_dashboard/ui"
 
 const DashboardScreen = () => {
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
   const [waitingListModalOpen, setWaitingListModalOpen] = useState(false)
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0) // Added to trigger refresh
 
   const { setSelectedAppointment } = useAppointments()
   const { isDarkMode, colors } = useTheme()
@@ -48,6 +48,27 @@ const DashboardScreen = () => {
     setFeedbackModalOpen(true)
   }
 
+  // Function to refresh appointment data
+  const refreshAppointments = useCallback(() => {
+    setRefreshKey(prevKey => prevKey + 1);
+  }, []);
+
+  // Close handlers that trigger refresh
+  const handleCloseBookingModal = () => {
+    setBookingModalOpen(false);
+    refreshAppointments();
+  };
+
+  const handleCloseWaitingListModal = () => {
+    setWaitingListModalOpen(false);
+    refreshAppointments();
+  };
+
+  const handleCloseFeedbackModal = () => {
+    setFeedbackModalOpen(false);
+    refreshAppointments();
+  };
+
   return (
     <Box 
       flex={1} 
@@ -64,25 +85,25 @@ const DashboardScreen = () => {
         bg={isDarkMode ? colors.background.dark : colors.background.light}
       >
         <Header />
-        <HStack 
-          justifyContent="flex-end" 
-          px={contentPadding} 
-          pb={2}
-        >
-          <ThemeToggle />
-        </HStack>
       </Box>
 
-      {/* Main Content */}
-      <ScrollView
-        style={{ flex: 1, width: '100%' }}
-        contentContainerStyle={{ alignItems: 'center', paddingTop: 16, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
+      {/* Main Content with TabsContainer and ScrollView */}
+      <Box
+        flex={1}
+        pt={70} // Add padding top to account for header height
       >
-        <Box width="100%" maxWidth={520} alignSelf="center">
-          <AppointmentTabs onOpenFeedback={handleOpenFeedback} />
+        <Box 
+          width="100%" 
+          maxWidth={520} 
+          alignSelf="center"
+          flex={1}
+        >
+          <AppointmentTabs 
+            key={refreshKey} // Add key to force remount on refresh
+            onOpenFeedback={handleOpenFeedback} 
+          />
         </Box>
-      </ScrollView>
+      </Box>
 
       {/* Fixed Bottom Button */}
       <Box
@@ -131,18 +152,18 @@ const DashboardScreen = () => {
       {/* Modals */}
       <BookAppointmentModal
         isOpen={bookingModalOpen}
-        onClose={() => setBookingModalOpen(false)}
+        onClose={handleCloseBookingModal}
         onJoinWaitingList={handleJoinWaitingList}
       />
 
       <WaitingListModal 
         isOpen={waitingListModalOpen} 
-        onClose={() => setWaitingListModalOpen(false)} 
+        onClose={handleCloseWaitingListModal} 
       />
 
       <FeedbackModal 
         isOpen={feedbackModalOpen} 
-        onClose={() => setFeedbackModalOpen(false)} 
+        onClose={handleCloseFeedbackModal} 
       />
     </Box>
   )

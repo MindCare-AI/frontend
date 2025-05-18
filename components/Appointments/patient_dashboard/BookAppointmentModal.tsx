@@ -1,11 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { View, Text, StyleSheet, useWindowDimensions, ScrollView } from "react-native"
+import { useState, useEffect } from "react" // Added useEffect
+import { View, Text, StyleSheet, useWindowDimensions, ScrollView, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { format } from "date-fns"
-import { useAppointments } from "../../../contexts/AppointmentContext"
+import { createAppointment } from "../../../API/appointments/appointments" // Import API
+import { getTherapistAvailability } from "../../../API/appointments/patient" // Import API
 import { Modal, Button, DatePicker, Select, Alert } from "./ui"
 
 type BookAppointmentModalProps = {
@@ -19,64 +20,121 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
   const [therapist, setTherapist] = useState("")
   const [timeSlot, setTimeSlot] = useState("")
   const [noSlotsAvailable, setNoSlotsAvailable] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [therapists, setTherapists] = useState<Array<{ label: string, value: string }>>([])
+  const [timeSlots, setTimeSlots] = useState<Array<{ label: string, value: string }>>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { width } = useWindowDimensions()
 
-  const { addAppointment } = useAppointments()
+  // Fetch therapists when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchTherapists();
+    }
+  }, [isOpen]);
 
-  // Sample data - in a real app, this would come from an API
-  const therapists = [
-    { label: "Dr. John Doe", value: "1" },
-    { label: "Dr. Jane Smith", value: "2" },
-    { label: "Dr. Robert Johnson", value: "3" },
-  ]
+  const fetchTherapists = async () => {
+    // You would need to implement this API call or use a mock
+    // For now let's use your sample data
+    setTherapists([
+      { label: "Dr. John Doe", value: "1" },
+      { label: "Dr. Jane Smith", value: "2" },
+      { label: "Dr. Robert Johnson", value: "3" },
+    ]);
+  };
 
-  const timeSlots = [
-    { label: "9:00 AM", value: "1" },
-    { label: "10:30 AM", value: "2" },
-    { label: "1:00 PM", value: "3" },
-    { label: "2:30 PM", value: "4" },
-    { label: "4:00 PM", value: "5" },
-  ]
-
-  const handleDateChange = (selectedDate: Date | null) => {
+  const handleDateChange = async (selectedDate: Date | null) => {
     setDate(selectedDate)
-
-    // Simulate checking availability - in a real app, this would be an API call
-    if (selectedDate && selectedDate.getDate() % 2 === 1) {
-      setNoSlotsAvailable(true)
-      setTimeSlot("")
-    } else {
-      setNoSlotsAvailable(false)
+    
+    if (!selectedDate || !therapist) {
+      return;
     }
-  }
 
-  const handleSubmit = () => {
-    if (therapist && date && (noSlotsAvailable || timeSlot)) {
-      if (!noSlotsAvailable) {
-        const selectedTherapist = therapists.find((t) => t.value === therapist)?.label || ""
-        const selectedTime = timeSlots.find((t) => t.value === timeSlot)?.label || ""
+    setIsLoading(true);
+    setTimeSlots([]);
+    setTimeSlot("");
 
-        addAppointment({
-          id: Date.now(),
-          therapist: selectedTherapist,
-          date: format(date, "MMMM d, yyyy"),
-          time: selectedTime,
-          status: "Scheduled",
-          isWithin15Min: false,
-        })
+    try {
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+      const response = await getTherapistAvailability(parseInt(therapist), formattedDate);
+      
+      if (response.available_slots.length === 0) {
+        setNoSlotsAvailable(true);
+      } else {
+        setNoSlotsAvailable(false);
+        
+        // Format time slots for the dropdown
+        const formattedSlots = response.available_slots.map((slot, index) => {
+          const startTime = new Date(`${formattedDate}T${slot.start}`);
+          return {
+            label: startTime.toLocaleTimeString('en-US', {
+              hour: 'numeric', minute: 'numeric', hour12: true
+            }),
+            value: String(index)
+          };
+        });
+        
+        setTimeSlots(formattedSlots);
       }
-
-      onClose()
-      // Reset form
-      setDate(null)
-      setTherapist("")
-      setTimeSlot("")
-      setNoSlotsAvailable(false)
+    } catch (error) {
+      console.error('Error fetching therapist availability:', error);
+      setError('Failed to fetch available time slots');
+      setNoSlotsAvailable(true);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
+
+  const handleSubmit = async () => {
+    if (!therapist || !date || !timeSlot) return;
+    
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      const selectedSlot = timeSlots[parseInt(timeSlot)];
+      if (!selectedSlot) throw new Error('Invalid time slot selected');
+      
+      const formattedDate = format(date, 'yyyy-MM-dd');
+      const selectedTime = selectedSlot.label;
+      
+      // Format time for API: Convert "3:30 PM" to "15:30" format
+      const timeParts = selectedTime.match(/(\d+):(\d+) ([AP]M)/);
+      if (!timeParts) throw new Error('Invalid time format');
+      
+      let hours = parseInt(timeParts[1]);
+      if (timeParts[3] === 'PM' && hours !== 12) hours += 12;
+      if (timeParts[3] === 'AM' && hours === 12) hours = 0;
+      
+      const minutes = timeParts[2];
+      const isoTime = `${hours.toString().padStart(2, '0')}:${minutes}`;
+      
+      await createAppointment({
+        therapist_id: parseInt(therapist),
+        appointment_date: `${formattedDate}T${isoTime}:00`,
+        duration_minutes: 60
+      });
+      
+      onClose();
+      // Reset form
+      setDate(null);
+      setTherapist("");
+      setTimeSlot("");
+      setNoSlotsAvailable(false);
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      setError('Failed to book appointment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const footer = (
     <View style={styles.footerContainer}>
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
       {date && noSlotsAvailable ? (
         <Button 
           onPress={onJoinWaitingList} 
@@ -87,10 +145,17 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
       ) : (
         <Button
           onPress={handleSubmit}
-          isDisabled={!therapist || !date || (!noSlotsAvailable && !timeSlot)}
+          isDisabled={!therapist || !date || (!noSlotsAvailable && !timeSlot) || isSubmitting}
           colorScheme="primary"
         >
-          Book Appointment
+          {isSubmitting ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={{ color: "#FFFFFF" }}>Booking...</Text>
+            </View>
+          ) : (
+            "Book Appointment"
+          )}
         </Button>
       )}
     </View>
@@ -113,7 +178,12 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
             label="Therapist"
             options={therapists}
             value={therapist}
-            onValueChange={setTherapist}
+            onValueChange={(value) => {
+              setTherapist(value);
+              if (date) {
+                handleDateChange(date);
+              }
+            }}
             placeholder="Select a therapist"
             style={styles.select}
           />
@@ -127,7 +197,14 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
             style={styles.datePicker}
           />
 
-          {date && !noSlotsAvailable && (
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4F46E5" />
+              <Text style={{ marginLeft: 8 }}>Checking availability...</Text>
+            </View>
+          )}
+
+          {date && !noSlotsAvailable && !isLoading && (
             <Select
               label="Time Slot"
               options={timeSlots}
@@ -138,7 +215,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
             />
           )}
 
-          {date && noSlotsAvailable && (
+          {date && noSlotsAvailable && !isLoading && (
             <Alert
               status="info"
               title="No Available Slots"
@@ -179,6 +256,17 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 16,
+  },
+  errorText: {
+    color: "#E53E3E",
+    marginBottom: 12,
+    textAlign: "center",
   },
 })
 
