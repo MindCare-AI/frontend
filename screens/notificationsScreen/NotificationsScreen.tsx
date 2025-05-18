@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ScrollView, View, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { ScrollView, View, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Text, Appbar, Button, Divider, useTheme } from 'react-native-paper';
-import { NotificationItem } from './components/NotificationItem';
-import { NotificationTypeFilter } from './components/NotificationTypeFilter';
-import { useNotifications } from './hooks/useNotifications';
-import { useMarkAllRead } from './hooks/useMarkAllRead';
+import { NotificationItem } from '../../components/notificationsScreen/NotificationItem';
+import { NotificationTypeFilter } from '../../components/notificationsScreen/NotificationTypeFilter';
+import { useNotifications } from '../../hooks/notificationsScreen/useNotifications';
+import { useMarkAllRead } from '../../hooks/notificationsScreen/useMarkAllRead';
 import { NOTIFICATION_TYPES } from './constants';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types/navigation';
@@ -16,15 +16,18 @@ interface NotificationsScreenProps {
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const { 
-    notifications, 
-    loading, 
-    error, 
-    refreshing, 
-    refreshNotifications, 
-    markAsRead 
+
+  // Use backend types if available, otherwise fallback to static
+  const {
+    notifications,
+    loading,
+    error,
+    refreshing,
+    refreshNotifications,
+    markAsRead,
+    types: backendTypes,
   } = useNotifications(selectedType);
-  
+
   const { markAllRead } = useMarkAllRead();
 
   const handleMarkAllRead = async () => {
@@ -32,14 +35,26 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       await markAllRead();
       refreshNotifications();
     } catch (error) {
-      console.error('Failed to mark all as read:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notifications as read';
+      Alert.alert('Error', errorMessage, [
+        { text: 'OK', style: 'cancel' },
+        { text: 'Retry', onPress: handleMarkAllRead }
+      ]);
     }
   };
 
-  const handleNotificationPress = (notificationId: string) => {
-    markAsRead(notificationId);
-    navigation.navigate('NotificationDetail', { id: notificationId });
+  const handleNotificationPress = async (notificationId: number) => {
+    try {
+      await markAsRead(notificationId);
+      navigation.navigate('NotificationDetail', { id: notificationId });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notification as read';
+      Alert.alert('Error', errorMessage);
+    }
   };
+
+  // Use backend types if present, otherwise fallback to static
+  const typeOptions = backendTypes && backendTypes.length > 0 ? backendTypes : NOTIFICATION_TYPES;
 
   return (
     <View style={styles.container}>
@@ -58,7 +73,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
       </Appbar.Header>
 
       <NotificationTypeFilter
-        types={NOTIFICATION_TYPES}
+        types={typeOptions}
         selectedType={selectedType}
         onSelectType={setSelectedType}
       />
@@ -74,13 +89,22 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             mode="contained" 
             onPress={refreshNotifications}
             style={styles.retryButton}
+            icon="refresh"
           >
-            Retry
+            Try Again
           </Button>
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No notifications found</Text>
+          <Text style={styles.emptyText}>No notifications yet</Text>
+          <Button 
+            mode="text" 
+            onPress={refreshNotifications}
+            style={styles.refreshButton}
+            icon="refresh"
+          >
+            Refresh
+          </Button>
         </View>
       ) : (
         <ScrollView
@@ -96,7 +120,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ naviga
             <NotificationItem
               key={notification.id}
               notification={notification}
-              onPress={() => handleNotificationPress(notification.id)}
+              onPress={() => handleNotificationPress(parseInt(notification.id))}
             />
           ))}
         </ScrollView>
@@ -136,6 +160,9 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   retryButton: {
+    marginTop: 16,
+  },
+  refreshButton: {
     marginTop: 16,
   },
 });

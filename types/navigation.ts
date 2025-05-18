@@ -8,11 +8,13 @@ export type RootStackParamList = {
   Chatbot: undefined;
   MessagingTab: undefined;
   Profile: undefined;
-  AppointmentManagement: undefined;
+  AppointmentManagement: { therapistId?: number }; // Changed from string to number
   Notifications: undefined; // Add this
-  NotificationDetail: { id: string }; // And this
+  NotificationDetail: { id: number }; // Changed from string to number
   Settings: undefined;
   Appointments: undefined;
+  PatientDashboard: undefined; // Added
+  TherapistDashboard: undefined; // Added
 };
 
 export type AppTabParamList = {
@@ -34,43 +36,72 @@ export type AuthStackParamList = {
   Onboarding: undefined;
 };
 
-// New MessagingStackParamList to specify nested messaging routes
+// Update MessagingStackParamList
 export type MessagingStackParamList = {
   Messaging: undefined;
   Chat: {
-    conversationId: string | number;
+    conversationId: string;
     conversationType: 'one_to_one' | 'group';
     title: string;
     otherParticipantId?: number;
   };
   NewConversation: undefined;
   GroupDetails?: {
-    groupId: string | number;
+    groupId: string;
   };
 };
 
 export type SettingsStackParamList = {
-  SettingsHome: undefined;
-  UserSettings: undefined;
-  UserProfile: undefined;
-  UserPreferences: undefined;
-  TherapistAvailability: undefined;
-  HealthMetrics: undefined;  // Added new screen
-  MedicalHistory: undefined; // Added new screen
+  Settings: undefined;
+  AppSettings: undefined;
+  TherapistProfile: undefined;
+  PatientProfile: undefined;
+  NotificationSettings: undefined;
+  PatientMedicalInfo: undefined;
+  Availability: undefined;
 };
 
 export type AppointmentStackParamList = {
   AppointmentManagement: undefined;
   BookAppointment: undefined;
+  AppointmentConfirmation: undefined;
+  TherapistProfile: undefined;
+  TherapistAvailability: undefined;
+  TherapistProfileEdit: undefined;
+  TherapistProfileView: undefined;
+  TherapistProfileViewEdit: undefined;
 };
 
-// Add the Appointment interface export:
+// Update Appointment interface
 export interface Appointment {
-  id: string;
-  date: string;
-  time?: string;
-  patientName?: string;
-  status?: string;
+  id: number; // Changed from string to number
+  patient: number;
+  therapist: number;
+  appointment_date: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  notes?: string;
+  duration: number;
+}
+
+// Add new interfaces
+export interface Message {
+  id: number;
+  conversation: number;
+  content: string;
+  message_type: 'text' | 'image' | 'file';
+  sender: number;
+  sender_name: string;
+  timestamp: string;
+}
+
+export interface Conversation {
+  id: number;
+  participants: number[];
+  created_at: string;
+  unread_count: number;
+  last_message?: Message;
+  other_participant?: number;
+  other_user_name?: string;
 }
 
 declare global {

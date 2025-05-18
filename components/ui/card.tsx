@@ -1,86 +1,152 @@
 "use client";
 
-import React from "react";
-import { Platform, View, ViewProps, StyleSheet } from "react-native";
+import React, { useRef } from "react";
+import { View, Platform, Animated, StyleSheet, Pressable } from "react-native";
+import * as Haptics from 'expo-haptics';
 
-// Define native props.
-type NativeCardProps = {
+interface CardProps {
   children: React.ReactNode;
+  onPress?: () => void;
+  variant?: 'default' | 'elevated' | 'outlined';
+  disabled?: boolean;
   style?: any;
-} & ViewProps;
-
-// Define web props.
-type WebCardProps = {
-  children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
-} & React.HTMLAttributes<HTMLDivElement>;
-
-// Union type for Card.
-export type CardProps = NativeCardProps | WebCardProps;
-
-export function Card({ children, style, ...props }: CardProps) {
-  if (Platform.OS === "web") {
-    const { className = "", ...rest } = props as WebCardProps;
-    return (
-      <div
-        className={`bg-white shadow rounded-lg ${className}`}
-        style={style as React.CSSProperties}
-        {...rest}
-      >
-        {children}
-      </div>
-    );
-  } else {
-    return (
-      <View style={[styles.card, style]} {...(props as NativeCardProps)}>
-        {children}
-      </View>
-    );
-  }
 }
 
-// Define CardContentProps explicitly to ensure required properties are present.
-type CardContentProps = {
-  children: React.ReactNode;
-  style?: any;
-  className?: string;
-} & (ViewProps | React.HTMLAttributes<HTMLDivElement>);
+export function Card({ children, onPress, variant = 'default', disabled, style }: CardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const shadowAnim = useRef(new Animated.Value(1)).current;
 
-export function CardContent({ children, style, ...props }: CardContentProps) {
-  if (Platform.OS === "web") {
-    const { className = "", ...rest } = props as WebCardProps;
-    return (
-      <div
-        className={`p-4 ${className}`}
-        style={style as React.CSSProperties}
-        {...rest}
-      >
-        {children}
-      </div>
-    );
-  } else {
-    return (
-      <View style={[styles.cardContent, style]} {...(props as NativeCardProps)}>
-        {children}
-      </View>
-    );
-  }
+  const handlePressIn = () => {
+    if (disabled || !onPress) return;
+
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.98,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shadowAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handlePressOut = () => {
+    if (disabled || !onPress) return;
+
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shadowAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const getBackgroundColor = () => {
+    if (disabled) return '#F3F4F6';
+    return '#FFFFFF';
+  };
+
+  const getBorderColor = () => {
+    if (disabled) return '#E5E7EB';
+    return variant === 'outlined' ? '#E5E7EB' : 'transparent';
+  };
+
+  const CardWrapper = onPress ? Pressable : View;
+
+  return (
+    <CardWrapper
+      onPress={disabled ? undefined : onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={({ pressed }: any) => [
+        styles.container,
+        {
+          backgroundColor: getBackgroundColor(),
+          borderColor: getBorderColor(),
+          borderWidth: variant === 'outlined' ? 1 : 0,
+          transform: [{ scale: scaleAnim }],
+          opacity: pressed ? 0.9 : 1,
+        },
+        variant === 'elevated' && {
+          shadowOpacity: shadowAnim,
+        },
+        style,
+      ]}
+      disabled={disabled}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityState={{ disabled }}
+    >
+      {children}
+    </CardWrapper>
+  );
+}
+
+export function CardHeader({ children, style }: { children: React.ReactNode; style?: any }) {
+  return (
+    <View style={[styles.header, style]}>
+      {children}
+    </View>
+  );
+}
+
+export function CardContent({ children, style }: { children: React.ReactNode; style?: any }) {
+  return (
+    <View style={[styles.content, style]}>
+      {children}
+    </View>
+  );
+}
+
+export function CardFooter({ children, style }: { children: React.ReactNode; style?: any }) {
+  return (
+    <View style={[styles.footer, style]}>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    // Shadow for iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    // Elevation for Android
-    elevation: 3,
+  container: {
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      },
+    }),
   },
-  cardContent: {
+  header: {
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  content: {
+    padding: 16,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
 });

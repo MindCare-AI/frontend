@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScrollView, View, StyleSheet } from 'react-native';
-import { Text, Appbar, Button, ActivityIndicator, useTheme } from 'react-native-paper';
-import { NotificationPreferenceItem } from './components/NotificationPreferenceItem';
-import { useNotificationPreferences } from './hooks/useNotificationPreferences';
+import { Text, Appbar, Button, ActivityIndicator, useTheme, Switch, Divider } from 'react-native-paper';
+import { NotificationPreferenceItem } from '../../components/notificationsScreen/NotificationPreferenceItem';
+import { useNotificationPreferences } from '../../hooks/notificationsScreen/useNotificationPreferences';
 import { NavigationProp } from '@react-navigation/native';
 
 interface NotificationPreferencesScreenProps {
@@ -16,20 +16,39 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
     loading, 
     error, 
     togglePreference, 
-    savePreferences 
+    savePreferences,
+    emailNotifications,
+    inAppNotifications,
+    toggleEmailNotifications,
+    toggleInAppNotifications,
+    disabledTypes,
+    toggleDisabledType,
   } = useNotificationPreferences();
 
   const [localPrefs, setLocalPrefs] = React.useState(preferences);
+  const [localEmail, setLocalEmail] = React.useState(emailNotifications);
+  const [localInApp, setLocalInApp] = React.useState(inAppNotifications);
 
   React.useEffect(() => {
-    if (preferences) {
-      setLocalPrefs(preferences);
-    }
+    setLocalPrefs(preferences);
   }, [preferences]);
+
+  React.useEffect(() => {
+    setLocalEmail(emailNotifications);
+  }, [emailNotifications]);
+
+  React.useEffect(() => {
+    setLocalInApp(inAppNotifications);
+  }, [inAppNotifications]);
 
   const handleSave = async () => {
     try {
-      await savePreferences(localPrefs);
+      await savePreferences({
+        notification_preferences: localPrefs,
+        email_notifications: localEmail,
+        in_app_notifications: localInApp,
+        disabled_notification_types: disabledTypes,
+      });
       navigation.goBack();
     } catch (error) {
       console.error('Error saving preferences:', error);
@@ -82,6 +101,26 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
           />
         ))}
 
+        <Divider style={{ marginVertical: 16 }} />
+
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Channels
+        </Text>
+        <View style={styles.row}>
+          <Text>Email Notifications</Text>
+          <Switch
+            value={localEmail}
+            onValueChange={val => setLocalEmail(val)}
+          />
+        </View>
+        <View style={styles.row}>
+          <Text>In-App Notifications</Text>
+          <Switch
+            value={localInApp}
+            onValueChange={val => setLocalInApp(val)}
+          />
+        </View>
+
         <Button 
           mode="contained" 
           onPress={handleSave}
@@ -123,5 +162,11 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 24,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
 });
