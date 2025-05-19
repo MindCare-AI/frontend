@@ -1,191 +1,187 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import { MessageBubble } from '../../components/MessagingScreen/MessageBubble';
-import { MessageInput } from '../../components/MessagingScreen/MessageInput';
-import { TypingIndicator } from '../../components/MessagingScreen/TypingIndicator';
-import { FilePreviewModal } from '../../components/MessagingScreen/FilePreviewModal';
-import { useMessaging } from '../../contexts/MessagingContext';
-import { useAuth } from '../../contexts/AuthContext';
-import { Message, MessageAttachment } from '../../types/messaging';
-import { globalStyles } from '../../styles/global';
-import messagingService from '../../services/messagingService';
+"use client"
 
-export default function ChatScreen() {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { user } = useAuth();
-  const flatListRef = useRef<FlatList>(null);
-  const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
-  
+import type React from "react"
+import { useEffect, useState } from "react"
+import { View, StyleSheet, SafeAreaView, TouchableOpacity, Text } from "react-native"
+import { useRoute, useNavigation } from "@react-navigation/native"
+import { Feather } from "@expo/vector-icons"
+import { MessageList } from "../../components/MessagingScreen/messages/MessageList"
+import { ChatInput } from "../../components/MessagingScreen/messages/ChatInput"
+import { Avatar } from "../../components/MessagingScreen/ui/Avatar"
+import { useMessagesStore } from "../../store/messagesStore"
+import type { ChatScreenRouteProp, ChatScreenNavigationProp } from "../../navigation/types"
+import type { Message, Conversation } from "../../types/messaging/index"
+import { ErrorBoundary } from "../../components/MessagingScreen/ErrorBoundary"
+import { NetworkStatusBar } from "../../components/MessagingScreen/NetworkStatusBar"
+
+const ChatScreen: React.FC = () => {
+  const route = useRoute<ChatScreenRouteProp>()
+  const navigation = useNavigation<ChatScreenNavigationProp>()
+  const { id: conversationId } = route.params
+
   const {
-    state: {
-      messages: allMessages,
-      loadingMessages,
-      hasMoreMessages,
-      typingIndicators,
-      activeConversation
-    },
-    sendMessage,
-    loadMoreMessages,
-    startTyping,
-    stopTyping,
-    markAsRead,
-    setActiveConversation,
-  } = useMessaging();
+    messages: allMessages,
+    conversations,
+    addMessage,
+    updateMessage,
+    deleteMessage,
+    markConversationAsRead,
+  } = useMessagesStore()
 
-  const { conversationId, title } = route.params as { conversationId: string; title: string };
-  const messages = allMessages[conversationId] || [];
-  const typingUsers = Array.from(typingIndicators || [])
-    .filter(indicator => indicator.conversation_id === conversationId);
+  const [conversation, setConversation] = useState<Conversation | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const messages = allMessages[conversationId] || []
 
   useEffect(() => {
-    navigation.setOptions({ title });
-    setActiveConversation({ 
-      id: conversationId,
-      name: title
-    });
-
-    return () => {
-      setActiveConversation(null);
-    };
-  }, [conversationId, navigation, setActiveConversation, title]);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      const unreadMessages = messages.filter(
-        (msg: Message) => !msg.readBy?.includes(user?.id?.toString() || '')
-      );
-      unreadMessages.forEach((msg: Message) => markAsRead(msg.id));
+    const currentConversation = conversations.find((c) => c.id === conversationId)
+    if (currentConversation) {
+      setConversation(currentConversation)
+      markConversationAsRead(conversationId)
     }
-  }, [messages, markAsRead, user?.id]);
+    setIsLoading(false)
+  }, [conversationId, conversations])
 
-  const handleSend = async (content: string, attachment?: File) => {
-    try {
-      await sendMessage(content, attachment);
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    } catch (error) {
-      console.error('Error sending message:', error);
+  const handleSendMessage = (message: Message) => {
+    addMessage(message)
+  }
+
+  const handleDeleteMessage = (messageId: string) => {
+    deleteMessage(conversationId, messageId)
+  }
+
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    updateMessage(conversationId, messageId, { content: newContent, edited: true })
+  }
+
+  const handleReactToMessage = (messageId: string, reaction: string) => {
+    const message = messages.find((msg) => msg.id === messageId)
+    if (!message) return
+
+    const existingReactions = message.reactions || []
+    const hasReacted = existingReactions.some((r) => r.userId === "current-user" && r.type === reaction)
+
+    let updatedReactions = [...existingReactions]
+    if (hasReacted) {
+      updatedReactions = updatedReactions.filter((r) => !(r.userId === "current-user" && r.type === reaction))
+    } else {
+      updatedReactions.push({ userId: "current-user", type: reaction })
     }
-  };
 
-  const handleLoadMore = () => {
-    if (hasMoreMessages && !loadingMessages) {
-      loadMoreMessages();
-    }
-  };
+    updateMessage(conversationId, messageId, { reactions: updatedReactions })
+  }
 
-  const handleAttachmentPress = (attachment: MessageAttachment) => {
-    setSelectedAttachment(attachment);
-  };
-
-  const handleReactionPress = async (messageId: string, emoji: string) => {
-    try {
-      const message = messages.find((m: Message) => m.id === messageId);
-      if (!message) return;
-
-      const hasReacted = message.reactions?.some(
-        r => r.userId === user?.id?.toString() && r.emoji === emoji
-      );
-
-      if (hasReacted) {
-        await messagingService.removeReaction(messageId, emoji);
-      } else {
-        await messagingService.addReaction(messageId, emoji);
-      }
-    } catch (error) {
-      console.error('Error handling reaction:', error);
-    }
-  };
-
-  const renderMessage = ({ item: message }: { item: Message }) => {
-    const isOwn = message.sender_id === user?.id?.toString();
-
+  if (!conversation) {
     return (
-      <MessageBubble
-        text={message.content}
-        timestamp={message.timestamp}
-        isOwn={isOwn}
-        status={message.status}
-        senderName={!isOwn ? message.sender_name : undefined}
-        attachment={message.attachment}
-        reactions={message.reactions}
-        edited={message.edited}
-        onAttachmentPress={handleAttachmentPress}
-        onReactionPress={(emoji) => handleReactionPress(message.id, emoji)}
-      />
-    );
-  };
-
-  const renderTypingIndicator = () => {
-    if (typingUsers.length === 0) return null;
-
-    const typingUser = typingUsers[0];
-    return <TypingIndicator username={typingUser.username} />;
-  };
-
-  const renderFooter = () => {
-    if (!loadingMessages) return null;
-    
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color={globalStyles.colors.primary} />
-      </View>
-    );
-  };
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text>Conversation not found</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-    >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        inverted
-        contentContainerStyle={styles.messageList}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-      />
-      {renderTypingIndicator()}
-      <MessageInput
-        onSend={handleSend}
-        onTypingStart={startTyping}
-        onTypingEnd={stopTyping}
-      />
-      <FilePreviewModal
-        visible={!!selectedAttachment}
-        attachment={selectedAttachment!}
-        onClose={() => setSelectedAttachment(null)}
-        onError={(error) => {
-          setSelectedAttachment(null);
-        }}
-      />
-    </KeyboardAvoidingView>
-  );
+    <ErrorBoundary>
+      <SafeAreaView style={styles.container}>
+        <NetworkStatusBar />
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Feather name="arrow-left" size={24} color="#333" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.profileSection}
+            onPress={() => navigation.navigate("Profile", { id: conversationId })}
+          >
+            <Avatar source={conversation.avatar} name={conversation.name} size={40} online={conversation.isOnline} />
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{conversation.name}</Text>
+              <Text style={styles.profileStatus}>{conversation.isOnline ? "Online" : "Offline"}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.iconButton}>
+              <Feather name="phone" size={22} color="#333" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Feather name="video" size={22} color="#333" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate("Search", { conversationId })}
+            >
+              <Feather name="search" size={22} color="#333" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.content}>
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            onDeleteMessage={handleDeleteMessage}
+            onEditMessage={handleEditMessage}
+            onReactToMessage={handleReactToMessage}
+          />
+        </View>
+
+        <ChatInput conversationId={conversationId} onSendMessage={handleSendMessage} />
+      </SafeAreaView>
+    </ErrorBoundary>
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: globalStyles.colors.backgroundLight,
+    backgroundColor: "white",
   },
-  messageList: {
-    paddingVertical: 16,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  backButton: {
+    padding: 4,
+  },
+  profileSection: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  profileInfo: {
+    marginLeft: 12,
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  profileStatus: {
+    fontSize: 12,
+    color: "#10B981",
+  },
+  headerButtons: {
+    flexDirection: "row",
+  },
+  iconButton: {
+    padding: 8,
+    marginLeft: 4,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
   },
   loadingContainer: {
-    padding: 16,
-    alignItems: 'center',
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-});
+})
+
+export default ChatScreen

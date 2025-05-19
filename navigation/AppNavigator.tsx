@@ -89,6 +89,9 @@ const TabNavigator = () => {
             case 'Journal':
               iconName = focused ? 'book' : 'book-outline';
               break;
+            case 'Messaging':
+              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+              break;
             default:
               iconName = 'alert';
           }
@@ -128,7 +131,7 @@ const TabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Notifications"
+        name="Messaging"
         component={MessagingNavigator}
         options={{ 
           tabBarLabel: 'Messages',

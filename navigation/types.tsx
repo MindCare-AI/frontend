@@ -8,10 +8,8 @@ export type RootStackParamList = {
   BookAppointment: undefined;
   Messaging: undefined;
   Chat: {
-    conversationId: string;
-    conversationType: 'one_to_one' | 'group';
-    title: string;
-    otherParticipantId?: number;
+    id: string;
+    highlightMessageId?: string;
   };
   MoodTracker: { screen?: keyof MoodTrackerParamList; params?: object };
   Main: undefined;
@@ -24,7 +22,8 @@ export type AppStackParamList = {
   Settings: undefined;
   MoodTracker: undefined;
   Appointments: undefined;
-  Journal: undefined; // Add this line
+  Journal: undefined;
+  Messaging: undefined; // Add this line
 };
 
 export type AuthStackParamList = {
@@ -62,15 +61,22 @@ export type AppointmentStackParamList = {
   DeclineAppointment: { appointmentId: number };
 };
 
+// Updated Messaging navigation types
 export type MessagingStackParamList = {
-  Messaging: undefined;
-  Chat: {
-    conversationId: string;
-    conversationType: 'one_to_one' | 'group';
-    title: string;
-    otherParticipantId?: number;
+  Home: undefined;
+  Chat: { 
+    id: string;
+    highlightMessageId?: string;
   };
-  NewChat: undefined;
+  Profile: { id: string };
+  NewConversation: undefined;
+  NewGroup: undefined;
+  Search: { conversationId?: string };
+  MediaGallery: { id: string };
+  GroupMembers: { id: string };
+  Settings: undefined;
+  NotificationSettings: undefined;
+  Messaging: undefined;
 };
 
 export type MoodTrackerParamList = {
@@ -98,3 +104,25 @@ export type DrawerParamList = {
   Settings: undefined;
   Appointments: undefined;
 };
+
+// Messaging Screen Navigation Props
+export type HomeScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Home">;
+export type ChatScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Chat">;
+export type ProfileScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Profile">;
+export type NewConversationScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NewConversation">;
+export type NewGroupScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NewGroup">;
+export type SearchScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Search">;
+export type MediaGalleryScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "MediaGallery">;
+export type GroupMembersScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "GroupMembers">;
+export type SettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Settings">;
+export type NotificationSettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NotificationSettings">;
+
+// Messaging Screen Route Props
+export type ChatScreenRouteProp = RouteProp<MessagingStackParamList, "Chat">;
+export type ProfileScreenRouteProp = RouteProp<MessagingStackParamList, "Profile">;
+export type MediaGalleryScreenRouteProp = RouteProp<MessagingStackParamList, "MediaGallery">;
+export type GroupMembersScreenRouteProp = RouteProp<MessagingStackParamList, "GroupMembers">;
+export type SearchScreenRouteProp = RouteProp<MessagingStackParamList, "Search">;
+
+import type { RouteProp } from "@react-navigation/native";
+import type { StackNavigationProp } from "@react-navigation/stack";
