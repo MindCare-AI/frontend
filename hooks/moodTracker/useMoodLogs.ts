@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { MoodLog, MoodFormData, MoodFilters } from '../../types/Mood';
 import { MoodApi } from '../../services/moodApi';
 import { useMoodContext } from '../../contexts/moodContext';
+import { useIsFocused } from '@react-navigation/native';
 
 export const useMoodLogs = () => {
   const {
@@ -9,12 +10,27 @@ export const useMoodLogs = () => {
     isLoading,
     error,
     filters,
-    fetchMoodLogs,
+    fetchMoodLogs: contextFetchMoodLogs,
     createMoodLog,
     updateMoodLog, 
     deleteMoodLog,
     setFilters
   } = useMoodContext();
+  
+  // Add this to fetch logs when the screen is focused
+  const isFocused = useIsFocused();
+  
+  // Wrapper for context fetch that handles the API response format
+  const fetchMoodLogs = useCallback(async (queryFilters?: MoodFilters) => {
+    // Force refetch from API to ensure we have fresh data
+    return await contextFetchMoodLogs(queryFilters);
+  }, [contextFetchMoodLogs]);
+  
+  useEffect(() => {
+    if (isFocused) {
+      fetchMoodLogs();
+    }
+  }, [isFocused, fetchMoodLogs]);
 
   const applyFilters = useCallback((newFilters: Partial<MoodFilters>) => {
     const updatedFilters = { ...filters, ...newFilters };

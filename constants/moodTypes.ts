@@ -22,11 +22,11 @@ export const ACTIVITY_OPTIONS = [
 ];
 
 export const ENERGY_LEVELS = [
-  { label: "Very Low", value: 1 },
-  { label: "Low", value: 2 },
-  { label: "Moderate", value: 3 },
-  { label: "High", value: 4 },
-  { label: "Very High", value: 5 },
+  { label: "😴", value: 1, description: "Very Low" },
+  { label: "🥱", value: 2, description: "Low" },
+  { label: "😐", value: 3, description: "Moderate" },
+  { label: "😊", value: 4, description: "High" },
+  { label: "🤩", value: 5, description: "Very High" },
 ];
 
 export const MOOD_DESCRIPTIONS = {

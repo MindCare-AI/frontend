@@ -30,12 +30,23 @@ export const MoodProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const appliedFilters = queryFilters || filters;
-      const logs = await MoodApi.getMoodLogs(appliedFilters);
+      const response = await MoodApi.getMoodLogs(appliedFilters);
+      
+      // Handle different API response formats (paginated or direct array)
+      let logs;
+      if (response && 'results' in response) {
+        // This is a paginated response
+        logs = response.results;
+      } else {
+        // Direct array response or other format
+        logs = response;
+      }
+      
       // Ensure logs is an array before setting state
       setMoodLogs(Array.isArray(logs) ? logs : []);
     } catch (err) {
       setError('Failed to fetch mood logs');
-      console.error(err);
+      console.error("Error fetching mood logs:", err);
     } finally {
       setIsLoading(false);
     }

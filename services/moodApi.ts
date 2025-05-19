@@ -19,13 +19,20 @@ const formatQueryString = (filters?: MoodFilters): string => {
   return params.toString() ? `?${params.toString()}` : '';
 };
 
+interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export const MoodApi = {
   // Get all mood logs with optional filters
-  getMoodLogs: async (filters?: MoodFilters): Promise<MoodLog[]> => {
+  getMoodLogs: async (filters?: MoodFilters): Promise<MoodLog[] | PaginatedResponse<MoodLog>> => {
     try {
       const queryString = formatQueryString(filters);
       const response = await axios.get(`${MOOD_API_BASE}/${queryString}`);
-      return response.data as MoodLog[];
+      return response.data;
     } catch (error) {
       console.error('Error fetching mood logs:', error);
       throw error;

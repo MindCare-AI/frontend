@@ -1,6 +1,0 @@
-# Toggle between local and cloud
-python manage.py toggle_db
-
-# Explicitly set to local or cloud
-python manage.py toggle_db --mode=local
-python manage.py toggle_db --mode=cloud

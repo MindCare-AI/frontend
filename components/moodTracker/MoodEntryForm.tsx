@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Platform } from 'react-native';
-import { Button, Surface, Text, TextInput, HelperText, Menu, Divider } from 'react-native-paper';
+import { Button, Surface, Text, TextInput, HelperText, Menu, Divider, Tooltip } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
-// Import our custom slider instead
 import WebFriendlySlider from '../common/WebFriendlySlider';
 import { Formik, FormikProps } from 'formik';
 import * as Yup from 'yup';
@@ -17,6 +16,15 @@ interface MoodEntryFormProps {
   onSubmit: (data: MoodFormData) => Promise<void>;
   initialValues?: Partial<MoodFormData>;
   onCancel?: () => void;
+  colors?: {
+    primary: string;
+    lightBlue: string;
+    white: string;
+    textDark: string;
+    textMedium: string;
+    borderColor: string;
+    background: string;
+  };
 }
 
 const MoodValidationSchema = Yup.object().shape({
@@ -27,7 +35,16 @@ const MoodValidationSchema = Yup.object().shape({
 const MoodEntryForm: React.FC<MoodEntryFormProps> = ({ 
   onSubmit, 
   initialValues, 
-  onCancel 
+  onCancel,
+  colors = {
+    primary: '#002D62',
+    lightBlue: '#E4F0F6',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#444',
+    borderColor: '#F0F0F0',
+    background: '#FFFFFF',
+  }
 }) => {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [activitiesMenuVisible, setActivitiesMenuVisible] = useState(false);
@@ -58,14 +75,6 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
       }),
     ]).start();
   }, []);
-
-  // Colors for the blue and white theme
-  const colors = {
-    primary: '#0d6efd',
-    lightBlue: '#cfe2ff',
-    white: '#ffffff',
-    background: '#f8f9fa',
-  };
 
   return (
     <Animated.View
@@ -105,7 +114,7 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
             </Text>
             
             <View style={styles.ratingContainer}>
-              <Text style={styles.ratingLabel}>
+              <Text style={[styles.ratingLabel, { color: colors.textDark }]}>
                 Mood: {values.mood_rating}/10 - {getMoodDescription(values.mood_rating)}
               </Text>
               <WebFriendlySlider
@@ -141,23 +150,26 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
             </View>
             
             <View style={styles.energyContainer}>
-              <Text style={styles.label}>Energy Level</Text>
+              <Text style={[styles.label, { color: colors.textDark }]}>Energy Level</Text>
               <View style={styles.energyLevelsContainer}>
                 {ENERGY_LEVELS.map((level) => (
-                  <Button
-                    key={level.value}
-                    mode={values.energy_level === level.value ? "contained" : "outlined"}
-                    onPress={() => setFieldValue('energy_level', level.value)}
-                    style={styles.energyButton}
-                  >
-                    {level.label}
-                  </Button>
+                  <Tooltip key={level.value} title={level.description} enterTouchDelay={50} leaveTouchDelay={1500}>
+                    <Button
+                      mode={values.energy_level === level.value ? "contained" : "outlined"}
+                      onPress={() => setFieldValue('energy_level', level.value)}
+                      style={styles.energyButton}
+                      buttonColor={values.energy_level === level.value ? colors.primary : undefined}
+                      textColor={values.energy_level === level.value ? colors.white : colors.primary}
+                    >
+                      <Text style={styles.emojiText}>{level.label}</Text>
+                    </Button>
+                  </Tooltip>
                 ))}
               </View>
             </View>
             
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Activity</Text>
+              <Text style={[styles.label, { color: colors.textDark }]}>Activity</Text>
               <Menu
                 visible={activitiesMenuVisible}
                 onDismiss={() => setActivitiesMenuVisible(false)}
@@ -166,6 +178,7 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
                     mode="outlined" 
                     onPress={() => setActivitiesMenuVisible(true)}
                     style={styles.dropdownButton}
+                    textColor={colors.primary}
                   >
                     {values.activities || 'Select Activity'}
                   </Button>
@@ -187,11 +200,12 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
             </View>
             
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Date and Time</Text>
+              <Text style={[styles.label, { color: colors.textDark }]}>Date and Time</Text>
               <Button
                 mode="outlined"
                 onPress={() => setDatePickerVisible(true)}
                 style={styles.dateButton}
+                textColor={colors.primary}
               >
                 {new Date(values.logged_at || Date.now()).toLocaleString()}
               </Button>
@@ -216,7 +230,7 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
                 <Button 
                   mode="outlined" 
                   onPress={onCancel}
-                  style={styles.button} 
+                  style={[styles.button, { borderColor: colors.primary }]} 
                   disabled={isSubmitting}
                   textColor={colors.primary}
                 >
@@ -285,9 +299,11 @@ const styles = StyleSheet.create({
   },
   dropdownButton: {
     width: '100%',
+    borderRadius: 12,
   },
   dateButton: {
     width: '100%',
+    borderRadius: 12,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -296,8 +312,11 @@ const styles = StyleSheet.create({
   },
   button: {
     width: '40%',
-    borderRadius: 25,
+    borderRadius: 12,
     paddingVertical: 6,
+  },
+  emojiText: {
+    fontSize: 20,
   },
 });
 

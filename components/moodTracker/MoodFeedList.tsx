@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Text, Button, IconButton, Dialog, Paragraph, Portal, ActivityIndicator } from 'react-native-paper';
 import { format } from 'date-fns';
 import { MoodLog } from '../../types/Mood';
-import { getMoodDescription } from '../../constants/moodTypes';
+import { getMoodDescription, ENERGY_LEVELS } from '../../constants/moodTypes';
 
 interface MoodFeedListProps {
   moodLogs: MoodLog[];
@@ -11,6 +11,16 @@ interface MoodFeedListProps {
   onRefresh: () => void;
   onEdit: (log: MoodLog) => void;
   onDelete: (id: number) => Promise<void>;
+  colors?: {
+    primary: string;
+    lightBlue: string;
+    lightPurple: string;
+    white: string;
+    textDark: string;
+    textMedium: string;
+    borderColor: string;
+    background: string;
+  };
 }
 
 const MoodFeedList: React.FC<MoodFeedListProps> = ({
@@ -18,10 +28,35 @@ const MoodFeedList: React.FC<MoodFeedListProps> = ({
   isLoading,
   onRefresh,
   onEdit,
-  onDelete
+  onDelete,
+  colors = {
+    primary: '#002D62',
+    lightBlue: '#E4F0F6',
+    lightPurple: '#F0EAFF',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#444',
+    borderColor: '#F0F0F0',
+    background: '#FFFFFF',
+  }
 }) => {
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  const [displayLogs, setDisplayLogs] = useState<MoodLog[]>([]);
+
+  useEffect(() => {
+    if (Array.isArray(moodLogs)) {
+      const formattedLogs = moodLogs.map(log => ({
+        ...log,
+        logged_at: typeof log.logged_at === 'string' ? 
+          (log.logged_at.includes('T') ? log.logged_at : new Date(log.logged_at.replace(' ', 'T')).toISOString()) :
+          new Date(log.logged_at).toISOString()
+      }));
+      setDisplayLogs(formattedLogs);
+    } else {
+      setDisplayLogs([]);
+    }
+  }, [moodLogs]);
 
   const handleDeleteConfirm = async () => {
     if (selectedLogId) {
@@ -36,39 +71,67 @@ const MoodFeedList: React.FC<MoodFeedListProps> = ({
     setDeleteDialogVisible(true);
   };
 
+  const getEnergyEmoji = (level?: number) => {
+    if (!level) return null;
+    const energyLevel = ENERGY_LEVELS.find(e => e.value === level);
+    return energyLevel ? energyLevel.label : null;
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy - h:mm a');
+    } catch (error) {
+      console.error("Date formatting error:", error, dateString);
+      return dateString;
+    }
+  };
+
   const renderMoodItem = ({ item }: { item: MoodLog }) => (
-    <Card style={styles.card}>
+    <Card style={[styles.card, { backgroundColor: colors.white }]}>
       <Card.Content>
         <View style={styles.header}>
           <View>
-            <Text variant="titleMedium">{getMoodDescription(item.mood_rating)}</Text>
-            <Text variant="bodySmall">
-              {format(new Date(item.logged_at), 'MMM d, yyyy - h:mm a')}
+            <Text variant="titleMedium" style={{ color: colors.textDark }}>{getMoodDescription(item.mood_rating)}</Text>
+            <Text variant="bodySmall" style={{ color: colors.textMedium }}>
+              {formatDate(item.logged_at)}
             </Text>
           </View>
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingText}>{item.mood_rating}/10</Text>
+          <View style={[styles.ratingBadge, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.ratingText, { color: colors.white }]}>{item.mood_rating}/10</Text>
           </View>
         </View>
         
         {item.activities && (
           <View style={styles.activityContainer}>
-            <Text variant="bodyMedium">Activity: {item.activities}</Text>
+            <Text variant="bodyMedium" style={{ color: colors.textMedium }}>Activity: {item.activities}</Text>
           </View>
         )}
         
         {item.energy_level && (
-          <Text variant="bodyMedium">Energy: {item.energy_level}/5</Text>
+          <Text variant="bodyMedium" style={{ color: colors.textMedium }}>
+            Energy: <Text style={styles.emojiText}>{getEnergyEmoji(item.energy_level)}</Text>
+          </Text>
         )}
       </Card.Content>
       
       <Card.Actions>
-        <Button onPress={() => onEdit(item)}>Edit</Button>
-        <Button onPress={() => showDeleteDialog(item.id)}>Delete</Button>
+        <Button 
+          onPress={() => onEdit(item)} 
+          textColor={colors.primary}
+        >
+          Edit
+        </Button>
+        <Button 
+          onPress={() => showDeleteDialog(item.id)} 
+          textColor={colors.primary}
+        >
+          Delete
+        </Button>
         {item.is_journaled && (
           <Button 
             icon="notebook"
             onPress={() => {}}
+            textColor={colors.primary}
           >
             View Journal
           </Button>
@@ -77,31 +140,32 @@ const MoodFeedList: React.FC<MoodFeedListProps> = ({
     </Card>
   );
 
-  if (isLoading && moodLogs.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text>Loading mood entries...</Text>
-      </View>
-    );
-  }
+  console.log("Display logs length:", displayLogs.length);
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={moodLogs}
+        data={displayLogs}
         renderItem={renderMoodItem}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
         onRefresh={onRefresh}
         refreshing={isLoading}
+        extraData={[displayLogs.length]}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text>No mood entries found</Text>
-            <Text variant="bodySmall" style={styles.emptyText}>
-              Start tracking your mood by adding an entry
-            </Text>
-          </View>
+          isLoading ? (
+            <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{ color: colors.textMedium, marginTop: 10 }}>Loading mood entries...</Text>
+            </View>
+          ) : (
+            <View style={[styles.emptyContainer, { backgroundColor: colors.lightBlue }]}>
+              <Text style={{ color: colors.textDark }}>No mood entries found</Text>
+              <Text variant="bodySmall" style={[styles.emptyText, { color: colors.textMedium }]}>
+                Start tracking your mood by adding an entry
+              </Text>
+            </View>
+          )
         }
       />
 
@@ -112,8 +176,8 @@ const MoodFeedList: React.FC<MoodFeedListProps> = ({
             <Paragraph>Are you sure you want to delete this mood entry? This action cannot be undone.</Paragraph>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setDeleteDialogVisible(false)}>Cancel</Button>
-            <Button onPress={handleDeleteConfirm}>Delete</Button>
+            <Button onPress={() => setDeleteDialogVisible(false)} textColor={colors.primary}>Cancel</Button>
+            <Button onPress={handleDeleteConfirm} textColor={colors.primary}>Delete</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -126,11 +190,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    padding: 16,
+    paddingBottom: 16,
   },
   card: {
     marginBottom: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   header: {
     flexDirection: 'row',
@@ -139,14 +208,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   ratingBadge: {
-    backgroundColor: '#6200ee',
     borderRadius: 16,
     padding: 8,
     minWidth: 40,
     alignItems: 'center',
   },
   ratingText: {
-    color: 'white',
     fontWeight: 'bold',
   },
   activityContainer: {
@@ -159,15 +226,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     textAlign: 'center',
     marginTop: 8,
-    color: '#666',
+  },
+  emojiText: {
+    fontSize: 18,
   },
 });
 
