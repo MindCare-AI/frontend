@@ -2,6 +2,7 @@
 import { View, StyleSheet, Dimensions, Platform } from "react-native"
 import { Card, Text, useTheme } from "react-native-paper"
 import React from "react"
+import { useMoodAnalytics } from "../../hooks/moodTracker/useMoodAnalytics"
 
 // Import the LineChart only on non-web platforms
 let LineChart: any = null
@@ -10,24 +11,45 @@ if (Platform.OS !== "web") {
 }
 
 interface AnalyticsSummaryProps {
-  style?: object
+  style?: object;
+  colors?: {
+    primary: string;
+    lightBlue: string;
+    white: string;
+    textDark: string;
+    textMedium: string;
+  };
 }
 
-export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
+export default function AnalyticsSummary({ 
+  style,
+  colors = {
+    primary: '#002D62',
+    lightBlue: '#E4F0F6',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#666',
+  }
+}: AnalyticsSummaryProps) {
   const theme = useTheme()
+  const { 
+    weeklyAverage, 
+    monthlyAverage, 
+    entryCount, 
+    getFormattedTrends 
+  } = useMoodAnalytics()
 
-  // Mock data for analytics
-  const weeklyAverage = 7.49
-  const monthlyAverage = 7.21
-  const totalEntries = 42
-
-  // Mock data for chart
+  const trendData = getFormattedTrends()
+  
+  // Prepare chart data
   const chartData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: trendData.slice(0, 7).map(item => item.label.split(' ')[0]), // Get just the day name
     datasets: [
       {
-        data: [6.5, 7.2, 5.8, 8.1, 7.5, 9.0, 8.3],
-        color: () => theme.colors.primary,
+        data: trendData.length ? 
+          trendData.slice(0, 7).map(item => item.value) : 
+          [5, 5, 5, 5, 5, 5, 5], // Default if no data
+        color: () => colors.primary,
         strokeWidth: 2,
       },
     ],
@@ -40,25 +62,62 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
     if (Platform.OS === "web") {
       // Basic web-friendly chart visualization
       return (
-        <div className="web-chart" style={webStyles.chartContainer}>
-          <div style={webStyles.chartHeader}>
-            <div style={webStyles.xAxisLabels}>
+        <div className="web-chart" style={{
+          width: "100%",
+          height: 150,
+          padding: 8,
+          backgroundColor: colors.white,
+          borderRadius: 8,
+          boxSizing: "border-box" as "border-box",
+        }}>
+          <div style={{
+            height: 20,
+            position: "relative" as "relative",
+          }}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              width: "100%",
+            }}>
               {chartData.labels.map((label, index) => (
-                <span key={index} style={webStyles.xAxisLabel}>
+                <span key={index} style={{
+                  fontSize: 10,
+                  color: colors.textMedium,
+                }}>
                   {label}
                 </span>
               ))}
             </div>
           </div>
-          <div style={webStyles.chartBody}>
-            <div style={webStyles.yAxis}>
+          <div style={{
+            height: "calc(100% - 20px)",
+            display: "flex",
+            position: "relative" as "relative",
+          }}>
+            <div style={{
+              width: 25,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column" as "column",
+              justifyContent: "space-between",
+            }}>
               {[10, 8, 6, 4, 2].map((value) => (
-                <span key={value} style={webStyles.yAxisLabel}>
+                <span key={value} style={{
+                  fontSize: 10,
+                  color: colors.textMedium,
+                }}>
                   {value}
                 </span>
               ))}
             </div>
-            <div style={webStyles.chartCanvas}>
+            <div style={{
+              flex: 1,
+              position: "relative" as "relative",
+              borderBottomWidth: 1,
+              borderBottomStyle: "solid" as "solid",
+              borderBottomColor: "#eee",
+              height: "100%",
+            }}>
               {chartData.datasets[0].data.map((value, index) => (
                 <div
                   key={index}
@@ -70,11 +129,15 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
                     transform: "translate(-4px, 4px)",
                     left: `${(index * 100) / (chartData.labels.length - 1)}%`,
                     bottom: `${(value / 10) * 100}%`,
-                    backgroundColor: theme.colors.primary,
+                    backgroundColor: colors.primary,
                   }}
                 />
               ))}
-              <div style={webStyles.chartLine}>
+              <div style={{
+                position: "absolute" as "absolute",
+                width: "100%",
+                height: "100%",
+              }}>
                 {chartData.datasets[0].data.map((value, index) =>
                   index < chartData.datasets[0].data.length - 1 ? (
                     <div
@@ -92,7 +155,7 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
                           value < chartData.datasets[0].data[index + 1]
                             ? "skewX(25deg)"
                             : "skewX(-25deg)",
-                        backgroundColor: theme.colors.primary,
+                        backgroundColor: colors.primary,
                         transformOrigin: "bottom left",
                       }}
                     />
@@ -113,23 +176,26 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
           width={screenWidth - 32} // Adjust for card padding
           height={150}
           chartConfig={{
-            backgroundColor: "#ffffff",
-            backgroundGradientFrom: "#ffffff",
-            backgroundGradientTo: "#ffffff",
+            backgroundColor: colors.white,
+            backgroundGradientFrom: colors.white,
+            backgroundGradientTo: colors.white,
             decimalPlaces: 1,
-            color: () => theme.colors.primary,
-            labelColor: () => "#666",
+            color: () => colors.primary,
+            labelColor: () => colors.textMedium,
             style: {
               borderRadius: 16,
             },
             propsForDots: {
               r: "4",
               strokeWidth: "2",
-              stroke: theme.colors.primary,
+              stroke: colors.primary,
             },
           }}
           bezier
-          style={styles.chart}
+          style={{
+            marginVertical: 8,
+            borderRadius: 8,
+          }}
           withInnerLines={false}
           withOuterLines={true}
           withVerticalLines={false}
@@ -142,53 +208,60 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
 
     // Fallback if LineChart is not available
     return (
-      <View style={styles.fallbackChart}>
+      <View style={{
+        height: 150,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: colors.lightBlue,
+        borderRadius: 8,
+        width: "100%",
+      }}>
         <Text>Chart not available on this platform</Text>
       </View>
     )
   }
 
   return (
-    <Card style={[styles.card, style]}>
+    <Card style={[{ borderRadius: 12, backgroundColor: colors.white }, style]}>
       <Card.Content>
-        <Text variant="titleMedium" style={styles.title}>
+        <Text variant="titleMedium" style={{ fontWeight: "bold", color: colors.textDark }}>
           Analytics
         </Text>
-        <Text variant="bodySmall" style={styles.subtitle}>
+        <Text variant="bodySmall" style={{ color: colors.textMedium, marginBottom: 12 }}>
           Your mood patterns and trends
         </Text>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text variant="bodySmall" style={styles.statLabel}>
+            <Text variant="bodySmall" style={{ color: colors.textMedium, marginBottom: 4 }}>
               Weekly Avg
             </Text>
-            <Text variant="headlineSmall" style={styles.statValue}>
-              {weeklyAverage.toFixed(2)}
+            <Text variant="headlineSmall" style={{ fontWeight: "bold", color: colors.primary }}>
+              {weeklyAverage ? weeklyAverage.toFixed(1) : "N/A"}
             </Text>
           </View>
 
           <View style={styles.statItem}>
-            <Text variant="bodySmall" style={styles.statLabel}>
+            <Text variant="bodySmall" style={{ color: colors.textMedium, marginBottom: 4 }}>
               Monthly Avg
             </Text>
-            <Text variant="headlineSmall" style={styles.statValue}>
-              {monthlyAverage.toFixed(2)}
+            <Text variant="headlineSmall" style={{ fontWeight: "bold", color: colors.primary }}>
+              {monthlyAverage ? monthlyAverage.toFixed(1) : "N/A"}
             </Text>
           </View>
 
           <View style={styles.statItem}>
-            <Text variant="bodySmall" style={styles.statLabel}>
+            <Text variant="bodySmall" style={{ color: colors.textMedium, marginBottom: 4 }}>
               Total Entries
             </Text>
-            <Text variant="headlineSmall" style={styles.statValue}>
-              {totalEntries}
+            <Text variant="headlineSmall" style={{ fontWeight: "bold", color: colors.primary }}>
+              {entryCount}
             </Text>
           </View>
         </View>
 
         <View style={styles.chartContainer}>
-          <Text variant="bodySmall" style={styles.chartLabel}>
+          <Text variant="bodySmall" style={{ alignSelf: "flex-start", marginBottom: 8, color: colors.textMedium }}>
             Daily Mood Trend (Past Week)
           </Text>
           {renderChart()}
@@ -199,16 +272,6 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 12,
-  },
-  title: {
-    fontWeight: "bold",
-  },
-  subtitle: {
-    color: "#666",
-    marginBottom: 12,
-  },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -218,85 +281,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-  statLabel: {
-    color: "#666",
-    marginBottom: 4,
-  },
-  statValue: {
-    fontWeight: "bold",
-  },
   chartContainer: {
     alignItems: "center",
-  },
-  chartLabel: {
-    alignSelf: "flex-start",
-    marginBottom: 8,
-    color: "#666",
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 8,
-  },
-  fallbackChart: {
-    height: 150,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-    width: "100%",
   },
 })
-
-// Web-specific styles using JavaScript objects
-const webStyles = {
-  chartContainer: {
-    width: "100%",
-    height: 150,
-    padding: 8,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    boxSizing: "border-box" as "border-box",
-  },
-  chartHeader: {
-    height: 20,
-    position: "relative" as "relative",
-  },
-  xAxisLabels: {
-    display: "flex",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  xAxisLabel: {
-    fontSize: 10,
-    color: "#666",
-  },
-  chartBody: {
-    height: "calc(100% - 20px)",
-    display: "flex",
-    position: "relative" as "relative",
-  },
-  yAxis: {
-    width: 25,
-    height: "100%",
-    display: "flex",
-    flexDirection: "column" as "column",
-    justifyContent: "space-between",
-  },
-  yAxisLabel: {
-    fontSize: 10,
-    color: "#666",
-  },
-  chartCanvas: {
-    flex: 1,
-    position: "relative" as "relative",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid" as "solid",
-    borderBottomColor: "#eee",
-    height: "100%",
-  },
-  chartLine: {
-    position: "absolute" as "absolute",
-    width: "100%",
-    height: "100%",
-  },
-}
