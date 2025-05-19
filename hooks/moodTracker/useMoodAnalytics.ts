@@ -1,132 +1,49 @@
-// hooks/moodTracker/useMoodAnalytics.ts
-import { useState, useEffect, useCallback } from 'react';
-import { MoodAnalytics, MoodFilters } from '../../types/Mood';
-import { MoodApi } from '../../services/moodApi';
-import { handleError } from '../../utils/errorHandler';
-import { useAuth } from '../../hooks/useAuth';
-import { useMood } from '../../contexts/moodContext';
-import { getStartOfWeek, getEndOfWeek, getStartOfMonth, getEndOfMonth } from '../../utils/dateUtils';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback } from 'react';
+import { MoodFilters } from '../../types/Mood';
+import { useMoodContext } from '../../contexts/moodContext';
 
-export const useMoodAnalytics = (initialFilters?: MoodFilters) => {
-  const globalMood = useMood();
-  const { user } = useAuth();
+export const useMoodAnalytics = () => {
+  const { 
+    analytics, 
+    isLoading, 
+    error, 
+    filters,
+    fetchAnalytics, 
+    setFilters 
+  } = useMoodContext();
   
-  const [filters, setFilters] = useState<MoodFilters>(initialFilters || {});
-  const [localAnalytics, setLocalAnalytics] = useState<MoodAnalytics | null>(null);
-  const [timeframe, setTimeframe] = useState<'week' | 'month' | 'custom'>('week');
-  const [localLoading, setLocalLoading] = useState<boolean>(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  // Function to set timeframe filters
-  const updateTimeframe = useCallback((newTimeframe: 'week' | 'month' | 'custom', customDates?: { startDate: string; endDate: string }) => {
-    setTimeframe(newTimeframe);
+  const refreshAnalytics = useCallback(async (newFilters?: Partial<MoodFilters>) => {
+    const updatedFilters = newFilters ? { ...filters, ...newFilters } : filters;
     
-    let newFilters: MoodFilters = {};
-    
-    if (newTimeframe === 'week') {
-      newFilters = {
-        ...filters,
-        startDate: getStartOfWeek(),
-        endDate: getEndOfWeek()
-      };
-    } else if (newTimeframe === 'month') {
-      newFilters = {
-        ...filters,
-        startDate: getStartOfMonth(),
-        endDate: getEndOfMonth()
-      };
-    } else if (newTimeframe === 'custom' && customDates) {
-      newFilters = {
-        ...filters,
-        startDate: customDates.startDate,
-        endDate: customDates.endDate
-      };
+    if (newFilters) {
+      setFilters(updatedFilters);
     }
     
-    setFilters(newFilters);
-  }, [filters]);
-
-  // Load analytics when component mounts or filters change
-  useEffect(() => {
-    if (user) {
-      loadAnalytics();
-    }
+    await fetchAnalytics(updatedFilters);
+  }, [filters, fetchAnalytics, setFilters]);
+  
+  const getFormattedTrends = useCallback(() => {
+    if (!analytics?.daily_trends) return [];
     
-    // Initialize with default weekly timeframe if no filters provided
-    if (!initialFilters && timeframe === 'week' && !filters.startDate) {
-      updateTimeframe('week');
-    }
-  }, [user, filters]);
-
-  // Fetch analytics based on filters
-  const loadAnalytics = useCallback(async () => {
-    setLocalLoading(true);
-    setLocalError(null);
-    
-    try {
-      if (Object.keys(filters).length > 0) {
-        const data = await MoodApi.getMoodAnalytics(filters);
-        setLocalAnalytics(data);
-      } else {
-        await globalMood.fetchMoodAnalytics();
-        setLocalAnalytics(null);
-      }
-    } catch (err) {
-      const formattedError = handleError(err);
-      setLocalError(formattedError.message);
-    } finally {
-      setLocalLoading(false);
-    }
-  }, [filters, globalMood]);
-
-  // Function to update filters (for specific ratings, activities, etc.)
-  const updateFilters = useCallback((newFilters: Partial<MoodFilters>) => {
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      ...newFilters
+    return analytics.daily_trends.map(trend => ({
+      date: new Date(trend.day),
+      value: trend.avg_mood,
+      label: new Date(trend.day).toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      }),
     }));
-  }, []);
-
-  // Reset all filters
-  const resetFilters = useCallback(() => {
-    setFilters({});
-    setTimeframe('week');
-    setLocalAnalytics(null);
-  }, []);
-
-  // Function to export analytics data
-  const exportAnalytics = useCallback(async () => {
-    try {
-      await globalMood.exportMoodData(filters);
-      return true;
-    } catch (err) {
-      handleError(err, ({ message }) => {
-        setLocalError(message);
-      });
-      return false;
-    }
-  }, [filters, globalMood]);
-
-  // Determine which analytics to use (local or global)
-  const currentAnalytics = localAnalytics || globalMood.analytics;
+  }, [analytics]);
   
-  // Flag for any loading state
-  const isLoading = localLoading || globalMood.isLoading;
-  
-  // Combined error state
-  const error = localError || globalMood.error;
-
   return {
-    analytics: currentAnalytics,
+    analytics,
     isLoading,
     error,
-    filters,
-    timeframe,
-    updateTimeframe,
-    updateFilters,
-    resetFilters,
-    exportAnalytics,
-    refresh: loadAnalytics
+    refreshAnalytics,
+    getFormattedTrends,
+    weeklyAverage: analytics?.weekly_average || 0,
+    monthlyAverage: analytics?.monthly_average || 0,
+    entryCount: analytics?.entry_count || 0,
   };
 };

@@ -1,5 +1,5 @@
 // styles/global.ts
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet, Platform } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +33,11 @@ const colors = {
 
 // Helper function for shadows
 export const getShadowStyles = (elevation: number) => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: `0px ${elevation / 2}px ${elevation}px rgba(0, 0, 0, 0.2)`,
+    };
+  }
   return {
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: elevation / 2 },

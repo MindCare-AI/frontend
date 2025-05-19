@@ -30,7 +30,7 @@ import FeedScreen from '../screens/FeedsScreen/FeedScreen';
 type DrawerParamList = {
   Home: undefined;
   Profile: undefined;
-  Settings: undefined;
+  TherapistSettings: undefined;
   Appointments: undefined;
 };
 
@@ -193,9 +193,10 @@ const DrawerNavigator = () => {
         }}
       />
       <Drawer.Screen
-        name="Settings"
+        name="TherapistSettings"
         component={SettingsScreen}
         options={{
+          title: "Settings",
           drawerIcon: ({ color }) => (
             <MaterialCommunityIcons name="cog" size={24} color={color} />
           ),

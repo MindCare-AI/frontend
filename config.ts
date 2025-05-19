@@ -8,7 +8,18 @@ export const WS_BASE_URL = API_BASE_URL.replace(
   __DEV__ ? 'ws' : 'wss'
 );
 
-export const API_URL = `${API_BASE_URL}/api/v1`;
+export const API_URL = 'http://localhost:8000/api/v1';
+
+// App Configuration
+export const APP_CONFIG = {
+  appName: 'Mood Tracker',
+  version: '1.0.0',
+  theme: {
+    primary: '#6200ee',
+    accent: '#03dac4',
+    background: '#f6f6f6',
+  }
+};
 
 export const SOCIAL_LOGIN_URLS = {
   google: `${API_BASE_URL}/api/v1/auth/login/google/`,

@@ -1,229 +1,102 @@
-"use client"
-
-import { useState } from "react"
-import { View, StyleSheet, Platform, TouchableOpacity } from "react-native"
-import { Button, Card, Text, useTheme, Portal, Modal } from "react-native-paper"
-import { format } from "date-fns"
-import { Calendar } from "react-native-calendars"
-import { MaterialCommunityIcons } from "@expo/vector-icons"
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { Button, Text } from 'react-native-paper';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 
 interface DateRangePickerProps {
-  startDate?: Date
-  endDate?: Date
-  onDatesChange: (start: Date, end: Date) => void
-  style?: object
+  startDate?: string;
+  endDate?: string;
+  onChangeStartDate: (date?: string) => void;
+  onChangeEndDate: (date?: string) => void;
 }
 
-export default function DateRangePicker({ startDate, endDate, onDatesChange, style }: DateRangePickerProps) {
-  const theme = useTheme()
-  const [isCalendarVisible, setIsCalendarVisible] = useState(false)
-  const [tempStartDate, setTempStartDate] = useState<Date | undefined>(startDate)
-  const [tempEndDate, setTempEndDate] = useState<Date | undefined>(endDate)
-  const [selectingStart, setSelectingStart] = useState(true)
-
-  // Format dates for display
-  const formattedStartDate = startDate ? format(startDate, "MMM d, yyyy") : "Select start date"
-  const formattedEndDate = endDate ? format(endDate, "MMM d, yyyy") : "Select end date"
-
-  // Format dates for calendar
-  const formatCalendarDate = (date?: Date) => {
-    if (!date) return ""
-    return format(date, "yyyy-MM-dd")
-  }
-
-  const markedDates: any = {}
-
-  if (tempStartDate) {
-    const startKey = formatCalendarDate(tempStartDate)
-    markedDates[startKey] = {
-      startingDay: true,
-      color: theme.colors.primary,
-      textColor: "#FFFFFF",
+const DateRangePicker: React.FC<DateRangePickerProps> = ({
+  startDate,
+  endDate,
+  onChangeStartDate,
+  onChangeEndDate,
+}) => {
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  
+  const handleStartDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowStartPicker(false);
+    if (selectedDate) {
+      onChangeStartDate(selectedDate.toISOString());
     }
-  }
-
-  if (tempEndDate) {
-    const endKey = formatCalendarDate(tempEndDate)
-    markedDates[endKey] = {
-      endingDay: true,
-      color: theme.colors.primary,
-      textColor: "#FFFFFF",
+  };
+  
+  const handleEndDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowEndPicker(false);
+    if (selectedDate) {
+      onChangeEndDate(selectedDate.toISOString());
     }
-  }
-
-  // Mark dates in between
-  if (tempStartDate && tempEndDate) {
-    const startTime = tempStartDate.getTime()
-    const endTime = tempEndDate.getTime()
-
-    for (let t = startTime + 86400000; t < endTime; t += 86400000) {
-      const dateInBetween = new Date(t)
-      const dateKey = formatCalendarDate(dateInBetween)
-      markedDates[dateKey] = {
-        color: `${theme.colors.primary}50`, // 50% opacity
-        textColor: "#000000",
-      }
-    }
-  }
-
-  const handleDayPress = (day: { dateString: string }) => {
-    const selectedDate = new Date(day.dateString)
-
-    if (selectingStart) {
-      setTempStartDate(selectedDate)
-      setTempEndDate(undefined)
-      setSelectingStart(false)
-    } else {
-      // Ensure end date is after start date
-      if (tempStartDate && selectedDate < tempStartDate) {
-        setTempStartDate(selectedDate)
-        setTempEndDate(tempStartDate)
-      } else {
-        setTempEndDate(selectedDate)
-        setSelectingStart(true)
-
-        // If both dates are selected, we can close the calendar on mobile
-        if (Platform.OS !== "web" && tempStartDate) {
-          setTimeout(() => {
-            applyDateRange()
-          }, 500)
-        }
-      }
-    }
-  }
-
-  const applyDateRange = () => {
-    if (tempStartDate && tempEndDate) {
-      onDatesChange(tempStartDate, tempEndDate)
-    }
-    setIsCalendarVisible(false)
-  }
-
-  const cancelSelection = () => {
-    setTempStartDate(startDate)
-    setTempEndDate(endDate)
-    setIsCalendarVisible(false)
-    setSelectingStart(true)
-  }
-
+  };
+  
+  const formatDisplayDate = (dateString?: string) => {
+    if (!dateString) return 'Select date';
+    return format(new Date(dateString), 'MMM d, yyyy');
+  };
+  
   return (
-    <View style={style}>
-      <TouchableOpacity onPress={() => setIsCalendarVisible(true)}>
-        <Card style={styles.card}>
-          <Card.Content style={styles.cardContent}>
-            <MaterialCommunityIcons name="calendar-range" size={20} color={theme.colors.primary} />
-            <Text style={styles.dateText}>
-              {formattedStartDate} - {formattedEndDate}
-            </Text>
-          </Card.Content>
-        </Card>
-      </TouchableOpacity>
-
-      {Platform.OS === "web" ? (
-        <Portal>
-          <Modal visible={isCalendarVisible} onDismiss={cancelSelection} contentContainerStyle={styles.modalContainer}>
-            <View style={styles.calendarContainer}>
-              <Text variant="titleMedium" style={styles.calendarTitle}>
-                {selectingStart ? "Select Start Date" : "Select End Date"}
-              </Text>
-
-              <Calendar
-                markingType="period"
-                markedDates={markedDates}
-                onDayPress={handleDayPress}
-                theme={{
-                  todayTextColor: theme.colors.primary,
-                  arrowColor: theme.colors.primary,
-                }}
-              />
-
-              <View style={styles.buttonContainer}>
-                <Button onPress={cancelSelection} mode="outlined">
-                  Cancel
-                </Button>
-                <Button onPress={applyDateRange} mode="contained" disabled={!tempStartDate || !tempEndDate}>
-                  Apply
-                </Button>
-              </View>
-            </View>
-          </Modal>
-        </Portal>
-      ) : (
-        <Portal>
-          <Modal
-            visible={isCalendarVisible}
-            onDismiss={cancelSelection}
-            contentContainerStyle={styles.mobileModalContainer}
-          >
-            <View style={styles.mobileCalendarContainer}>
-              <Text variant="titleMedium" style={styles.calendarTitle}>
-                {selectingStart ? "Select Start Date" : "Select End Date"}
-              </Text>
-
-              <Calendar
-                markingType="period"
-                markedDates={markedDates}
-                onDayPress={handleDayPress}
-                theme={{
-                  todayTextColor: theme.colors.primary,
-                  arrowColor: theme.colors.primary,
-                }}
-              />
-
-              <View style={styles.buttonContainer}>
-                <Button onPress={cancelSelection} mode="outlined">
-                  Cancel
-                </Button>
-                <Button onPress={applyDateRange} mode="contained" disabled={!tempStartDate || !tempEndDate}>
-                  Apply
-                </Button>
-              </View>
-            </View>
-          </Modal>
-        </Portal>
-      )}
+    <View style={styles.container}>
+      <View style={styles.dateContainer}>
+        <Text style={styles.label}>Start Date</Text>
+        <Button 
+          mode="outlined" 
+          onPress={() => setShowStartPicker(true)}
+          style={styles.dateButton}
+        >
+          {formatDisplayDate(startDate)}
+        </Button>
+        {showStartPicker && (
+          <DateTimePicker
+            value={startDate ? new Date(startDate) : new Date()}
+            mode="date"
+            display="default"
+            onChange={handleStartDateChange}
+          />
+        )}
+      </View>
+      
+      <View style={styles.dateContainer}>
+        <Text style={styles.label}>End Date</Text>
+        <Button 
+          mode="outlined" 
+          onPress={() => setShowEndPicker(true)}
+          style={styles.dateButton}
+        >
+          {formatDisplayDate(endDate)}
+        </Button>
+        {showEndPicker && (
+          <DateTimePicker
+            value={endDate ? new Date(endDate) : new Date()}
+            mode="date"
+            display="default"
+            onChange={handleEndDateChange}
+            minimumDate={startDate ? new Date(startDate) : undefined}
+          />
+        )}
+      </View>
     </View>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 8,
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  cardContent: {
-    flexDirection: "row",
-    alignItems: "center",
+  dateContainer: {
+    width: '48%',
   },
-  dateText: {
-    marginLeft: 8,
+  label: {
+    marginBottom: 4,
   },
-  modalContainer: {
-    backgroundColor: "white",
-    padding: 20,
-    margin: 40,
-    borderRadius: 8,
+  dateButton: {
+    width: '100%',
   },
-  mobileModalContainer: {
-    backgroundColor: "white",
-    margin: 0,
-    marginTop: "auto",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  calendarContainer: {
-    padding: 16,
-  },
-  mobileCalendarContainer: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  calendarTitle: {
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-  },
-})
+});
+
+export default DateRangePicker;
