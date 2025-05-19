@@ -8,7 +8,7 @@ import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useToast } from "../../contexts/feeds/ToastContext"
 
 interface PostActionsProps {
-  postId: string
+  postId: number
   userReaction: string | null
   onReactionChange: (reaction: string | null) => void
   onCommentToggle: () => void

@@ -22,55 +22,9 @@ const MediaGalleryScreen: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedItems, setSelectedItems] = useState<string[]>([])
 
-  // Mock media items
-  const photoItems = Array.from({ length: 12 }).map((_, i) => ({
-    id: `photo-${i + 1}`,
-    type: "photo",
-    url: `https://picsum.photos/200/200?random=${i + 1}`,
-    timestamp: new Date(Date.now() - i * 86400000).toISOString(),
-  }))
-
-  const documentItems = [
-    {
-      id: "doc-1",
-      name: "CBT_Workbook.pdf",
-      type: "pdf",
-      timestamp: new Date(Date.now() - 2 * 86400000).toISOString(),
-    },
-    {
-      id: "doc-2",
-      name: "Weekly_Reflection_Template.docx",
-      type: "docx",
-      timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
-    },
-    {
-      id: "doc-3",
-      name: "Anxiety_Resources.pdf",
-      type: "pdf",
-      timestamp: new Date(Date.now() - 5 * 86400000).toISOString(),
-    },
-  ]
-
-  const linkItems = [
-    {
-      id: "link-1",
-      title: "10 Breathing Exercises for Anxiety",
-      url: "https://example.com/article-1",
-      timestamp: new Date(Date.now() - 1 * 86400000).toISOString(),
-    },
-    {
-      id: "link-2",
-      title: "Mindfulness Techniques",
-      url: "https://example.com/article-2",
-      timestamp: new Date(Date.now() - 4 * 86400000).toISOString(),
-    },
-    {
-      id: "link-3",
-      title: "Sleep Hygiene Tips",
-      url: "https://example.com/article-3",
-      timestamp: new Date(Date.now() - 6 * 86400000).toISOString(),
-    },
-  ]
+  const photoItems: any[] = [] // TODO: Fetch from backend or store
+  const documentItems: any[] = [] // TODO: Fetch from backend or store
+  const linkItems: any[] = [] // TODO: Fetch from backend or store
 
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode)

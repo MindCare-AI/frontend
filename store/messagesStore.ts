@@ -1,5 +1,4 @@
 import { create } from "zustand"
-import { getConversations, getMessagesByConversationId, getUsers } from "../utils/messaging/mockData"
 import type { Conversation, Message, User, SearchResult } from "../types/messaging/index"
 
 interface MessagesState {
@@ -222,19 +221,16 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     return results
   },
 
-  initializeStore: () => {
+  initializeStore: async () => {
     try {
       set({ isLoading: true })
-      const conversations = getConversations()
-      const messages: Record<string, Message[]> = {}
-
-      conversations.forEach((conversation) => {
-        messages[conversation.id] = getMessagesByConversationId(conversation.id)
-      })
-
-      const contacts = getUsers()
-
-      set({ conversations, messages, contacts, isLoading: false, error: null })
+      // TODO: Fetch conversations, messages, and contacts from backend API here
+      // Example:
+      // const conversations = await fetchConversationsFromAPI()
+      // const messages = await fetchMessagesFromAPI()
+      // const contacts = await fetchContactsFromAPI()
+      // set({ conversations, messages, contacts, isLoading: false, error: null })
+      set({ conversations: [], messages: {}, contacts: [], isLoading: false, error: null })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Unknown error", isLoading: false })
     }

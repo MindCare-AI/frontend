@@ -2,145 +2,34 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList } from "react-native"
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from "react-native"
 import { formatDistanceToNow } from "date-fns"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
+import { useComments } from "../../hooks/feeds/useComments"
 import Avatar from "./ui/Avatar"
-import { MOCK_COMMENTS } from "../../data/feeds/mockData"
-import type { Comment } from "../../types/feeds/feed"
 
 interface CommentSectionProps {
-  postId: string
+  postId: number
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
   const { colors, isDark } = useTheme()
-  const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS)
   const [newComment, setNewComment] = useState("")
-  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({})
-  const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState("")
 
-  const handleAddComment = () => {
-    if (!newComment.trim()) return
-
-    // In a real app, you would call an API to add the comment
-    const comment: Comment = {
-      id: `comment${Date.now()}`,
-      author: {
-        id: "currentUser",
-        name: "Current User",
-        avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      },
-      content: newComment,
-      created_at: new Date().toISOString(),
-      is_edited: false,
-      reactions: {
-        like: 0,
-      },
-      user_reaction: null,
-      replies_count: 0,
-      replies: [],
-    }
-
-    setComments([comment, ...comments])
-    setNewComment("")
-  }
-
-  const handleAddReply = (commentId: string) => {
-    if (!replyContent.trim()) return
-
-    // In a real app, you would call an API to add the reply
-    const reply: Comment = {
-      id: `reply${Date.now()}`,
-      author: {
-        id: "currentUser",
-        name: "Current User",
-        avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-      },
-      content: replyContent,
-      created_at: new Date().toISOString(),
-      is_edited: false,
-      reactions: {
-        like: 0,
-      },
-      user_reaction: null,
-      replies_count: 0,
-    }
-
-    setComments(
-      comments.map((comment) => {
-        if (comment.id === commentId) {
-          return {
-            ...comment,
-            replies: [...(comment.replies || []), reply],
-            replies_count: (comment.replies_count || 0) + 1,
-          }
-        }
-        return comment
-      }),
-    )
-
-    setReplyingTo(null)
-    setReplyContent("")
-  }
-
-  const toggleReplies = (commentId: string) => {
-    setExpandedComments((prev) => ({
-      ...prev,
-      [commentId]: !prev[commentId],
-    }))
-  }
-
-  const handleReaction = (commentId: string, isReply = false, parentId?: string) => {
-    // In a real app, you would call an API to update the reaction
-    if (isReply && parentId) {
-      setComments(
-        comments.map((comment) => {
-          if (comment.id === parentId) {
-            return {
-              ...comment,
-              replies: comment.replies?.map((reply) => {
-                if (reply.id === commentId) {
-                  const newReaction = reply.user_reaction === "like" ? null : "like"
-                  const likeDelta = newReaction === "like" ? 1 : -1
-
-                  return {
-                    ...reply,
-                    user_reaction: newReaction,
-                    reactions: {
-                      like: Math.max(0, reply.reactions.like + likeDelta),
-                    },
-                  }
-                }
-                return reply
-              }),
-            }
-          }
-          return comment
-        }),
-      )
-    } else {
-      setComments(
-        comments.map((comment) => {
-          if (comment.id === commentId) {
-            const newReaction = comment.user_reaction === "like" ? null : "like"
-            const likeDelta = newReaction === "like" ? 1 : -1
-
-            return {
-              ...comment,
-              user_reaction: newReaction,
-              reactions: {
-                like: Math.max(0, comment.reactions.like + likeDelta),
-              },
-            }
-          }
-          return comment
-        }),
-      )
-    }
-  }
+  const {
+    comments,
+    loading,
+    error,
+    expandedComments,
+    replyingTo,
+    setReplyingTo,
+    addComment,
+    addReply,
+    toggleReplies,
+    reactToComment
+  } = useComments(postId);
 
   const formatDate = (dateString: string) => {
     try {
@@ -150,10 +39,40 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
     }
   }
 
-  const renderComment = ({ item }: { item: Comment }) => (
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return
+    
+    try {
+      await addComment(newComment);
+      setNewComment("");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    }
+  }
+
+  const handleAddReply = async (commentId: number) => {
+    if (!replyContent.trim() || !replyingTo) return
+    
+    try {
+      await addReply(commentId, replyContent);
+      setReplyContent("");
+    } catch (error) {
+      console.error("Error adding reply:", error);
+    }
+  }
+
+  const handleReaction = async (commentId: number) => {
+    try {
+      await reactToComment(commentId, "like");
+    } catch (error) {
+      console.error("Error liking comment:", error);
+    }
+  }
+
+  const renderComment = ({ item }: { item: any }) => (
     <View style={styles.commentItem}>
       <View style={styles.commentContent}>
-        <Avatar source={item.author.avatar} name={item.author.name} size="small" />
+        <Avatar source={item.author_profile_pic} name={item.author_name} size="small" />
         <View style={styles.commentBody}>
           <View
             style={[
@@ -164,7 +83,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
             ]}
           >
             <View style={styles.commentHeader}>
-              <Text style={[styles.authorName, { color: colors.text }]}>{item.author.name}</Text>
+              <Text style={[styles.authorName, { color: colors.text }]}>{item.author_name}</Text>
               <TouchableOpacity>
                 <Ionicons name="ellipsis-horizontal" size={16} color={colors.muted} />
               </TouchableOpacity>
@@ -176,17 +95,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
               <Ionicons
                 name="thumbs-up"
                 size={14}
-                color={item.user_reaction === "like" ? colors.primary : colors.muted}
+                color={item.current_user_reaction === "like" ? colors.primary : colors.muted}
               />
-              {item.reactions.like > 0 && (
+              {item.reactions_count > 0 && (
                 <Text
-                  style={[styles.actionText, { color: item.user_reaction === "like" ? colors.primary : colors.muted }]}
+                  style={[styles.actionText, { color: item.current_user_reaction === "like" ? colors.primary : colors.muted }]}
                 >
-                  {item.reactions.like}
+                  {item.reactions_count}
                 </Text>
               )}
               <Text
-                style={[styles.actionText, { color: item.user_reaction === "like" ? colors.primary : colors.muted }]}
+                style={[styles.actionText, { color: item.current_user_reaction === "like" ? colors.primary : colors.muted }]}
               >
                 Like
               </Text>
@@ -207,7 +126,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
           {/* Reply form */}
           {replyingTo === item.id && (
             <View style={styles.replyForm}>
-              <Avatar size="small" source="https://randomuser.me/api/portraits/men/1.jpg" name="Current User" />
+              <Avatar size="small" name="You" />
               <View style={styles.replyInputContainer}>
                 <TextInput
                   style={[
@@ -218,7 +137,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
                       backgroundColor: isDark ? colors.highlight : "#F0F0F0",
                     },
                   ]}
-                  placeholder={`Reply to ${item.author.name}...`}
+                  placeholder={`Reply to ${item.author_name}...`}
                   placeholderTextColor={colors.muted}
                   value={replyContent}
                   onChangeText={setReplyContent}
@@ -265,9 +184,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
 
           {expandedComments[item.id] && item.replies && (
             <View style={[styles.repliesList, { borderLeftColor: colors.border }]}>
-              {item.replies.map((reply) => (
+              {item.replies.map((reply: any) => (
                 <View key={reply.id} style={styles.replyItem}>
-                  <Avatar size="small" source={reply.author.avatar} name={reply.author.name} />
+                  <Avatar size="small" source={reply.author_profile_pic} name={reply.author_name} />
                   <View style={styles.replyBody}>
                     <View
                       style={[
@@ -278,37 +197,34 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
                       ]}
                     >
                       <View style={styles.commentHeader}>
-                        <Text style={[styles.authorName, { color: colors.text }]}>{reply.author.name}</Text>
-                        <TouchableOpacity>
-                          <Ionicons name="ellipsis-horizontal" size={16} color={colors.muted} />
-                        </TouchableOpacity>
+                        <Text style={[styles.authorName, { color: colors.text }]}>{reply.author_name}</Text>
                       </View>
                       <Text style={[styles.commentText, { color: colors.text }]}>{reply.content}</Text>
                     </View>
                     <View style={styles.commentActions}>
                       <TouchableOpacity
                         style={styles.commentAction}
-                        onPress={() => handleReaction(reply.id, true, item.id)}
+                        onPress={() => handleReaction(reply.id)}
                       >
                         <Ionicons
                           name="thumbs-up"
                           size={14}
-                          color={reply.user_reaction === "like" ? colors.primary : colors.muted}
+                          color={reply.current_user_reaction === "like" ? colors.primary : colors.muted}
                         />
-                        {reply.reactions.like > 0 && (
+                        {reply.reactions_count > 0 && (
                           <Text
                             style={[
                               styles.actionText,
-                              { color: reply.user_reaction === "like" ? colors.primary : colors.muted },
+                              { color: reply.current_user_reaction === "like" ? colors.primary : colors.muted },
                             ]}
                           >
-                            {reply.reactions.like}
+                            {reply.reactions_count}
                           </Text>
                         )}
                         <Text
                           style={[
                             styles.actionText,
-                            { color: reply.user_reaction === "like" ? colors.primary : colors.muted },
+                            { color: reply.current_user_reaction === "like" ? colors.primary : colors.muted },
                           ]}
                         >
                           Like
@@ -332,6 +248,22 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
     </View>
   )
 
+  if (loading && comments.length === 0) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ color: colors.danger }}>Failed to load comments</Text>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -343,7 +275,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
     >
       {/* Add comment form */}
       <View style={styles.commentForm}>
-        <Avatar size="small" source="https://randomuser.me/api/portraits/men/1.jpg" name="Current User" />
+        <Avatar size="small" name="You" />
         <View style={styles.inputContainer}>
           <TextInput
             style={[
@@ -380,7 +312,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
       <FlatList
         data={comments}
         renderItem={renderComment}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.commentsList}
       />
     </View>

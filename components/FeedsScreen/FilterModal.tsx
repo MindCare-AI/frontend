@@ -4,7 +4,7 @@ import type React from "react"
 import { Modal, View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
-import type { FilterState } from "../../types/feeds/feed"
+import type { FilterState } from "../../types/feeds"
 
 interface FilterModalProps {
   visible: boolean
