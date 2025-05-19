@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Platform, ScrollView } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
-import type { FilterState } from "../../types/feeds/feed"
+import type { FilterState, SortOption } from "../../types/feeds"
 import FilterModal from "./FilterModal"
 import SortModal from "./SortModal"
 import SearchModal from "./SearchModal"
@@ -14,12 +14,21 @@ import TabBar from "./ui/TabBar"
 
 interface FeedHeaderProps {
   onFiltersChange: (filters: FilterState) => void
-  onSortChange: (sort: string) => void
+  onSortChange: (sort: SortOption) => void
   onSearchChange: (query: string) => void
   onTabChange: (tab: string) => void
+  onRefresh: () => void
+  showFollowingTab?: boolean // Add this prop
 }
 
-const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, onSearchChange, onTabChange }) => {
+const FeedHeader: React.FC<FeedHeaderProps> = ({ 
+  onFiltersChange, 
+  onSortChange, 
+  onSearchChange, 
+  onTabChange, 
+  onRefresh,
+  showFollowingTab = true // Default to showing it
+}) => {
   const { colors, isDark } = useTheme()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilters, setActiveFilters] = useState<FilterState>({
@@ -28,7 +37,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
     tags: [],
     users: [],
   })
-  const [activeSort, setActiveSort] = useState("newest")
+  const [activeSort, setActiveSort] = useState<SortOption>("newest") // Added SortOption type here
   const [filterModalVisible, setFilterModalVisible] = useState(false)
   const [sortModalVisible, setSortModalVisible] = useState(false)
   const [searchModalVisible, setSearchModalVisible] = useState(false)
@@ -46,7 +55,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
   }, [activeFilters, onFiltersChange])
 
   useEffect(() => {
-    onSortChange(activeSort)
+    onSortChange(activeSort as SortOption) // Ensure the type is correct
   }, [activeSort, onSortChange])
 
   useEffect(() => {
@@ -58,30 +67,30 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
   }, [activeTab, onTabChange])
 
   const handleTopicToggle = (topic: string) => {
-    setActiveFilters((prev) => ({
+    setActiveFilters((prev: FilterState) => ({
       ...prev,
-      topics: prev.topics.includes(topic) ? prev.topics.filter((t) => t !== topic) : [...prev.topics, topic],
+      topics: prev.topics.includes(topic) ? prev.topics.filter((t: string) => t !== topic) : [...prev.topics, topic],
     }))
   }
 
   const handleTypeToggle = (type: string) => {
-    setActiveFilters((prev) => ({
+    setActiveFilters((prev: FilterState) => ({
       ...prev,
-      types: prev.types.includes(type) ? prev.types.filter((t) => t !== type) : [...prev.types, type],
+      types: prev.types.includes(type) ? prev.types.filter((t: string) => t !== type) : [...prev.types, type],
     }))
   }
 
   const handleTagToggle = (tag: string) => {
-    setActiveFilters((prev) => ({
+    setActiveFilters((prev: FilterState) => ({
       ...prev,
-      tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
+      tags: prev.tags.includes(tag) ? prev.tags.filter((t: string) => t !== tag) : [...prev.tags, tag],
     }))
   }
 
   const handleUserToggle = (user: string) => {
-    setActiveFilters((prev) => ({
+    setActiveFilters((prev: FilterState) => ({
       ...prev,
-      users: prev.users.includes(user) ? prev.users.filter((u) => u !== user) : [...prev.users, user],
+      users: prev.users.includes(user) ? prev.users.filter((u: string) => u !== user) : [...prev.users, user],
     }))
   }
 
@@ -100,6 +109,14 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
     setSearchModalVisible(false)
+  }
+
+  // Add this handler function to handle sort changes from SortModal
+  const handleSortChange = (sort: string) => {
+    // Ensure the string is a valid SortOption
+    if (sort === "newest" || sort === "most-viewed" || sort === "most-reactions") {
+      setActiveSort(sort as SortOption)
+    }
   }
 
   return (
@@ -178,30 +195,35 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
           style={styles.filtersScrollView}
           contentContainerStyle={styles.filtersContainer}
         >
-          {activeFilters.topics.map((topic) => (
+          {activeFilters.topics.map((topic: string) => (
             <Badge key={`topic-${topic}`} text={`Topic: ${topic}`} onRemove={() => handleTopicToggle(topic)} />
           ))}
-          {activeFilters.types.map((type) => (
+          {activeFilters.types.map((type: string) => (
             <Badge key={`type-${type}`} text={`Type: ${type}`} onRemove={() => handleTypeToggle(type)} />
           ))}
-          {activeFilters.tags.map((tag) => (
+          {activeFilters.tags.map((tag: string) => (
             <Badge key={`tag-${tag}`} text={`Tag: ${tag}`} onRemove={() => handleTagToggle(tag)} />
           ))}
-          {activeFilters.users.map((user) => (
+          {activeFilters.users.map((user: string) => (
             <Badge key={`user-${user}`} text={`Author: ${user}`} onRemove={() => handleUserToggle(user)} />
           ))}
         </ScrollView>
       )}
 
       {/* Feed tabs */}
-      <TabBar
-        tabs={[
-          { key: "for-you", title: "For You" },
-          { key: "following", title: "Following" },
-        ]}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <View style={styles.headerRow}>
+        <TabBar
+          tabs={[
+            { key: "for-you", title: "For You" },
+            ...(showFollowingTab ? [{ key: "following", title: "Following" }] : [])
+          ]}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
+        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+          <Ionicons name="refresh" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
 
       <FilterModal
         visible={filterModalVisible}
@@ -218,7 +240,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({ onFiltersChange, onSortChange, 
         visible={sortModalVisible}
         onClose={() => setSortModalVisible(false)}
         activeSort={activeSort}
-        onSortChange={setActiveSort}
+        onSortChange={handleSortChange} // Use handleSortChange instead of setActiveSort
         sortOptions={SORT_OPTIONS}
       />
 
@@ -291,6 +313,16 @@ const styles = StyleSheet.create({
   filtersContainer: {
     paddingVertical: 8,
     paddingRight: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
   },
 })
 
