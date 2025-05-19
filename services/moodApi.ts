@@ -2,7 +2,6 @@
 import axios from 'axios';
 import { API_URL } from '../config';
 import { MoodLog, MoodAnalytics, MoodFormData, MoodFilters } from '../types/Mood';
-
 const MOOD_API_BASE = `${API_URL}/mood/logs`;
 
 // Format optional filters into query string
@@ -15,6 +14,7 @@ const formatQueryString = (filters?: MoodFilters): string => {
   if (filters.minRating) params.append('min_rating', filters.minRating.toString());
   if (filters.maxRating) params.append('max_rating', filters.maxRating.toString());
   if (filters.activities) params.append('activities', filters.activities);
+  if (filters.searchText) params.append('search', filters.searchText);
   
   return params.toString() ? `?${params.toString()}` : '';
 };

@@ -2,6 +2,7 @@
 import { View, StyleSheet, Dimensions, Platform } from "react-native"
 import { Card, Text, useTheme } from "react-native-paper"
 import React from "react"
+import { useMoodAnalytics } from "../../hooks/moodTracker/useMoodAnalytics"
 
 // Import the LineChart only on non-web platforms
 let LineChart: any = null
@@ -15,18 +16,23 @@ interface AnalyticsSummaryProps {
 
 export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
   const theme = useTheme()
+  const { 
+    weeklyAverage, 
+    monthlyAverage, 
+    entryCount, 
+    getFormattedTrends 
+  } = useMoodAnalytics()
 
-  // Mock data for analytics
-  const weeklyAverage = 7.49
-  const monthlyAverage = 7.21
-  const totalEntries = 42
-
-  // Mock data for chart
+  const trendData = getFormattedTrends()
+  
+  // Prepare chart data
   const chartData = {
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    labels: trendData.slice(0, 7).map(item => item.label.split(' ')[0]), // Get just the day name
     datasets: [
       {
-        data: [6.5, 7.2, 5.8, 8.1, 7.5, 9.0, 8.3],
+        data: trendData.length ? 
+          trendData.slice(0, 7).map(item => item.value) : 
+          [5, 5, 5, 5, 5, 5, 5], // Default if no data
         color: () => theme.colors.primary,
         strokeWidth: 2,
       },
@@ -164,7 +170,7 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
               Weekly Avg
             </Text>
             <Text variant="headlineSmall" style={styles.statValue}>
-              {weeklyAverage.toFixed(2)}
+              {weeklyAverage ? weeklyAverage.toFixed(1) : "N/A"}
             </Text>
           </View>
 
@@ -173,7 +179,7 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
               Monthly Avg
             </Text>
             <Text variant="headlineSmall" style={styles.statValue}>
-              {monthlyAverage.toFixed(2)}
+              {monthlyAverage ? monthlyAverage.toFixed(1) : "N/A"}
             </Text>
           </View>
 
@@ -182,7 +188,7 @@ export default function AnalyticsSummary({ style }: AnalyticsSummaryProps) {
               Total Entries
             </Text>
             <Text variant="headlineSmall" style={styles.statValue}>
-              {totalEntries}
+              {entryCount}
             </Text>
           </View>
         </View>

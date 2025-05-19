@@ -52,6 +52,7 @@
     "expo-splash-screen": "~0.29.22",
     "expo-status-bar": "~2.0.1",
     "firebase": "^11.4.0",
+    "formik": "^2.4.6",
     "framer-motion": "^12.4.10",
     "gsap": "^3.12.7",
     "lucide-react": "^0.483.0",
@@ -91,6 +92,7 @@
     "tailwind-merge": "^3.2.0",
     "tailwind-rn": "^4.2.0",
     "uuid": "^11.1.0",
+    "yup": "^1.6.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

@@ -1,263 +1,404 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Platform,
-  KeyboardAvoidingView,
-  Alert,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  KeyboardAvoidingView, Platform, StyleSheet, SafeAreaView,
+  ActivityIndicator, StatusBar, Keyboard, Image
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { API_URL } from '../../config'; // Ensure this is properly defined in your config
-import { useAuth } from '../../contexts/AuthContext';
-import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage'; // updated import
+import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
 import TypingIndicator from '../../components/ChatbotScreen/TypingIndicator';
-
-interface Message {
-  id: string;
-  sender: string;
-  content: string;
-  timestamp: string;
-  is_chatbot?: boolean;
-  status?: 'sending' | 'sent' | 'failed';
-}
+import { ChatMessageBubble } from '../../components/ChatbotScreen/ChatMessageBubble';
+import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage';
+import { useTheme } from '../../theme/ThemeProvider';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
 
 export default function ChatbotScreen() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [conversationId, setConversationId] = useState<number | null>(null);
-  const { accessToken } = useAuth();
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    isTyping,
+    retryMessage,
+    clearHistory
+  } = useChatbot();
+  
+  const [input, setInput] = React.useState('');
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  const { colors } = useTheme();
+  const dark = React.useMemo(() => {
+    return colors.background === '#121212' || colors.primary === '#002D62';
+  }, [colors]);
+  
   const scrollViewRef = useRef<ScrollView | null>(null);
-  const typingOpacity = useRef(new Animated.Value(1)).current;
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Initialize chatbot conversation
-  const initializeChatbotConversation = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ initial_message: "Hello, I need help." }) // added required field
-      });
-
-      if (!response.ok) throw new Error('Failed to initialize chatbot conversation');
-
-      const data = await response.json();
-      setConversationId(data.id);
-      return data.id;
-    } catch (error) {
-      Alert.alert('Error', 'Could not start chatbot conversation');
-      console.error(error);
-      return null;
+  const navigation = useNavigation();
+  
+  // Theme-based styles
+  const dynamicStyles = {
+    container: {
+      backgroundColor: dark ? colors.darkBackground : colors.lightBackground
+    },
+    header: {
+      backgroundColor: dark ? colors.primaryDark : colors.primary,
+      borderBottomColor: dark ? '#2C2C2C' : '#E5E5E5'
+    },
+    headerTitle: {
+      color: '#FFFFFF'
+    },
+    inputContainer: {
+      backgroundColor: dark ? '#1E1E1E' : '#FFFFFF',
+      borderTopColor: dark ? '#2C2C2C' : '#E5E5E5'
+    },
+    input: {
+      backgroundColor: dark ? '#2C2C2C' : '#F5F5F5',
+      color: dark ? '#FFFFFF' : '#000000'
+    },
+    sendButton: {
+      backgroundColor: colors.primary
     }
-  }, [accessToken]);
+  };
 
-  // Fetch messages
-  const fetchMessages = useCallback(async () => {
-    if (!conversationId) return;
-
-    try {
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch messages');
-
-      const data = await response.json();
-      // If response contains a "messages" key, process as before.
-      if (data.messages) {
-        const messagesArray = Array.isArray(data.messages) ? data.messages : [];
-        const formattedMessages = messagesArray.map((msg: any) => ({
-          id: msg.id.toString(),
-          sender: msg.is_chatbot ? 'Samantha' : 'You',
-          content: msg.content,
-          timestamp: msg.timestamp,
-          is_chatbot: msg.is_chatbot,
-        }));
-        if (
-          formattedMessages.length > 0 &&
-          formattedMessages[formattedMessages.length - 1].is_chatbot
-        ) {
-          setIsTyping(false);
-        }
-        setMessages(formattedMessages);
-      } else {
-        console.info('No messages key found in response:', data);
-        // Instead of clearing messages, simply turn off the typing indicator.
-        setIsTyping(false);
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  }, [conversationId, accessToken]);
-
-  // Send a message
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || !conversationId) return;
-
-    const tempId = Date.now().toString();
-    const tempMessage: Message = {
-      id: tempId,
-      content: input.trim(),
-      sender: 'You',
-      timestamp: new Date().toISOString(),
-      status: 'sending',
-      is_chatbot: false
-    };
-
-    try {
-      setMessages(prev => [...prev, tempMessage]);
-      setInput('');
-      setIsTyping(true);
-
-      const response = await fetch(`${API_URL}/messaging/chatbot/${conversationId}/send_message/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: input.trim() })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.response) {
-        const formattedBot = {
-          id: `bot-${Date.now()}`,
-          content: data.response,
-          sender: 'Samantha',
-          timestamp: new Date().toISOString(),
-          is_chatbot: true
-        };
-
-        setMessages(prev => prev.map(msg => 
-          msg.id === tempId ? { ...msg, status: 'sent' } : msg
-        ));
-        
-        setTimeout(() => {
-          setMessages(prev => [...prev, formattedBot]);
-          setIsTyping(false);
-        }, 500);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-      console.error('Error sending message:', error);
-      setMessages(prev => prev.map(msg => 
-        msg.id === tempId ? { ...msg, status: 'failed' } : msg
-      ));
-      setIsTyping(false);
-      Alert.alert('Error', errorMessage);
-    }
-  }, [input, conversationId, accessToken]);
-
-  // Typing animation
+  // Listen for keyboard events
   useEffect(() => {
-    if (isTyping) {
-      const animation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(typingOpacity, { toValue: 0.3, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(typingOpacity, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
-        ])
-      );
-      animation.start();
-      return () => animation.stop();
-    }
-  }, [isTyping, typingOpacity]);
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
 
-  // Initialize conversation
-  useEffect(() => {
-    initializeChatbotConversation();
-  }, [initializeChatbotConversation]);
-
-  // Setup polling
-  useEffect(() => {
-    if (conversationId) {
-      fetchMessages();
-      pollingRef.current = setInterval(fetchMessages, 3000);
-    }
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
-  }, [conversationId, fetchMessages]);
+  }, []);
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardAvoidingView}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Chat with Samantha 🤖</Text>
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (scrollViewRef.current && messages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages, isTyping]);
+
+  // Helper to handle sending a message
+  const handleSendMessage = () => {
+    if (!input.trim()) return;
+    sendMessage(input.trim());
+    setInput('');
+  };
+  
+  // Loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, dynamicStyles.container]}>
+        <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Animated.Text 
+            entering={FadeIn.duration(500)}
+            style={styles.loadingText}
+          >
+            Connecting to your AI assistant...
+          </Animated.Text>
         </View>
-
-        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.messagesContainer}>
-          {messages.map((msg, index) => (
-            <View key={index} style={[styles.messageRow, msg.is_chatbot ? styles.botMessageRow : styles.userMessageRow]}>
-              <View style={[styles.messageBubble, msg.is_chatbot ? styles.botBubble : styles.userBubble]}>
-                {msg.is_chatbot ? (
-                  <AnimatedBotMessage message={msg.content} />
-                ) : (
-                  <Text style={msg.is_chatbot ? styles.botText : styles.userText}>{msg.content}</Text>
-                )}
-              </View>
-            </View>
-          ))}
-          {isTyping && <TypingIndicator visible={isTyping} />}
-        </ScrollView>
-
-        <View style={styles.inputContainer}>
-          <TextInput 
-            style={styles.input} 
-            value={input} 
-            onChangeText={setInput} 
-            placeholder="Type a message..." 
-            onSubmitEditing={sendMessage}  // Add this line
-          />
-          <TouchableOpacity 
-            style={[styles.sendButton, !input.trim() && { opacity: 0.5 }]} 
-            onPress={sendMessage} 
-            disabled={!input.trim()}>
-            <Text style={styles.sendButtonText}>Send</Text>
+      </SafeAreaView>
+    );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, dynamicStyles.container]}>
+        <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, dynamicStyles.container]}>
+      <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+      >
+        <View style={[styles.header, dynamicStyles.header]}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>
+              Samantha AI
+            </Text>
+            <TouchableOpacity onPress={clearHistory} style={styles.clearButton}>
+              <Ionicons name="refresh-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.messagesContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+        >
+          {messages.length === 0 && (
+            <Animated.View 
+              entering={FadeIn.duration(800)}
+              style={styles.emptyStateContainer}
+            >
+              <View style={styles.emptyStateIconContainer}>
+                <Ionicons 
+                  name="chatbubble-ellipses" 
+                  size={100} 
+                  color={colors.primary} 
+                />
+              </View>
+              <Text style={styles.emptyStateTitle}>Welcome to Samantha AI</Text>
+              <Text style={styles.emptyStateText}>
+                I'm your personal mental health assistant. How can I help you today?
+              </Text>
+            </Animated.View>
+          )}
+
+          {messages.map((msg) => (
+            <View 
+              key={msg.id} 
+              style={[
+                styles.messageRow,
+                msg.is_bot ? styles.botMessageRow : styles.userMessageRow
+              ]}
+            >
+              {msg.is_bot ? (
+                <AnimatedBotMessage message={msg.content}>
+                  <ChatMessageBubble
+                    message={msg.content}
+                    isBot={true}
+                    timestamp={new Date(msg.timestamp)}
+                  />
+                </AnimatedBotMessage>
+              ) : (
+                <ChatMessageBubble
+                  message={msg.content}
+                  isBot={false}
+                  timestamp={new Date(msg.timestamp)}
+                  status={msg.status === 'failed' ? undefined : msg.status}
+                />
+              )}
+            </View>
+          ))}
+
+          {isTyping && (
+            <View style={styles.typingContainer}>
+              <TypingIndicator visible={isTyping} />
+            </View>
+          )}
+          
+          {/* Add extra space at bottom for better scrolling experience */}
+          <View style={{ height: 20 }} />
+        </ScrollView>
+
+        <Animated.View 
+          style={[styles.inputContainer, dynamicStyles.inputContainer]}
+          entering={FadeIn}
+          exiting={FadeOut}
+        >
+          <TextInput
+            style={[styles.input, dynamicStyles.input]}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type a message..."
+            placeholderTextColor={dark ? '#AAAAAA' : '#888888'}
+            returnKeyType="send"
+            onSubmitEditing={handleSendMessage}
+            multiline={true}
+            maxLength={1000}
+            numberOfLines={5}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              dynamicStyles.sendButton,
+              !input.trim() && styles.sendButtonDisabled
+            ]}
+            onPress={handleSendMessage}
+            disabled={!input.trim()}
+          >
+            <Ionicons name="send" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
-  keyboardAvoidingView: { flex: 1 },
-  header: { padding: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5E5' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#002D62' },
-  messagesContainer: { paddingHorizontal: 12, paddingBottom: 20 },
-  messageRow: { flexDirection: 'row', marginVertical: 5 },
-  botMessageRow: { justifyContent: 'flex-start' },
-  userMessageRow: { justifyContent: 'flex-end' },
-  messageBubble: { maxWidth: '75%', padding: 12, borderRadius: 16 },
-  botBubble: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E5E5' },
-  userBubble: { backgroundColor: '#002D62' },
-  botText: { color: '#333' },
-  userText: { color: '#FFF' },
-  typingIndicator: { padding: 8, marginLeft: 10 },
-  typingText: { color: '#666', fontStyle: 'italic' },
-  inputContainer: { flexDirection: 'row', padding: 12, backgroundColor: '#FFF', borderTopWidth: 1, borderTopColor: '#E5E5E5' },
-  input: { flex: 1, marginRight: 12, padding: 10, backgroundColor: '#F5F5F5', borderRadius: 24, fontSize: 16 },
-  sendButton: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, backgroundColor: '#002D62' },
-  sendButtonText: { color: '#FFF', fontWeight: 'bold' },
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5'
+  },
+  keyboardAvoidingView: {
+    flex: 1
+  },
+  header: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#002D62',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  backButton: {
+    padding: 8
+  },
+  clearButton: {
+    padding: 8
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#FFFFFF',
+    flex: 1
+  },
+  messagesContainer: {
+    padding: 16,
+    paddingBottom: 20,
+    flexGrow: 1
+  },
+  messageRow: {
+    marginVertical: 4
+  },
+  botMessageRow: {
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start'
+  },
+  userMessageRow: {
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end'
+  },
+  typingContainer: {
+    marginLeft: 10,
+    marginTop: 8,
+    alignSelf: 'flex-start'
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+    alignItems: 'center'
+  },
+  input: {
+    flex: 1,
+    marginRight: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 24,
+    fontSize: 16,
+    maxHeight: 120,
+    minHeight: 40
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#002D62',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  sendButtonDisabled: {
+    opacity: 0.5
+  },
+  sendButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold'
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 20,
+    textAlign: 'center'
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 20
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#002D62'
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold'
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginVertical: 40
+  },
+  emptyStateIconContainer: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(0, 45, 98, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 12
+  },
+  emptyStateText: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.7,
+    maxWidth: '80%'
+  }
 });

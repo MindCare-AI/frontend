@@ -1,228 +1,222 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { View, StyleSheet, ScrollView, Platform } from "react-native"
-import { Modal, Portal, Text, Button, RadioButton, Divider, TextInput, useTheme } from "react-native-paper"
-import { type SortBy, type SortOrder, ACTIVITIES } from "../../types/mood/mood"
-import MultiSlider from "@ptomasroos/react-native-multi-slider"
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { Button, Surface, Text, Modal, TextInput, Chip } from 'react-native-paper';
+import Slider from '@react-native-community/slider';
+import { MoodFilters } from '../../types/Mood';
+import { ACTIVITY_OPTIONS } from '../../constants/moodTypes';
+import DateRangePicker from './DateRangePicker';
 
 interface FilterSheetProps {
-  visible: boolean
-  onDismiss: () => void
-  initialValues: {
-    sortBy: SortBy
-    sortOrder: SortOrder
-    moodRange: [number, number]
-    activity: string
-    searchText: string
-  }
-  onApplyFilters: (
-    sortBy: SortBy,
-    sortOrder: SortOrder,
-    moodRange: [number, number],
-    activity: string,
-    searchText: string,
-  ) => void
+  visible: boolean;
+  initialFilters: MoodFilters;
+  onApply: (filters: MoodFilters) => void;
+  onDismiss: () => void;
+  onClear: () => void;
 }
 
-export default function FilterSheet({ visible, onDismiss, initialValues, onApplyFilters }: FilterSheetProps) {
-  const theme = useTheme()
-
-  const [sortBy, setSortBy] = useState<SortBy>(initialValues.sortBy)
-  const [sortOrder, setSortOrder] = useState<SortOrder>(initialValues.sortOrder)
-  const [moodRange, setMoodRange] = useState<[number, number]>(initialValues.moodRange)
-  const [activity, setActivity] = useState(initialValues.activity)
-  const [searchText, setSearchText] = useState(initialValues.searchText)
-
-  // Update local state when initialValues change
+const FilterSheet: React.FC<FilterSheetProps> = ({
+  visible,
+  initialFilters,
+  onApply,
+  onDismiss,
+  onClear,
+}) => {
+  const [filters, setFilters] = useState<MoodFilters>(initialFilters);
+  const [activityVisible, setActivityVisible] = useState(false);
+  
+  // Reset local state when initialFilters change
   useEffect(() => {
-    setSortBy(initialValues.sortBy)
-    setSortOrder(initialValues.sortOrder)
-    setMoodRange(initialValues.moodRange)
-    setActivity(initialValues.activity)
-    setSearchText(initialValues.searchText)
-  }, [initialValues])
-
-  const handleReset = () => {
-    setSortBy("logged_at")
-    setSortOrder("desc")
-    setMoodRange([1, 10])
-    setActivity("all")
-    setSearchText("")
-  }
-
+    setFilters(initialFilters);
+  }, [initialFilters]);
+  
   const handleApply = () => {
-    onApplyFilters(sortBy, sortOrder, moodRange, activity, searchText)
-  }
+    onApply(filters);
+    onDismiss();
+  };
+  
+  const handleClear = () => {
+    setFilters({});
+    onClear();
+    onDismiss();
+  };
+  
+  const toggleActivity = (activity: string) => {
+    const currentActivities = filters.activities ? filters.activities.split(',') : [];
+    const updatedActivities = currentActivities.includes(activity)
+      ? currentActivities.filter(a => a !== activity)
+      : [...currentActivities, activity];
+    
+    setFilters({
+      ...filters,
+      activities: updatedActivities.length ? updatedActivities.join(',') : undefined,
+    });
+  };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={Platform.OS === "web" ? styles.webModalContainer : styles.modalContainer}
-      >
-        <View style={styles.header}>
-          <Text variant="titleLarge">Filter & Sort</Text>
-          <Text variant="bodySmall" style={styles.subtitle}>
-            Customize how your mood entries are displayed
-          </Text>
-        </View>
-
-        <ScrollView style={styles.scrollView}>
+    <Modal
+      visible={visible}
+      onDismiss={onDismiss}
+      contentContainerStyle={styles.modalContainer}
+    >
+      <ScrollView>
+        <Surface style={styles.container}>
+          <Text variant="titleLarge" style={styles.title}>Filter Mood Entries</Text>
+          
           <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Sort By
-            </Text>
-            <RadioButton.Group onValueChange={(value) => setSortBy(value as SortBy)} value={sortBy}>
-              <RadioButton.Item label="Date Logged" value="logged_at" />
-              <RadioButton.Item label="Creation Date" value="created_at" />
-              <RadioButton.Item label="Mood Rating" value="mood_rating" />
-            </RadioButton.Group>
-          </View>
-
-          <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Sort Order
-            </Text>
-            <RadioButton.Group onValueChange={(value) => setSortOrder(value as SortOrder)} value={sortOrder}>
-              <View style={styles.radioRow}>
-                <RadioButton.Item label="Newest First" value="desc" />
-                <RadioButton.Item label="Oldest First" value="asc" />
-              </View>
-            </RadioButton.Group>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.section}>
-            <View style={styles.sliderHeader}>
-              <Text variant="titleMedium" style={styles.sectionTitle}>
-                Mood Range
-              </Text>
-              <Text variant="bodyMedium">
-                {moodRange[0]} - {moodRange[1]}
-              </Text>
-            </View>
-            <View style={styles.sliderContainer}>
-              <MultiSlider
-                values={[moodRange[0], moodRange[1]]}
-                min={1}
-                max={10}
-                step={1}
-                sliderLength={Platform.OS === "web" ? 300 : 280}
-                onValuesChange={(values) => setMoodRange([values[0], values[1]] as [number, number])}
-                selectedStyle={{ backgroundColor: theme.colors.primary }}
-                markerStyle={{ backgroundColor: theme.colors.primary }}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Activity
-            </Text>
-            <RadioButton.Group onValueChange={setActivity} value={activity}>
-              <RadioButton.Item label="All Activities" value="all" />
-              {ACTIVITIES.map((act) => (
-                <RadioButton.Item key={act} label={act} value={act.toLowerCase()} />
-              ))}
-            </RadioButton.Group>
-          </View>
-
-          <View style={styles.section}>
-            <Text variant="titleMedium" style={styles.sectionTitle}>
-              Search Notes
-            </Text>
-            <TextInput
-              mode="outlined"
-              placeholder="Search in notes..."
-              value={searchText}
-              onChangeText={setSearchText}
-              style={styles.searchInput}
+            <Text variant="titleSmall" style={styles.sectionTitle}>Date Range</Text>
+            <DateRangePicker
+              startDate={filters.startDate}
+              endDate={filters.endDate}
+              onChangeStartDate={(date) => setFilters({ ...filters, startDate: date })}
+              onChangeEndDate={(date) => setFilters({ ...filters, endDate: date })}
             />
           </View>
-        </ScrollView>
-
-        <View style={styles.buttonContainer}>
-          <Button mode="outlined" onPress={handleReset} style={styles.button}>
-            Reset
-          </Button>
-          <Button mode="contained" onPress={handleApply} style={styles.button}>
-            Apply Filters
-          </Button>
-        </View>
-      </Modal>
-    </Portal>
-  )
-}
+          
+          <View style={styles.section}>
+            <Text variant="titleSmall" style={styles.sectionTitle}>Mood Rating Range</Text>
+            <View style={styles.ratingContainer}>
+              <Text>Min: {filters.minRating || 1}</Text>
+              <Text>Max: {filters.maxRating || 10}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text>Min</Text>
+              <Slider
+                value={filters.minRating || 1}
+                onValueChange={(min) =>
+                  setFilters({ ...filters, minRating: min })
+                }
+                minimumValue={1}
+                maximumValue={filters.maxRating || 10}
+                step={1}
+                style={[styles.slider, { flex: 1, marginHorizontal: 8 }]}
+                minimumTrackTintColor="#6200ee"
+                maximumTrackTintColor="#e0e0e0"
+              />
+              <Text>{filters.minRating || 1}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+              <Text>Max</Text>
+              <Slider
+                value={filters.maxRating || 10}
+                onValueChange={(max) =>
+                  setFilters({ ...filters, maxRating: max })
+                }
+                minimumValue={filters.minRating || 1}
+                maximumValue={10}
+                step={1}
+                style={[styles.slider, { flex: 1, marginHorizontal: 8 }]}
+                minimumTrackTintColor="#6200ee"
+                maximumTrackTintColor="#e0e0e0"
+              />
+              <Text>{filters.maxRating || 10}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.section}>
+            <Text variant="titleSmall" style={styles.sectionTitle}>Activities</Text>
+            <Button 
+              mode="outlined" 
+              onPress={() => setActivityVisible(!activityVisible)}
+              icon={activityVisible ? "chevron-up" : "chevron-down"}
+              style={styles.activityButton}
+            >
+              {filters.activities ? `${filters.activities.split(',').length} selected` : 'Select Activities'}
+            </Button>
+            
+            {activityVisible && (
+              <View style={styles.chipContainer}>
+                {ACTIVITY_OPTIONS.map(activity => {
+                  const isSelected = filters.activities?.includes(activity.value);
+                  return (
+                    <Chip
+                      key={activity.value}
+                      selected={isSelected}
+                      onPress={() => toggleActivity(activity.value)}
+                      style={styles.chip}
+                    >
+                      {activity.label}
+                    </Chip>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.section}>
+            <Text variant="titleSmall" style={styles.sectionTitle}>Search Text</Text>
+            <TextInput
+              placeholder="Search in notes..."
+              value={filters.searchText}
+              onChangeText={(text) => setFilters({ ...filters, searchText: text })}
+              style={styles.textInput}
+            />
+          </View>
+          
+          <View style={styles.buttonContainer}>
+            <Button onPress={handleClear} mode="outlined" style={styles.button}>
+              Clear Filters
+            </Button>
+            <Button onPress={handleApply} mode="contained" style={styles.button}>
+              Apply Filters
+            </Button>
+          </View>
+        </Surface>
+      </ScrollView>
+    </Modal>
+  );
+};
 
 const styles = StyleSheet.create({
   modalContainer: {
-    backgroundColor: "white",
-    margin: 0,
-    marginTop: "auto",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    height: "80%",
+    marginHorizontal: 16,
+    marginVertical: 80,
+    maxHeight: '80%',
   },
-  webModalContainer: {
-    backgroundColor: "white",
-    margin: 40,
-    padding: 20,
-    borderRadius: 8,
-    maxHeight: "80%",
-    maxWidth: 600,
-    alignSelf: "center",
-  },
-  header: {
+  container: {
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderRadius: 16,
   },
-  subtitle: {
-    color: "#666",
-    marginTop: 4,
-  },
-  scrollView: {
-    flex: 1,
+  title: {
+    textAlign: 'center',
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
   section: {
-    padding: 16,
+    marginBottom: 16,
   },
   sectionTitle: {
     marginBottom: 8,
   },
-  radioRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  ratingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  divider: {
-    height: 1,
-    backgroundColor: "#eee",
+  slider: {
+    height: 40,
   },
-  sliderHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+  activityButton: {
+    marginBottom: 8,
   },
-  sliderContainer: {
-    alignItems: "center",
-    marginVertical: 8,
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  searchInput: {
-    marginTop: 8,
+  chip: {
+    marginVertical: 4,
+  },
+  textInput: {
+    backgroundColor: 'transparent',
   },
   buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   button: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-})
+    width: '48%',
+  }
+});
+
+export default FilterSheet;

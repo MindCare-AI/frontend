@@ -1,209 +1,144 @@
-// contexts/moodContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { MoodLog, MoodAnalytics, MoodFilters, MoodFormData } from '../types/Mood';
+import { MoodLog, MoodFormData, MoodFilters, MoodAnalytics } from '../types/Mood';
 import { MoodApi } from '../services/moodApi';
-import { handleError } from '../utils/errorHandler';
-import { useAuth } from './AuthContext';
 
 interface MoodContextType {
-  logs: MoodLog[];
-  analytics: MoodAnalytics | null;
+  moodLogs: MoodLog[];
   isLoading: boolean;
   error: string | null;
+  analytics: MoodAnalytics | null;
+  filters: MoodFilters;
   fetchMoodLogs: (filters?: MoodFilters) => Promise<void>;
-  fetchMoodAnalytics: (filters?: MoodFilters) => Promise<void>;
-  createMoodLog: (data: MoodFormData) => Promise<MoodLog | null>;
-  updateMoodLog: (id: number, data: Partial<MoodFormData>) => Promise<MoodLog | null>;
-  deleteMoodLog: (id: number) => Promise<boolean>;
-  exportMoodData: (filters?: MoodFilters) => Promise<void>;
+  fetchAnalytics: (filters?: MoodFilters) => Promise<void>;
+  createMoodLog: (data: MoodFormData) => Promise<MoodLog>;
+  updateMoodLog: (id: number, data: Partial<MoodFormData>) => Promise<MoodLog>;
+  deleteMoodLog: (id: number) => Promise<void>;
+  setFilters: (filters: MoodFilters) => void;
 }
-
-const initialAnalytics: MoodAnalytics = {
-  weekly_average: 0,
-  monthly_average: 0,
-  daily_trends: [],
-  entry_count: 0
-};
 
 const MoodContext = createContext<MoodContextType | undefined>(undefined);
 
-export const MoodProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { accessToken, user } = useAuth();
-  const [logs, setLogs] = useState<MoodLog[]>([]);
+export const MoodProvider = ({ children }: { children: ReactNode }) => {
+  const [moodLogs, setMoodLogs] = useState<MoodLog[]>([]);
   const [analytics, setAnalytics] = useState<MoodAnalytics | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<MoodFilters>({});
 
-  // Reset state when user changes
-  useEffect(() => {
-    setLogs([]);
-    setAnalytics(null);
-    setError(null);
-  }, [user?.id]);
-
-  const fetchMoodLogs = async (filters?: MoodFilters) => {
-    if (!accessToken) {
-      setError('You must be logged in to view mood logs');
-      return;
-    }
-
+  const fetchMoodLogs = async (queryFilters?: MoodFilters) => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const data = await MoodApi.getMoodLogs(filters);
-      setLogs(data);
+      const appliedFilters = queryFilters || filters;
+      const logs = await MoodApi.getMoodLogs(appliedFilters);
+      // Ensure logs is an array before setting state
+      setMoodLogs(Array.isArray(logs) ? logs : []);
     } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
+      setError('Failed to fetch mood logs');
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchMoodAnalytics = async (filters?: MoodFilters) => {
-    if (!accessToken) {
-      setError('You must be logged in to view analytics');
-      return;
-    }
-
+  const fetchAnalytics = async (queryFilters?: MoodFilters) => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const data = await MoodApi.getMoodAnalytics(filters);
-      setAnalytics(data);
+      const appliedFilters = queryFilters || filters;
+      const analyticsData = await MoodApi.getMoodAnalytics(appliedFilters);
+      setAnalytics(analyticsData);
     } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
-      setAnalytics(initialAnalytics);
+      setError('Failed to fetch analytics');
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const createMoodLog = async (data: MoodFormData): Promise<MoodLog | null> => {
-    if (!accessToken) {
-      setError('You must be logged in to create a mood log');
-      return null;
-    }
-
+  const createMoodLog = async (data: MoodFormData) => {
     setIsLoading(true);
     setError(null);
-
     try {
       const newLog = await MoodApi.createMoodLog(data);
-      setLogs(prev => [newLog, ...prev]);
+      // Fix the error by explicitly handling potential null/undefined cases
+      setMoodLogs(prevLogs => Array.isArray(prevLogs) ? [newLog, ...prevLogs] : [newLog]);
       return newLog;
     } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
-      return null;
+      setError('Failed to create mood log');
+      console.error(err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateMoodLog = async (
-    id: number,
-    data: Partial<MoodFormData>
-  ): Promise<MoodLog | null> => {
-    if (!accessToken) {
-      setError('You must be logged in to update a mood log');
-      return null;
-    }
-
+  const updateMoodLog = async (id: number, data: Partial<MoodFormData>) => {
     setIsLoading(true);
     setError(null);
-
     try {
       const updatedLog = await MoodApi.updateMoodLog(id, data);
-      setLogs(prev => prev.map(log => (log.id === id ? updatedLog : log)));
+      // Fix the error by ensuring prevLogs is treated as an array
+      setMoodLogs(prevLogs => {
+        if (!Array.isArray(prevLogs)) return [updatedLog];
+        return prevLogs.map(log => log.id === id ? updatedLog : log);
+      });
       return updatedLog;
     } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
-      return null;
+      setError('Failed to update mood log');
+      console.error(err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteMoodLog = async (id: number): Promise<boolean> => {
-    if (!accessToken) {
-      setError('You must be logged in to delete a mood log');
-      return false;
-    }
-
+  const deleteMoodLog = async (id: number) => {
     setIsLoading(true);
     setError(null);
-
     try {
       await MoodApi.deleteMoodLog(id);
-      setLogs(prev => prev.filter(log => log.id !== id));
-      return true;
+      // Fix the error by ensuring prevLogs is treated as an array
+      setMoodLogs(prevLogs => {
+        if (!Array.isArray(prevLogs)) return [];
+        return prevLogs.filter(log => log.id !== id);
+      });
     } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
-      return false;
+      setError('Failed to delete mood log');
+      console.error(err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const exportMoodData = async (filters?: MoodFilters): Promise<void> => {
-    if (!accessToken) {
-      setError('You must be logged in to export data');
-      return;
-    }
+  // Load initial data
+  useEffect(() => {
+    fetchMoodLogs();
+    fetchAnalytics();
+  }, []);
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const blob = await MoodApi.exportMoodLogs(filters);
-      
-      // Create a URL for the blob
-      const url = URL.createObjectURL(blob);
-      
-      // Create a link element and trigger download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `mood-logs-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      const formattedError = handleError(err);
-      setError(formattedError.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const value: MoodContextType = {
-    logs,
-    analytics,
+  const value = {
+    moodLogs,
     isLoading,
     error,
+    analytics,
+    filters,
     fetchMoodLogs,
-    fetchMoodAnalytics,
+    fetchAnalytics,
     createMoodLog,
     updateMoodLog,
     deleteMoodLog,
-    exportMoodData,
+    setFilters,
   };
 
   return <MoodContext.Provider value={value}>{children}</MoodContext.Provider>;
 };
 
-export const useMood = (): MoodContextType => {
+export const useMoodContext = () => {
   const context = useContext(MoodContext);
   if (context === undefined) {
-    throw new Error('useMood must be used within a MoodProvider');
+    throw new Error('useMoodContext must be used within a MoodProvider');
   }
   return context;
 };
