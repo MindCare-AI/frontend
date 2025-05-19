@@ -7,10 +7,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getUserProfile } from '../../API/settings/user';
 import { getNotificationSettings, updateNotificationSettings } from '../../API/settings/notifications';
+import { handleLogout } from '../auth/logoutHandler';
 
 const HomeSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useAuth(); // Get both user and signOut
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   
@@ -52,13 +53,10 @@ const HomeSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      // Navigation will be handled by the AuthContext's state change
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+  const onLogoutPress = () => {
+    handleLogout(navigation, signOut).catch(error => {
+      console.error('Failed to logout:', error);
+    });
   };
 
   // Get profile picture from patient_profile or therapist_profile
@@ -233,7 +231,7 @@ const HomeSettingsScreen: React.FC = () => {
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity 
               style={styles.logoutButton}
-              onPress={handleLogout}
+              onPress={onLogoutPress}
             >
               <Text style={styles.logoutText}>Log Out</Text>
             </TouchableOpacity>

@@ -77,7 +77,7 @@ const Header: React.FC = () => {
                 icon="settings-outline"
                 label="Settings"
                 isActive={false}
-                onPress={() => navigation.navigate("Settings" as never)}
+                onPress={() => navigation.navigate("Settings")}
               />
             </>
           )}
