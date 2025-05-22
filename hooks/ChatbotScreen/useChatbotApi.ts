@@ -80,6 +80,10 @@ export const getChatbotHistory = async (
   token: string
 ): Promise<any[]> => {
   try {
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
     const response = await axios.get(
       `${API_URL}/chatbot/${conversationId}/`,
       {

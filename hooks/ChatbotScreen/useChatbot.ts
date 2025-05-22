@@ -118,7 +118,7 @@ export const useChatbot = (): UseChatbotReturn => {
   }, [accessToken, setActiveConversation, user]);
 
   const sendMessage = useCallback(async (content: string): Promise<void> => {
-    if (!content.trim() || !conversation) return;
+    if (!content.trim() || !conversation || !accessToken) return;
     
     try {
       // Add user message to UI immediately
@@ -143,7 +143,7 @@ export const useChatbot = (): UseChatbotReturn => {
       const response = await sendChatbotMessage(
         parseInt(conversation.id),
         content,
-        accessToken || ''
+        accessToken
       );
       
       // Update messages - replace temp message with confirmed one and add bot response
@@ -153,7 +153,7 @@ export const useChatbot = (): UseChatbotReturn => {
           const updatedMessages = prevMessages.map(msg => 
             msg.id === tempId ? {
               ...msg,
-              id: `user-${Date.now()}`,
+              id: response.user_message?.id || `user-${Date.now()}`,
               status: 'sent' as 'sent'
             } : msg
           );
@@ -161,11 +161,11 @@ export const useChatbot = (): UseChatbotReturn => {
           // Add bot response if it exists
           if (response.bot_response) {
             const botMessage: ChatbotMessage = {
-              id: `bot-${Date.now()}`,
+              id: response.bot_response.id || `bot-${Date.now()}`,
               content: response.bot_response.content,
               sender_id: 'bot',
               sender_name: 'Samantha',
-              timestamp: new Date().toISOString(),
+              timestamp: response.bot_response.timestamp || new Date().toISOString(),
               message_type: 'text',
               is_bot: true,
               status: 'sent'
@@ -184,9 +184,7 @@ export const useChatbot = (): UseChatbotReturn => {
       // Update message status to failed
       setMessages(prevMessages => 
         prevMessages.map(msg => 
-          msg.content === content && msg.status === 'sending' 
-            ? { ...msg, status: 'failed' } 
-            : msg
+          msg.id === tempId ? { ...msg, status: 'failed' } : msg
         )
       );
     } finally {

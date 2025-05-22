@@ -1,102 +1,93 @@
-import { ChatbotConversation, ChatbotMessage } from '../types/chatbot';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ChatbotConversation, ChatbotMessage } from '../types/chatbot';
+import { getChatbotHistory } from '../hooks/ChatbotScreen/useChatbotApi';
 
-const CURRENT_CONVERSATION_KEY = 'current_chatbot_conversation';
-const HISTORY_PREFIX = 'chatbot_history_';
-
-/**
- * Service for managing chatbot conversations and local storage
- */
 class ChatbotService {
   private currentConversation: ChatbotConversation | null = null;
+  private readonly STORAGE_KEY = 'chatbot_conversation';
 
-  /**
-   * Initialize the service and load any stored conversation
-   */
-  constructor() {
-    this.loadCurrentConversation();
-  }
-
-  /**
-   * Load the current conversation from storage
-   */
-  private async loadCurrentConversation(): Promise<void> {
-    try {
-      const storedConversation = await AsyncStorage.getItem(CURRENT_CONVERSATION_KEY);
-      if (storedConversation) {
-        this.currentConversation = JSON.parse(storedConversation);
-      }
-    } catch (error) {
-      console.error('Failed to load conversation from storage:', error);
-    }
-  }
-
-  /**
-   * Get the current active conversation
-   */
+  // Get the current active conversation
   getCurrentConversation(): ChatbotConversation | null {
     return this.currentConversation;
   }
 
-  /**
-   * Set the current active conversation and store it
-   */
-  async setCurrentConversation(conversation: ChatbotConversation | null): Promise<void> {
+  // Set the current conversation and cache it
+  setCurrentConversation(conversation: ChatbotConversation): void {
     this.currentConversation = conversation;
-    
+    this.cacheConversation(conversation);
+  }
+
+  // Cache conversation to AsyncStorage
+  private async cacheConversation(conversation: ChatbotConversation): Promise<void> {
     try {
-      if (conversation) {
-        await AsyncStorage.setItem(CURRENT_CONVERSATION_KEY, JSON.stringify(conversation));
-      } else {
-        await AsyncStorage.removeItem(CURRENT_CONVERSATION_KEY);
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(conversation));
+    } catch (error) {
+      console.error('Error caching conversation:', error);
+    }
+  }
+
+  // Load conversation from cache
+  async loadCachedConversation(): Promise<ChatbotConversation | null> {
+    try {
+      const cached = await AsyncStorage.getItem(this.STORAGE_KEY);
+      if (cached) {
+        this.currentConversation = JSON.parse(cached);
+        return this.currentConversation;
       }
     } catch (error) {
-      console.error('Failed to store conversation:', error);
+      console.error('Error loading cached conversation:', error);
     }
+    return null;
   }
 
-  /**
-   * Save chat history for a conversation
-   */
-  async saveChatHistory(conversationId: string, messages: ChatbotMessage[]): Promise<void> {
-    try {
-      const key = `${HISTORY_PREFIX}${conversationId}`;
-      await AsyncStorage.setItem(key, JSON.stringify(messages));
-    } catch (error) {
-      console.error('Failed to save chat history:', error);
-    }
-  }
-
-  /**
-   * Get chat history for a conversation
-   */
+  // Get chat history for a conversation
   async getChatHistory(conversationId: string): Promise<ChatbotMessage[]> {
     try {
-      const key = `${HISTORY_PREFIX}${conversationId}`;
-      const storedHistory = await AsyncStorage.getItem(key);
-      if (storedHistory) {
-        return JSON.parse(storedHistory);
-      }
+      const messages = await getChatbotHistory(parseInt(conversationId), '');
+      return messages.map(this.transformMessageData);
     } catch (error) {
-      console.error('Failed to get chat history:', error);
+      console.error('Error getting chat history:', error);
+      return [];
     }
-    
-    return [];
   }
 
-  /**
-   * Clear chat history for a conversation
-   */
+  // Transform API message data to ChatbotMessage format
+  private transformMessageData = (msg: any): ChatbotMessage => {
+    return {
+      id: msg.id?.toString() || '',
+      content: msg.content || '',
+      sender_id: msg.is_bot ? 'bot' : msg.sender_id?.toString() || 'user',
+      sender_name: msg.is_bot ? 'Samantha' : msg.sender_name || 'You',
+      timestamp: msg.timestamp || new Date().toISOString(),
+      message_type: 'text',
+      is_bot: msg.is_bot || false,
+      status: 'sent'
+    };
+  };
+
+  // Clear chat history (placeholder for now)
   async clearHistory(conversationId: string): Promise<void> {
+    // This would typically make an API call to clear server-side history
+    // For now, we'll just clear the local cache
     try {
-      const key = `${HISTORY_PREFIX}${conversationId}`;
-      await AsyncStorage.removeItem(key);
+      await AsyncStorage.removeItem(this.STORAGE_KEY);
+      this.currentConversation = null;
     } catch (error) {
-      console.error('Failed to clear chat history:', error);
+      console.error('Error clearing history:', error);
+      throw error;
+    }
+  }
+
+  // Clear all cached data
+  async clearCache(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.STORAGE_KEY);
+      this.currentConversation = null;
+    } catch (error) {
+      console.error('Error clearing cache:', error);
     }
   }
 }
 
-// Create and export a singleton instance
-const chatbotService = new ChatbotService();
-export default chatbotService;
+// Export a singleton instance
+export default new ChatbotService();

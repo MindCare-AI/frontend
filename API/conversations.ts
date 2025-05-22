@@ -45,7 +45,7 @@ export const getConversationById = async (conversationId: ConversationId) => {
       const response = await axios.get(`${API_URL}/messaging/one_to_one/${conversationId}/`, config);
       // Return properly structured data with is_group flag
       return {
-        ...response.data,
+        ...(typeof response.data === 'object' && response.data !== null ? response.data : {}),
         is_group: false,
       };
     } catch (error) {
@@ -53,7 +53,7 @@ export const getConversationById = async (conversationId: ConversationId) => {
       const groupResponse = await axios.get(`${API_URL}/messaging/groups/${conversationId}/`, config);
       // Return properly structured data with is_group flag
       return {
-        ...groupResponse.data,
+        ...(typeof groupResponse.data === 'object' && groupResponse.data !== null ? groupResponse.data : {}),
         is_group: true,
       };
     }
@@ -95,8 +95,8 @@ export const sendMessage = async (
     const isGroupConversation = isGroup || await isGroupType(conversationId);
     
     const endpoint = isGroupConversation
-      ? `${API_URL}/messaging/groups/${conversationId}/messages/`
-      : `${API_URL}/messaging/one_to_one/${conversationId}/messages/`;
+      ? `${API_URL}/messaging/groups/messages/`
+      : `${API_URL}/messaging/one_to_one/messages/`;
       
     const payload = {
       content,
