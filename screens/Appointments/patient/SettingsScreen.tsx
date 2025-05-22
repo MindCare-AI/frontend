@@ -1,6 +1,6 @@
 import { Box, Text, Heading, VStack, Switch, HStack, Divider, Icon, Pressable } from "native-base"
 import { Ionicons } from "@expo/vector-icons"
-import Header from "../../components/Appointments/patient_dashboard/Header"
+import Header from "../../../components/Appointments/patient_dashboard/Header"
 
 const SettingsScreen = () => {
   return (

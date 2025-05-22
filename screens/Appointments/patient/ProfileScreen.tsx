@@ -1,5 +1,5 @@
 import { Box, Text, Heading, VStack, Avatar, Divider } from "native-base"
-import Header from "../../components/Appointments/patient_dashboard/Header"
+import Header from "../../../components/Appointments/patient_dashboard/Header"
 
 const ProfileScreen = () => {
   return (
@@ -65,7 +65,12 @@ const ProfileScreen = () => {
   )
 }
 
-const HStack = ({ children, ...props }) => {
+type HStackProps = {
+  children: React.ReactNode
+  [key: string]: any
+}
+
+const HStack: React.FC<HStackProps> = ({ children, ...props }) => {
   return (
     <Box flexDirection="row" {...props}>
       {children}

@@ -5,25 +5,29 @@ export type AppointmentStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Resched
 export interface Appointment {
   id: number;
   patientName: string;
+  patientId?: number;
   time: string;
   date?: string;
-  status: AppointmentStatus;
+  status: string;
   notes?: string;
   isExpanded?: boolean;
+  video_session_link?: string;
 }
 
 export interface WaitingListEntry {
   id: number;
   patientName: string;
-  requestedDate: string;
+  patientId?: number;
+  requestDate: string;
+  preferredDates: string[];
   preferredTimeSlots: string[];
-  status: 'Pending' | 'Notified';
-  isExpired: boolean;
+  status: "Pending" | "Notified";
 }
 
 export interface SessionNote {
   id: number;
   patientName: string;
+  patientId?: number;
   date: string;
   notes: string;
 }

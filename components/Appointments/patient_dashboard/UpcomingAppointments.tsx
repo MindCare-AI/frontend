@@ -1,12 +1,14 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { StyleSheet, ScrollView, View, Text, ActivityIndicator } from "react-native"
-import { cancelAppointment } from "../../../API/appointments/appointments" // Import API
+import { cancelAppointment } from "../../../API/Appointment/patient"
 import { Badge, Button, Card } from "./ui"
 import { Ionicons } from "@expo/vector-icons"
-import type { AppointmentType } from "../../../types/appointmentTypes"
+import type { AppointmentType } from "../../../types/appoint_patient/appointmentTypes"
 import { CardContent, CardFooter, CardHeader } from "../../ui/card"
+import { useAppointments } from "../../../contexts/appoint_patient/AppointmentContext"
+import RescheduleAppointmentModal from "./RescheduleAppointmentModal"
 
 type UpcomingAppointmentsProps = {
   appointments: AppointmentType[];
@@ -14,12 +16,12 @@ type UpcomingAppointmentsProps = {
 }
 
 const UpcomingAppointments: React.FC<UpcomingAppointmentsProps> = ({ appointments, loading }) => {
+  const { refreshAppointments } = useAppointments();
+
   const handleCancelAppointment = async (id: number) => {
     try {
       await cancelAppointment(id);
-      // You could use a context or prop function to refresh data
-      // For now just log success
-      console.log(`Appointment ${id} cancelled successfully`);
+      await refreshAppointments();
     } catch (error) {
       console.error(`Error cancelling appointment ${id}:`, error);
     }
@@ -52,22 +54,24 @@ const UpcomingAppointments: React.FC<UpcomingAppointmentsProps> = ({ appointment
   }
 
   return (
-    <ScrollView 
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        padding: 16,
-        paddingBottom: 120, // Add extra padding at the bottom for FAB
-      }}
-      showsVerticalScrollIndicator={true}
-    >
-      {appointments.map((appointment) => (
-        <AppointmentCard
-          key={appointment.id}
-          appointment={appointment}
-          onCancel={() => handleCancelAppointment(appointment.id)}
-        />
-      ))}
-    </ScrollView>
+    <>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: 120, // Add extra padding at the bottom for FAB
+        }}
+        showsVerticalScrollIndicator={true}
+      >
+        {appointments.map((appointment) => (
+          <AppointmentCard
+            key={appointment.id}
+            appointment={appointment}
+            onCancel={() => handleCancelAppointment(appointment.id)}
+          />
+        ))}
+      </ScrollView>
+    </>
   )
 }
 
@@ -77,6 +81,8 @@ type AppointmentCardProps = {
 }
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, onCancel }) => {
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Confirmed":
@@ -93,82 +99,68 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, onCancel
   }
 
   return (
-    <Card 
-      style={styles.appointmentCard}
-      elevation={2}
-      animateOnPress
-    >
-      <CardHeader style={styles.cardHeader}>
-        <View style={styles.headerTop}>
-          <View style={styles.therapistInfo}>
-            <Ionicons name="person-circle-outline" size={24} color="#4A5568" style={styles.therapistIcon} />
-            <Text style={styles.therapistName}>{appointment.therapist}</Text>
-          </View>
-          <Badge 
-            colorScheme={getStatusColor(appointment.status)} 
-            variant="subtle"
-            size="md"
-          >
-            {appointment.status}
-          </Badge>
-        </View>
-        <View style={styles.dateTimeContainer}>
-          <View style={styles.dateTimeItem}>
-            <Ionicons name="calendar-outline" size={16} color="#718096" style={styles.dateTimeIcon} />
-            <Text style={styles.dateTimeText}>{appointment.date}</Text>
-          </View>
-          <View style={styles.dateTimeItem}>
-            <Ionicons name="time-outline" size={16} color="#718096" style={styles.dateTimeIcon} />
-            <Text style={styles.dateTimeText}>{appointment.time}</Text>
-          </View>
-        </View>
-      </CardHeader>
-      <CardFooter style={styles.cardFooter}>
-        {appointment.status === "Confirmed" && (
-          <Button 
-            variant={appointment.isWithin15Min ? "solid" : "outline"} 
-            colorScheme="primary" 
-            size="sm"
-            style={styles.actionButton}
-          >
-            {appointment.isWithin15Min ? "Join Session" : "Cancel Appointment"}
-          </Button>
-        )}
-
-        {appointment.status === "Scheduled" && (
-          <View style={styles.buttonGroup}>
-            <Button 
-              variant="outline" 
-              colorScheme="primary" 
-              size="sm"
-              onPress={onCancel}
-              style={styles.actionButton}
+    <>
+      <Card 
+        style={styles.appointmentCard}
+        elevation={2}
+        animateOnPress
+      >
+        <CardHeader style={styles.cardHeader}>
+          <View style={styles.headerTop}>
+            <View style={styles.therapistInfo}>
+              <Ionicons name="person-circle-outline" size={24} color="#4A5568" style={styles.therapistIcon} />
+              <Text style={styles.therapistName}>{appointment.therapist}</Text>
+            </View>
+            <Badge 
+              colorScheme={getStatusColor(appointment.status)} 
+              variant="subtle"
+              size="md"
             >
-              Cancel
-            </Button>
-            <Button 
-              variant="outline" 
-              colorScheme="primary" 
-              size="sm"
-              style={styles.actionButton}
-            >
-              Reschedule
-            </Button>
+              {appointment.status}
+            </Badge>
           </View>
-        )}
-
-        {appointment.status === "Pending" && (
-          <Button 
-            variant="outline" 
-            colorScheme="primary" 
-            size="sm"
-            style={styles.actionButton}
-          >
-            Reschedule
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
+          <View style={styles.dateTimeContainer}>
+            <View style={styles.dateTimeItem}>
+              <Ionicons name="calendar-outline" size={16} color="#718096" style={styles.dateTimeIcon} />
+              <Text style={styles.dateTimeText}>{appointment.date}</Text>
+            </View>
+            <View style={styles.dateTimeItem}>
+              <Ionicons name="time-outline" size={16} color="#718096" style={styles.dateTimeIcon} />
+              <Text style={styles.dateTimeText}>{appointment.time}</Text>
+            </View>
+          </View>
+        </CardHeader>
+        <CardFooter style={styles.cardFooter}>
+          {(appointment.status === "Confirmed" || appointment.status === "Scheduled" || appointment.status === "Pending") && (
+            <View style={styles.buttonGroup}>
+              <Button 
+                variant="outline" 
+                colorScheme="primary" 
+                size="sm"
+                onPress={onCancel}
+                style={styles.actionButton}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="outline" 
+                colorScheme="secondary" 
+                size="sm"
+                onPress={() => setRescheduleOpen(true)}
+                style={styles.actionButton}
+              >
+                Reschedule
+              </Button>
+            </View>
+          )}
+        </CardFooter>
+      </Card>
+      <RescheduleAppointmentModal
+        isOpen={rescheduleOpen}
+        onClose={() => setRescheduleOpen(false)}
+        appointment={appointment}
+      />
+    </>
   )
 }
 
@@ -234,11 +226,12 @@ const styles = StyleSheet.create({
   },
   therapistIcon: {
     marginRight: 8,
+    color: "#002D62"
   },
   therapistName: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#2D3748",
+    color: "#333",
   },
   dateTimeContainer: {
     flexDirection: "row",
@@ -273,6 +266,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontWeight: '700',
     fontSize: 16,
+    backgroundColor: "#002D62",
+    borderColor: "#002D62",
   },
   loadingContainer: {
     flex: 1,

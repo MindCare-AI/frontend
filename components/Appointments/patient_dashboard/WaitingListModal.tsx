@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, Platform, ScrollView, ActivityIndicator } from "react-native"
 import { format } from "date-fns"
-import { joinWaitingList } from "../../../API/appointments/waitingList" // Import API
+import { addToWaitingList, getAllTherapistProfiles } from "../../../API/Appointment/patient" // Updated import
 import { Modal, Button, DatePicker, Select, Checkbox } from "./ui"
 
 type WaitingListModalProps = {
@@ -16,11 +16,11 @@ const TimeSlotBadge: React.FC<{ timeSlot: string }> = ({ timeSlot }) => {
   const getBadgeColor = (slot: string) => {
     switch (slot) {
       case "Morning":
-        return "#FFE4B5" // Light orange
+        return "#F0EAFF" // Light purple matching settings screen
       case "Afternoon":
-        return "#B5E6FF" // Light blue
+        return "#E4F0F6" // Light blue matching settings gradient
       case "Evening":
-        return "#E6B5FF" // Light purple
+        return "#E8F0EA" // Light green keeping the same style
       default:
         return "#E5E5E5"
     }
@@ -48,13 +48,33 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
     afternoon: false,
     evening: false,
   })
+  const [therapists, setTherapists] = useState<Array<{ label: string, value: string }>>([])
+  const [therapistProfiles, setTherapistProfiles] = useState<any[]>([]);
 
-  // Sample data - in a real app, this would come from an API
-  const therapists = [
-    { label: "Dr. John Doe", value: "1" },
-    { label: "Dr. Jane Smith", value: "2" },
-    { label: "Dr. Robert Johnson", value: "3" },
-  ]
+  useEffect(() => {
+    fetchTherapists();
+  }, []);
+
+  const fetchTherapists = async () => {
+    try {
+      const response = await getAllTherapistProfiles();
+      if (!Array.isArray(response)) {
+        setTherapists([]);
+        setTherapistProfiles([]);
+        return;
+      }
+      setTherapistProfiles(response);
+      setTherapists(
+        response.map((therapist: any) => ({
+          label: `${therapist.first_name} ${therapist.last_name}`,
+          value: therapist.id?.toString() || "",
+        }))
+      );
+    } catch (error) {
+      setTherapists([]);
+      setTherapistProfiles([]);
+    }
+  };
 
   const handleSubmit = async () => {
     if (therapist && date && (timePreferences.morning || timePreferences.afternoon || timePreferences.evening)) {
@@ -62,19 +82,20 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
       setError(null)
       
       try {
-        // Prepare preferred time slots array
-        const preferredTimes: string[] = []
-        if (timePreferences.morning) preferredTimes.push("morning")
-        if (timePreferences.afternoon) preferredTimes.push("afternoon")
-        if (timePreferences.evening) preferredTimes.push("evening")
+        // Prepare preferred time slots array using backend values
+        const preferredTimeSlots: string[] = []
+        if (timePreferences.morning) preferredTimeSlots.push("morning")
+        if (timePreferences.afternoon) preferredTimeSlots.push("afternoon")
+        if (timePreferences.evening) preferredTimeSlots.push("evening")
 
         // Format date
         const formattedDate = format(date, 'yyyy-MM-dd');
 
-        // Add to waiting list
-        await joinWaitingList({
-          preferred_days: [formattedDate],
-          preferred_times: preferredTimes,
+        // Add to waiting list using patient API
+        await addToWaitingList({
+          therapist_id: parseInt(therapist),
+          preferred_dates: [formattedDate],
+          preferred_time_slots: preferredTimeSlots,
         });
 
         // Close modal and reset form
@@ -224,6 +245,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flex: 1,
   },
+  errorText: {
+    color: "#E53E3E",
+    marginBottom: 12,
+    textAlign: "center",
+  },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -233,12 +259,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#1F2937',
-  },
-  errorText: {
-    color: "#E53E3E",
-    marginBottom: 12,
-    textAlign: "center",
+    color: "#333", // Darker text to match settings screen
   },
 })
 

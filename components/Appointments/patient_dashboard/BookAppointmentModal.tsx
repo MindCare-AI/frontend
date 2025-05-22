@@ -1,12 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react" // Added useEffect
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, useWindowDimensions, ScrollView, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { format } from "date-fns"
-import { createAppointment } from "../../../API/appointments/appointments" // Import API
-import { getTherapistAvailability } from "../../../API/appointments/patient" // Import API
+import { createAppointment, getAllTherapistProfiles } from "../../../API/Appointment/patient"
 import { Modal, Button, DatePicker, Select, Alert } from "./ui"
 
 type BookAppointmentModalProps = {
@@ -22,9 +21,10 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
   const [noSlotsAvailable, setNoSlotsAvailable] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [therapists, setTherapists] = useState<Array<{ label: string, value: string }>>([])
-  const [timeSlots, setTimeSlots] = useState<Array<{ label: string, value: string }>>([])
+  const [timeSlots, setTimeSlots] = useState<Array<{ label: string, value: string, time: string }>>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [therapistProfiles, setTherapistProfiles] = useState<any[]>([]);
   const { width } = useWindowDimensions()
 
   // Fetch therapists when modal opens
@@ -35,19 +35,33 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
   }, [isOpen]);
 
   const fetchTherapists = async () => {
-    // You would need to implement this API call or use a mock
-    // For now let's use your sample data
-    setTherapists([
-      { label: "Dr. John Doe", value: "1" },
-      { label: "Dr. Jane Smith", value: "2" },
-      { label: "Dr. Robert Johnson", value: "3" },
-    ]);
+    try {
+      const response = await getAllTherapistProfiles();
+      if (!Array.isArray(response)) {
+        setTherapists([]);
+        setTherapistProfiles([]);
+        return;
+      }
+      setTherapistProfiles(response);
+      setTherapists(
+        response.map((therapist: any) => ({
+          label: `${therapist.first_name} ${therapist.last_name}`,
+          value: therapist.id?.toString() || "",
+        }))
+      );
+    } catch (error) {
+      setTherapists([]);
+      setTherapistProfiles([]);
+    }
   };
 
-  const handleDateChange = async (selectedDate: Date | null) => {
-    setDate(selectedDate)
-    
+  const handleDateChange = (selectedDate: Date | null) => {
+    setDate(selectedDate);
+
     if (!selectedDate || !therapist) {
+      setTimeSlots([]);
+      setNoSlotsAvailable(false);
+      setTimeSlot("");
       return;
     }
 
@@ -56,29 +70,42 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
     setTimeSlot("");
 
     try {
-      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
-      const response = await getTherapistAvailability(parseInt(therapist), formattedDate);
-      
-      if (response.available_slots.length === 0) {
+      const selectedTherapist = therapistProfiles.find((t) => t.id?.toString() === therapist);
+      if (!selectedTherapist || !selectedTherapist.availability) {
         setNoSlotsAvailable(true);
-      } else {
-        setNoSlotsAvailable(false);
-        
-        // Format time slots for the dropdown
-        const formattedSlots = response.available_slots.map((slot, index) => {
-          const startTime = new Date(`${formattedDate}T${slot.start}`);
-          return {
-            label: startTime.toLocaleTimeString('en-US', {
-              hour: 'numeric', minute: 'numeric', hour12: true
-            }),
-            value: String(index)
-          };
-        });
-        
-        setTimeSlots(formattedSlots);
+        setIsLoading(false);
+        return;
       }
+      const dayOfWeek = selectedDate.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+      const slots = selectedTherapist.availability[dayOfWeek] || [];
+      if (!slots.length) {
+        setNoSlotsAvailable(true);
+        setIsLoading(false);
+        return;
+      }
+      setNoSlotsAvailable(false);
+      // Flatten and format slots
+      const formattedSlots: Array<{ label: string, value: string, time: string }> = [];
+      slots.forEach((slot: any, idx: number) => {
+        // Assume slot.start and slot.end are in "HH:mm" format
+        const [startHour, startMinute] = slot.start.split(":").map(Number);
+        const [endHour, endMinute] = slot.end.split(":").map(Number);
+        let current = new Date(selectedDate);
+        current.setHours(startHour, startMinute, 0, 0);
+        const end = new Date(selectedDate);
+        end.setHours(endHour, endMinute, 0, 0);
+        while (current < end) {
+          const label = current.toLocaleTimeString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+          formattedSlots.push({
+            label,
+            value: `${idx}-${label}`,
+            time: `${current.getHours().toString().padStart(2, '0')}:${current.getMinutes().toString().padStart(2, '0')}`
+          });
+          current = new Date(current.getTime() + 30 * 60000); // 30 min interval
+        }
+      });
+      setTimeSlots(formattedSlots);
     } catch (error) {
-      console.error('Error fetching therapist availability:', error);
       setError('Failed to fetch available time slots');
       setNoSlotsAvailable(true);
     } finally {
@@ -88,34 +115,20 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
 
   const handleSubmit = async () => {
     if (!therapist || !date || !timeSlot) return;
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
-      const selectedSlot = timeSlots[parseInt(timeSlot)];
+      const selectedSlot = timeSlots.find((slot) => slot.value === timeSlot);
       if (!selectedSlot) throw new Error('Invalid time slot selected');
-      
+
       const formattedDate = format(date, 'yyyy-MM-dd');
-      const selectedTime = selectedSlot.label;
-      
-      // Format time for API: Convert "3:30 PM" to "15:30" format
-      const timeParts = selectedTime.match(/(\d+):(\d+) ([AP]M)/);
-      if (!timeParts) throw new Error('Invalid time format');
-      
-      let hours = parseInt(timeParts[1]);
-      if (timeParts[3] === 'PM' && hours !== 12) hours += 12;
-      if (timeParts[3] === 'AM' && hours === 12) hours = 0;
-      
-      const minutes = timeParts[2];
-      const isoTime = `${hours.toString().padStart(2, '0')}:${minutes}`;
-      
       await createAppointment({
-        therapist_id: parseInt(therapist),
-        appointment_date: `${formattedDate}T${isoTime}:00`,
-        duration_minutes: 60
+        therapist: parseInt(therapist),
+        appointment_date: `${formattedDate}T${selectedSlot.time}:00`
       });
-      
+
       onClose();
       // Reset form
       setDate(null);
@@ -123,7 +136,6 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
       setTimeSlot("");
       setNoSlotsAvailable(false);
     } catch (error) {
-      console.error('Error booking appointment:', error);
       setError('Failed to book appointment. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -238,7 +250,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#4A5568',
+    color: '#444', // Updated to match settings screen text color
     marginBottom: 24,
   },
   formContainer: {

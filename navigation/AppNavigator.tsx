@@ -13,7 +13,7 @@ import MoodNavigator from './mood/MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
-import DashboardScreen from '../screens/Appointments/DashboardScreen';
+import DashboardScreen from '../screens/Appointments/patient/DashboardScreen';
 import JournalNavigator from './Journal';
 
 // New imports
@@ -109,7 +109,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={DashboardScreenT}
+        component={DashboardScreen}
         options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
