@@ -3,12 +3,15 @@ export const API_BASE_URL = __DEV__
   ? 'http://127.0.0.1:8000' 
   : 'https://api.mindcareai.com';
 
-export const WS_BASE_URL = API_BASE_URL.replace(
-  'http',
-  __DEV__ ? 'ws' : 'wss'
-);
+// Use this for WebSocket connections
+export const WS_BASE_URL = __DEV__ 
+  ? 'ws://127.0.0.1:8000' 
+  : 'wss://api.mindcareai.com';
 
-export const API_URL = 'http://localhost:8000/api/v1';
+// Use this for REST API calls
+export const API_URL = __DEV__ 
+  ? 'http://127.0.0.1:8000/api/v1' 
+  : 'https://api.mindcareai.com/api/v1';
 
 // App Configuration
 export const APP_CONFIG = {
