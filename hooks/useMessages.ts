@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { sendMessage as apiSendMessage, getMessages } from '../API/conversations';
+import websocketService from '../services/websocketService';
 import { useAuth } from '../contexts/AuthContext';
-import websocketService, { WebSocketMessage } from '../services/websocketService';
-import { getMessages, sendMessage as apiSendMessage, markMessageAsRead } from '../API/conversations';
 
 interface Message {
   id: string | number;
@@ -14,399 +14,191 @@ interface Message {
   is_bot?: boolean;
 }
 
-export const useMessages = (conversationId: string | number) => {
+interface UseMessagesReturn {
+  messages: Message[];
+  loading: boolean;
+  error: string | null;
+  isTyping: boolean;
+  sendMessage: (content: string) => Promise<void>;
+  sendTyping: (isTyping: boolean) => void;
+  retryMessage: (messageId: string | number) => Promise<void>;
+  isConnected: boolean;
+  retryConnection: () => Promise<void>;
+}
+
+export const useMessages = (conversationId: string | number): UseMessagesReturn => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const { user } = useAuth();
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
-  const connectionAttemptRef = useRef<boolean>(false);
+  const wsMessageHandler = useRef<(() => void) | null>(null);
+  const wsConnectionHandler = useRef<(() => void) | null>(null);
 
-  // Connect to WebSocket when conversation changes
+  // Load initial messages
   useEffect(() => {
-    if (conversationId) {
-      connectionAttemptRef.current = true;
-      connectToConversation();
-    }
-
-    return () => {
-      if (connectionAttemptRef.current) {
-        console.log(`[useMessages] 🧹 Cleaning up connection state for conversation: ${conversationId}`);
-        // We don't disconnect - we're keeping connection alive
-        connectionAttemptRef.current = false;
+    const loadMessages = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log(`[useMessages] Loading messages for conversation: ${conversationId}`);
+        
+        const response = await getMessages(conversationId);
+        const messageList = response.results || [];
+        
+        console.log(`[useMessages] Loaded ${messageList.length} messages`);
+        setMessages(messageList);
+      } catch (err) {
+        console.error('[useMessages] Error loading messages:', err);
+        setError('Failed to load messages');
+      } finally {
+        setLoading(false);
       }
     };
+
+    loadMessages();
   }, [conversationId]);
 
-  // Set up WebSocket message listeners
+  // Setup WebSocket connection and message handlers
   useEffect(() => {
-    const unsubscribeMessage = websocketService.onMessage(handleWebSocketMessage);
-    const unsubscribeConnection = websocketService.onConnectionChange(handleConnectionChange);
-    
-    return () => {
-      unsubscribeMessage();
-      unsubscribeConnection();
-    };
-  }, []);
+    console.log(`[useMessages] Setting up WebSocket for conversation: ${conversationId}`);
 
-  const handleConnectionChange = useCallback((connected: boolean) => {
-    console.log(`[useMessages] 🔗 Connection status changed: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
-    setIsConnected(connected);
-  }, []);
+    // Message handler
+    const handleMessage = (data: any) => {
+      console.log(`[useMessages] Received WebSocket message:`, data);
 
-  const connectToConversation = async () => {
-    console.group(`[useMessages] 🔗 Connecting to conversation: ${conversationId}`);
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // First check if we're already connected to this conversation
-      const currentConvoId = websocketService.getCurrentConversationId();
-      const isAlreadyConnected = websocketService.isConnected() && 
-                               currentConvoId === conversationId.toString();
-                               
-      if (isAlreadyConnected) {
-        console.log(`[useMessages] ✓ Already connected to conversation ${conversationId}`);
-        setIsConnected(true);
-      } else {
-        // Load existing messages first
-        console.log(`[useMessages] 📋 Loading existing messages...`);
-        const messagesData = await getMessages(conversationId);
-        if (messagesData?.results) {
-          console.log(`[useMessages] ✅ Loaded ${messagesData.results.length} existing messages`);
-          setMessages(messagesData.results);
-        }
-        
-        console.log(`[useMessages] 🌐 Connecting to WebSocket...`);
-        
-        try {
-          // Add a connection timeout
-          const connectionPromise = websocketService.connect(conversationId.toString());
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Connection timeout')), 15000)
-          );
-          
-          await Promise.race([connectionPromise, timeoutPromise]);
-          
-          console.log(`[useMessages] ✅ WebSocket connected successfully`);
-          
-          // Verify connection status with a slight delay to ensure state is updated
-          setTimeout(() => {
-            const isConnected = websocketService.isConnected();
-            const currentConvId = websocketService.getCurrentConversationId();
-            console.log(`[useMessages] 🔍 Post-connection verification: Connected=${isConnected}, ConvId=${currentConvId}`);
-            
-            if (isConnected && currentConvId === conversationId.toString()) {
-              setIsConnected(true);
-              console.log(`[useMessages] ✅ WebSocket connection verified and ready`);
-            } else {
-              console.warn(`[useMessages] ⚠️ WebSocket connection verification failed`);
-              setIsConnected(false);
+      if (data.type === 'message' && data.event === 'new_message' && data.message) {
+        const newMessage: Message = {
+          id: data.message.id,
+          content: data.message.content,
+          sender_id: data.message.sender_id,
+          sender_name: data.message.sender_name,
+          timestamp: data.message.timestamp,
+          message_type: data.message.message_type || 'text',
+          status: 'sent',
+          is_bot: data.message.is_bot || false,
+        };
+
+        console.log(`[useMessages] Adding new message to state:`, newMessage);
+
+        // Only add if it's for the current conversation and not a duplicate
+        if (data.message.conversation_id === conversationId.toString()) {
+          setMessages(prevMessages => {
+            // Check if message already exists
+            const exists = prevMessages.some(msg => msg.id === newMessage.id);
+            if (exists) {
+              console.log(`[useMessages] Message ${newMessage.id} already exists, skipping`);
+              return prevMessages;
             }
-          }, 1000);
-          
-        } catch (wsError) {
-          console.error(`[useMessages] ❌ WebSocket connection failed:`, wsError);
-          console.log(`[useMessages] 📋 Will use REST API for messaging`);
-          setIsConnected(false);
+
+            console.log(`[useMessages] Adding message ${newMessage.id} to conversation ${conversationId}`);
+            return [...prevMessages, newMessage];
+          });
+        }
+      } else if (data.type === 'typing') {
+        // Handle typing indicators from other users
+        if (data.user_id !== user?.id?.toString()) {
+          setIsTyping(data.is_typing || false);
+          console.log(`[useMessages] Typing indicator: ${data.is_typing ? 'started' : 'stopped'} by ${data.username}`);
         }
       }
-      
-      // Log final connection status
-      const finalStats = websocketService.getConnectionStats();
-      console.log(`[useMessages] 📊 Final connection stats:`, finalStats);
-      
-    } catch (err) {
-      console.error('[useMessages] ❌ Error in connectToConversation:', err);
-      setError('Failed to load messages');
-      setIsConnected(false);
-    } finally {
-      setLoading(false);
-      console.groupEnd();
-    }
-  };
-
-  // Retry connection function
-  const retryConnection = useCallback(async () => {
-    console.log(`[useMessages] 🔄 Retrying WebSocket connection for conversation: ${conversationId}`);
-    
-    // Disconnect first to clean up
-    websocketService.disconnect();
-    
-    // Wait a bit before reconnecting
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Attempt to reconnect
-    try {
-      await websocketService.connect(conversationId.toString());
-      setIsConnected(true);
-      console.log(`[useMessages] ✅ WebSocket reconnection successful`);
-    } catch (error) {
-      console.error(`[useMessages] ❌ WebSocket reconnection failed:`, error);
-      setIsConnected(false);
-    }
-  }, [conversationId]);
-
-  const handleWebSocketMessage = useCallback((wsMessage: WebSocketMessage) => {
-    console.group(`[useMessages] 📨 WebSocket message received`);
-    console.log('Message type:', wsMessage.type);
-    console.log('Message data:', wsMessage);
-
-    switch (wsMessage.type) {
-      case 'message':
-        if (wsMessage.event === 'new_message' && wsMessage.message) {
-          console.log(`[useMessages] 💬 Processing new message from WebSocket`);
-          handleNewMessage(wsMessage.message);
-        }
-        break;
-        
-      case 'typing':
-        console.log(`[useMessages] ⌨️ Processing typing indicator`);
-        handleTypingIndicator(wsMessage);
-        break;
-        
-      case 'read':
-        if (wsMessage.message_id) {
-          console.log(`[useMessages] 👁️ Processing read receipt for message: ${wsMessage.message_id}`);
-          handleReadReceipt(wsMessage.message_id, wsMessage.user_id || '');
-        }
-        break;
-        
-      case 'reaction':
-        if (wsMessage.message_id && wsMessage.reaction) {
-          console.log(`[useMessages] 👍 Processing reaction: ${wsMessage.reaction} for message: ${wsMessage.message_id}`);
-          handleReaction(wsMessage.message_id, wsMessage.reaction, wsMessage.action || 'add', wsMessage.user_id || '');
-        }
-        break;
-        
-      case 'presence':
-        console.log(`[useMessages] 👤 Processing presence update`);
-        handlePresence(wsMessage);
-        break;
-        
-      default:
-        console.warn(`[useMessages] ❓ Unknown WebSocket message type: ${wsMessage.type}`);
-    }
-    
-    console.groupEnd();
-  }, []);
-
-  const handleNewMessage = useCallback((messageData: any) => {
-    console.log(`[useMessages] 📥 Adding new message from WebSocket to UI`);
-    console.log('Message data:', messageData);
-    console.log('Current user ID:', user?.id, 'type:', typeof user?.id);
-    console.log('Message sender ID:', messageData.sender_id, 'type:', typeof messageData.sender_id);
-    
-    const newMessage: Message = {
-      id: messageData.id,
-      content: messageData.content,
-      sender_id: messageData.sender_id,
-      sender_name: messageData.sender_name,
-      timestamp: messageData.timestamp,
-      message_type: messageData.message_type || 'text',
-      status: 'sent',
-      is_bot: messageData.is_bot || false
     };
 
-    console.log(`[useMessages] 🔍 Message comparison:`, {
-      messageId: newMessage.id,
-      messageSenderId: newMessage.sender_id,
-      currentUserId: user?.id,
-      isOwnMessage: newMessage.sender_id?.toString() === user?.id?.toString(),
-      isBot: newMessage.is_bot
-    });
+    // Connection status handler
+    const handleConnectionChange = (connected: boolean) => {
+      console.log(`[useMessages] Connection status changed: ${connected}`);
+      setIsConnected(connected);
+    };
 
-    setMessages(prevMessages => {
-      // Check if message already exists (avoid duplicates)
-      const exists = prevMessages.some(msg => msg.id === newMessage.id);
-      if (exists) {
-        console.log(`[useMessages] 🔄 Updating existing message: ${newMessage.id}`);
-        return prevMessages.map(msg => 
-          msg.id === newMessage.id ? newMessage : msg
-        );
+    // Subscribe to WebSocket events
+    wsMessageHandler.current = websocketService.onMessage(handleMessage);
+    wsConnectionHandler.current = websocketService.onConnectionChange(handleConnectionChange);
+
+    // Initial connection status
+    setIsConnected(websocketService.isConnected());
+
+    // Cleanup on unmount
+    return () => {
+      console.log(`[useMessages] Cleaning up WebSocket handlers for conversation: ${conversationId}`);
+      if (wsMessageHandler.current) {
+        wsMessageHandler.current();
+        wsMessageHandler.current = null;
       }
-      console.log(`[useMessages] ➕ Adding new message to list: ${newMessage.id}`);
-      return [...prevMessages, newMessage];
-    });
-
-    // Mark as read if not from current user
-    if (messageData.sender_id?.toString() !== user?.id?.toString()) {
-      console.log(`[useMessages] 👁️ Marking message as read (not from current user)`);
-      markMessageAsRead(messageData.id);
-    }
-  }, [user?.id]);
-
-  const handleTypingIndicator = useCallback((wsMessage: WebSocketMessage) => {
-    if (wsMessage.user_id !== user?.id?.toString()) {
-      setIsTyping(wsMessage.is_typing || false);
-      
-      // Clear typing indicator after a delay
-      if (wsMessage.is_typing) {
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
-        }
-        typingTimeoutRef.current = setTimeout(() => {
-          setIsTyping(false);
-        }, 3000);
+      if (wsConnectionHandler.current) {
+        wsConnectionHandler.current();
+        wsConnectionHandler.current = null;
       }
-    }
-  }, [user?.id]);
+    };
+  }, [conversationId, user?.id]);
 
-  const handleReadReceipt = useCallback((messageId: string, userId: string) => {
-    setMessages(prevMessages => 
-      prevMessages.map(msg => 
-        msg.id.toString() === messageId && msg.sender_id === user?.id?.toString()
-          ? { ...msg, status: 'read' }
-          : msg
-      )
-    );
-  }, [user?.id]);
-
-  const handleReaction = useCallback((messageId: string, reaction: string, action: string, userId: string) => {
-    // Handle reactions if your message model supports them
-    console.log('Reaction received:', { messageId, reaction, action, userId });
-  }, []);
-
-  const handlePresence = useCallback((wsMessage: WebSocketMessage) => {
-    if (wsMessage.event === 'online' && wsMessage.user_id) {
-      setOnlineUsers(prev => [...prev.filter(id => id !== wsMessage.user_id), wsMessage.user_id!]);
-    } else if (wsMessage.event === 'offline' && wsMessage.user_id) {
-      setOnlineUsers(prev => prev.filter(id => id !== wsMessage.user_id));
-    }
-  }, []);
-
-  const sendMessage = useCallback(async (content: string, attachments: any[] = []) => {
+  // Send message function
+  const sendMessage = useCallback(async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
-    const messageId = `temp-${Date.now()}`;
-    console.group(`[useMessages] 📤 Sending message: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`);
+    console.log(`[useMessages] Sending message: "${content}"`);
+
+    // Create temporary message for immediate UI feedback
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      content,
+      sender_id: user?.id || '',
+      sender_name: user?.username || 'You',
+      timestamp: new Date().toISOString(),
+      message_type: 'text',
+      status: 'sending',
+    };
+
+    // Add temp message to UI
+    setMessages(prev => [...prev, tempMessage]);
 
     try {
-      // Add optimistic message to UI
-      const optimisticMessage: Message = {
-        id: messageId,
-        content,
-        sender_id: user?.id || '',
-        sender_name: user?.username || 'You',
-        timestamp: new Date().toISOString(),
-        message_type: 'text',
-        status: 'sending'
-      };
+      // Send via API (which will use WebSocket if available)
+      const response = await apiSendMessage(conversationId, content);
+      console.log(`[useMessages] Message sent successfully:`, response);
 
-      setMessages(prev => [...prev, optimisticMessage]);
-      console.log(`[useMessages] ✅ Optimistic message added to UI with ID: ${messageId}`);
-
-      // Always try WebSocket first, if not connected, try to connect
-      let isWebSocketConnected = websocketService.isConnected();
-      let currentConversationId = websocketService.getCurrentConversationId();
-      let isCorrectConversation = currentConversationId === conversationId.toString();
-
-      // If not connected or wrong conversation, try to connect
-      if (!isWebSocketConnected || !isCorrectConversation) {
-        console.log(`[useMessages] 🔄 WS not ready, attempting connect before sending`);
-        try {
-          await websocketService.connect(conversationId.toString());
-          console.log(`[useMessages] ✅ WS connection established`);
-          isWebSocketConnected = true;
-          isCorrectConversation = true;
-        } catch (error) {
-          console.log(`[useMessages] ❌ WS connection failed:`, error);
-        }
-      }
-
-      console.log(`[useMessages] 🔍 WebSocket Status Check:`);
-      console.log(`  • Connected: ${isWebSocketConnected}`);
-      console.log(`  • Current conversation: ${currentConversationId}`);
-      console.log(`  • Target conversation: ${conversationId}`);
-      console.log(`  • Conversation match: ${isCorrectConversation}`);
-
-      // Send via WebSocket if connected, otherwise use REST API
-      if (isWebSocketConnected && isCorrectConversation) {
-        console.log(`[useMessages] 🌐 Sending via WebSocket...`);
-        
-        try {
-          websocketService.sendMessage({
-            content,
-            message_type: 'text',
-            metadata: { timestamp: new Date().toISOString() }
-          });
-          
-          console.log(`[useMessages] ✅ Message sent via WebSocket successfully`);
-          console.log(`[useMessages] ⏳ Waiting for WebSocket confirmation...`);
-          
-          // Update status to indicate it was sent via WebSocket
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === messageId 
-                ? { ...msg, status: 'sent' }
-                : msg
-            )
-          );
-          
-        } catch (wsError) {
-          console.error(`[useMessages] ❌ WebSocket send failed:`, wsError);
-          console.log(`[useMessages] 🔄 Falling back to REST API...`);
-          throw wsError; // This will trigger the REST API fallback
-        }
-        
-      } else {
-        console.log(`[useMessages] 🌐 Sending via REST API...`);
-        console.log(`[useMessages] 📍 Reason: ${!isWebSocketConnected ? 'WebSocket not connected' : 'Wrong conversation'}`);
-        
-        // If WebSocket is not connected, try to reconnect in the background
-        if (!isWebSocketConnected) {
-          console.log(`[useMessages] 🔄 Attempting background WebSocket reconnection...`);
-          retryConnection().catch(err => 
-            console.warn(`[useMessages] ⚠️ Background reconnection failed:`, err)
-          );
-        }
-        
-        const response = await apiSendMessage(conversationId, content, false, attachments);
-        
-        console.log(`[useMessages] ✅ Message sent via REST API successfully`);
-        console.log(`[useMessages] 📨 API Response:`, response);
-        
-        // Update the optimistic message with the real response
-        setMessages(prev => 
-          prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, id: (response as any).id, status: 'sent' }
-              : msg
-          )
-        );
-      }
-
-    } catch (error) {
-      console.error('[useMessages] ❌ Error sending message:', error);
-      
-      // Mark message as failed
+      // Update temp message status
       setMessages(prev => 
         prev.map(msg => 
-          msg.id === messageId 
+          msg.id === tempMessage.id 
+            ? { ...msg, id: response.id || msg.id, status: 'sent' }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error(`[useMessages] Failed to send message:`, error);
+      
+      // Update temp message status to failed
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === tempMessage.id 
             ? { ...msg, status: 'failed' }
             : msg
         )
       );
-    } finally {
-      console.groupEnd();
+      
+      throw error;
     }
-  }, [conversationId, user, retryConnection]);
+  }, [conversationId, user]);
 
-  const sendTyping = useCallback((isTyping: boolean) => {
-    if (websocketService.isConnected()) {
-      websocketService.sendTyping(isTyping);
+  // Send typing indicator
+  const sendTyping = useCallback((typing: boolean) => {
+    console.log(`[useMessages] Sending typing indicator: ${typing}`);
+    try {
+      websocketService.sendTyping(typing);
+    } catch (error) {
+      console.error('[useMessages] Failed to send typing indicator:', error);
     }
   }, []);
 
-  const retryMessage = useCallback(async (messageId: string | number) => {
+  // Retry failed message
+  const retryMessage = useCallback(async (messageId: string | number): Promise<void> => {
+    console.log(`[useMessages] Retrying message: ${messageId}`);
+    
     const message = messages.find(m => m.id === messageId);
     if (!message) return;
 
-    // Update status to sending
+    // Update message status to sending
     setMessages(prev => 
       prev.map(msg => 
         msg.id === messageId ? { ...msg, status: 'sending' } : msg
@@ -416,28 +208,39 @@ export const useMessages = (conversationId: string | number) => {
     try {
       await sendMessage(message.content);
       
-      // Remove the failed message since a new one will be added
+      // Remove the failed message since sendMessage will add a new one
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
     } catch (error) {
-      // Mark as failed again
+      // Revert to failed status
       setMessages(prev => 
         prev.map(msg => 
           msg.id === messageId ? { ...msg, status: 'failed' } : msg
         )
       );
+      throw error;
     }
   }, [messages, sendMessage]);
+
+  // Retry WebSocket connection
+  const retryConnection = useCallback(async (): Promise<void> => {
+    console.log(`[useMessages] Retrying WebSocket connection for conversation: ${conversationId}`);
+    try {
+      await websocketService.connect(conversationId.toString());
+    } catch (error) {
+      console.error('[useMessages] Failed to retry connection:', error);
+      throw error;
+    }
+  }, [conversationId]);
 
   return {
     messages,
     loading,
     error,
     isTyping,
-    onlineUsers,
     sendMessage,
     sendTyping,
     retryMessage,
     isConnected,
-    retryConnection
+    retryConnection,
   };
 };

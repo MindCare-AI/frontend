@@ -4,6 +4,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -22,66 +23,85 @@ const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   placeholder = "Type a message...",
 }) => {
+  const canSend = value.trim().length > 0 && !disabled;
+
   return (
     <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor="#999999"
-          multiline
-          maxLength={1000}
-          editable={!disabled}
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#999999"
+        multiline
+        textAlignVertical="top"
+        editable={!disabled}
+      />
+      
+      <TouchableOpacity
+        style={[
+          styles.sendButton,
+          canSend ? styles.sendButtonActive : styles.sendButtonDisabled
+        ]}
+        onPress={onSend}
+        disabled={!canSend}
+      >
+        <Ionicons 
+          name="send" 
+          size={20} 
+          color={canSend ? "#FFFFFF" : "#CCCCCC"} 
         />
-        
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            { opacity: value.trim().length > 0 && !disabled ? 1 : 0.5 }
-          ]}
-          onPress={onSend}
-          disabled={!value.trim() || disabled}
-        >
-          <Ionicons name="send" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E7',
-  },
-  inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 44,
-  },
-  textInput: {
-    flex: 1,
+    paddingVertical: 10,
+    marginRight: 12,
     fontSize: 16,
-    color: '#000000',
     maxHeight: 100,
-    marginRight: 8,
+    minHeight: 40,
+    backgroundColor: '#F8F8F8',
   },
   sendButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 18,
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  sendButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#E5E5E5',
   },
 });
 

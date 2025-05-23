@@ -44,7 +44,7 @@ const MessagesList: React.FC<MessagesListProps> = ({
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messages.length]);
+  }, [messages]); // scroll on any change, not just length
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const previousMessage = index > 0 ? messages[index - 1] : null;
@@ -110,7 +110,7 @@ const MessagesList: React.FC<MessagesListProps> = ({
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={(item) => `message-${item.id}-${item.timestamp}`}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderMessage}
         contentContainerStyle={[
           styles.messagesContainer,

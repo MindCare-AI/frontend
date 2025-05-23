@@ -52,6 +52,12 @@ class WebSocketService {
       return Promise.resolve();
     }
 
+    // If connecting to a different conversation, disconnect first
+    if (this.ws && this.conversationId && this.conversationId !== conversationId) {
+      console.log('[WebSocket] 🔄 Switching conversations, disconnecting first');
+      this.disconnect(true);
+    }
+
     this.isConnecting = true;
     this.conversationId = conversationId;
     this.connectionStartTime = Date.now();
