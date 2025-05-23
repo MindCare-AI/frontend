@@ -67,15 +67,35 @@ export const getConversationById = async (conversationId: ConversationId) => {
 // Get messages for a conversation
 export const getMessages = async (conversationId: ConversationId) => {
   try {
-    const conversation = await getConversationById(conversationId);
+    const config = await getAuthHeaders();
     
-    // If the conversation has messages, return them
-    if ('messages' in conversation && Array.isArray(conversation.messages)) {
-      return { results: conversation.messages };
+    // Try to get messages from the conversation endpoint first
+    try {
+      // For one-to-one conversations
+      const response = await axios.get(`${API_URL}/messaging/one_to_one/${conversationId}/messages/`, config);
+      return { 
+        results: Array.isArray(response.data) ? response.data : (response.data.results || [])
+      };
+    } catch (error) {
+      // If it fails, try as a group conversation
+      try {
+        const groupResponse = await axios.get(`${API_URL}/messaging/groups/${conversationId}/messages/`, config);
+        return { 
+          results: Array.isArray(groupResponse.data) ? groupResponse.data : (groupResponse.data.results || [])
+        };
+      } catch (groupError) {
+        // Fallback: try to get conversation details and extract messages
+        const conversation = await getConversationById(conversationId);
+        
+        // If the conversation has messages, return them
+        if ('messages' in conversation && Array.isArray(conversation.messages)) {
+          return { results: conversation.messages };
+        }
+        
+        // If no messages are found, return an empty array
+        return { results: [] };
+      }
     }
-    
-    // If no messages are found, return an empty array
-    return { results: [] };
   } catch (error) {
     console.error('Error fetching messages:', error);
     throw error;

@@ -32,8 +32,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRetry,
   showSenderName = false,
 }) => {
+  // Ensure proper comparison of sender_id with currentUserId
   const isOwnMessage = message.sender_id?.toString() === currentUserId?.toString();
   const isBot = message.is_bot || false;
+
+  console.log(`[MessageBubble] Rendering message ${message.id}:`, {
+    senderId: message.sender_id,
+    currentUserId,
+    isOwnMessage,
+    senderIdType: typeof message.sender_id,
+    currentUserIdType: typeof currentUserId,
+    content: message.content.substring(0, 30)
+  });
 
   const getStatusIcon = () => {
     switch (message.status) {
@@ -79,7 +89,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </Text>
         
         <View style={styles.messageFooter}>
-          <Text style={styles.timestamp}>
+          <Text style={[
+            styles.timestamp,
+            isOwnMessage ? styles.ownTimestamp : styles.otherTimestamp
+          ]}>
             {formatTime(message.timestamp)}
           </Text>
           
@@ -168,8 +181,13 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 11,
-    color: '#999999',
     marginRight: 4,
+  },
+  ownTimestamp: {
+    color: 'rgba(255, 255, 255, 0.7)', // Light color for own messages
+  },
+  otherTimestamp: {
+    color: '#999999', // Darker color for other messages
   },
   statusContainer: {
     marginLeft: 4,

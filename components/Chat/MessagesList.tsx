@@ -57,7 +57,8 @@ const MessagesList: React.FC<MessagesListProps> = ({
       senderId: item.sender_id,
       currentUserId,
       isOwnMessage: item.sender_id?.toString() === currentUserId?.toString(),
-      showSenderName
+      showSenderName,
+      messageContent: item.content.substring(0, 50)
     });
 
     return (

@@ -47,8 +47,24 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         const response = await getMessages(conversationId);
         const messageList = response.results || [];
         
-        console.log(`[useMessages] Loaded ${messageList.length} messages`);
-        setMessages(messageList);
+        // Ensure messages are in ascending order by timestamp and have proper sender_id mapping
+        const sortedMessages = messageList
+          .map((msg: any) => ({
+            id: msg.id,
+            content: msg.content,
+            sender_id: msg.sender_id || msg.sender || (msg.sender_detail ? msg.sender_detail.id : null),
+            sender_name: msg.sender_name || (msg.sender_detail ? msg.sender_detail.username : 'Unknown'),
+            timestamp: msg.timestamp,
+            message_type: msg.message_type || 'text',
+            status: 'sent' as const,
+            is_bot: msg.is_bot || false,
+          }))
+          .sort((a: { timestamp: string | number | Date; }, b: { timestamp: string | number | Date; }) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        
+        console.log(`[useMessages] Loaded ${sortedMessages.length} messages`);
+        console.log(`[useMessages] First message sender_id:`, sortedMessages[0]?.sender_id);
+        console.log(`[useMessages] Current user ID:`, user?.id);
+        setMessages(sortedMessages);
       } catch (err) {
         console.error('[useMessages] Error loading messages:', err);
         setError('Failed to load messages');
@@ -58,7 +74,7 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
     };
 
     loadMessages();
-  }, [conversationId]);
+  }, [conversationId, user?.id]);
 
   // Setup WebSocket connection and message handlers
   useEffect(() => {
@@ -72,8 +88,8 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         const newMessage: Message = {
           id: data.message.id,
           content: data.message.content,
-          sender_id: data.message.sender_id,
-          sender_name: data.message.sender_name,
+          sender_id: data.message.sender_id || data.message.sender,
+          sender_name: data.message.sender_name || data.message.sender_username || 'Unknown',
           timestamp: data.message.timestamp,
           message_type: data.message.message_type || 'text',
           status: 'sent',
@@ -81,6 +97,7 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         };
 
         console.log(`[useMessages] Adding new message to state:`, newMessage);
+        console.log(`[useMessages] New message sender_id:`, newMessage.sender_id);
 
         // Only add if it's for the current conversation and not a duplicate
         if (data.message.conversation_id === conversationId.toString()) {
@@ -93,6 +110,7 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
             }
 
             console.log(`[useMessages] Adding message ${newMessage.id} to conversation ${conversationId}`);
+            // Add to the end to maintain chronological order
             return [...prevMessages, newMessage];
           });
         }
@@ -149,7 +167,7 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
       status: 'sending',
     };
 
-    // Add temp message to UI
+    // Add temp message to UI (at the end to maintain chronological order)
     setMessages(prev => [...prev, tempMessage]);
 
     try {
