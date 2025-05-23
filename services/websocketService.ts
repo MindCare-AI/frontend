@@ -2,7 +2,7 @@ import { WS_BASE_URL } from '../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface WebSocketMessage {
-  type: 'message' | 'typing' | 'read' | 'reaction' | 'presence';
+  type: 'message' | 'typing' | 'read' | 'reaction' | 'presence' | 'heartbeat';
   event?: string;
   message?: any;
   user_id?: string;
@@ -35,6 +35,11 @@ class WebSocketService {
   private lastPingTime: number = 0;
   private messagesSentCount = 0;
   private messagesReceivedCount = 0;
+  private lastHeartbeat: number = 0;
+  private heartbeatInterval: number = 30000; // 30 seconds, matching backend
+  private heartbeatCheckTimer: NodeJS.Timeout | null = null;
+  private missedHeartbeats: number = 0;
+  private readonly MAX_MISSED_HEARTBEATS = 3;
 
   // Connect to WebSocket for a specific conversation
   async connect(conversationId: string): Promise<void> {
@@ -86,34 +91,11 @@ class WebSocketService {
           
           // Log connection details
           this.logConnectionStatus();
+          this.startHeartbeatMonitoring();
           resolve();
         };
 
-        this.ws!.onmessage = (event) => {
-          try {
-            this.messagesReceivedCount++;
-            const data: WebSocketMessage = JSON.parse(event.data);
-            
-            console.log(`[WebSocket] 📨 Message received (#${this.messagesReceivedCount}):`, data);
-            console.log(`[WebSocket] 📊 Message type: ${data.type}, Event: ${data.event || 'N/A'}`);
-            
-            // Log specific message content based on type
-            if (data.type === 'message' && data.message) {
-              console.log(`[WebSocket] 💬 New message from ${data.message.sender_name}: "${data.message.content?.substring(0, 50)}${data.message.content?.length > 50 ? '...' : ''}"`);
-            } else if (data.type === 'typing') {
-              console.log(`[WebSocket] ⌨️ Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
-            } else if (data.type === 'read') {
-              console.log(`[WebSocket] 👁️ Read receipt from ${data.username} for message ${data.message_id}`);
-            } else if (data.type === 'presence') {
-              console.log(`[WebSocket] 👤 Presence update: ${data.username} is ${data.event}`);
-            }
-            
-            this.notifyMessageCallbacks(data);
-          } catch (error) {
-            console.error('[WebSocket] ❌ Error parsing message:', error);
-            console.error('[WebSocket] 📄 Raw message data:', event.data);
-          }
-        };
+        this.ws!.onmessage = this.handleMessageEvent;
 
         this.ws!.onclose = (event) => {
           console.log(`[WebSocket] 🔌 Connection closed - Code: ${event.code}, Reason: "${event.reason}"`);
@@ -122,6 +104,7 @@ class WebSocketService {
           
           this.isConnecting = false;
           this.notifyConnectionCallbacks(false);
+          this.stopHeartbeatMonitoring();
           
           // Log close reasons
           if (event.code === 1000) {
@@ -317,6 +300,73 @@ class WebSocketService {
     }
   }
 
+  // Heartbeat monitoring methods
+  private startHeartbeatMonitoring(): void {
+    this.lastHeartbeat = Date.now();
+    this.missedHeartbeats = 0;
+
+    // Clear any existing heartbeat check timer
+    if (this.heartbeatCheckTimer) {
+      clearInterval(this.heartbeatCheckTimer);
+    }
+
+    // Start monitoring heartbeats
+    this.heartbeatCheckTimer = setInterval(() => {
+      const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeat;
+      
+      if (timeSinceLastHeartbeat > this.heartbeatInterval) {
+        this.missedHeartbeats++;
+        console.log(`[WebSocket] ❤️ Missed heartbeat #${this.missedHeartbeats}`);
+        
+        if (this.missedHeartbeats >= this.MAX_MISSED_HEARTBEATS) {
+          console.log('[WebSocket] 💔 Connection considered stale, initiating reconnection');
+          this.handleStaleConnection();
+        }
+      }
+    }, this.heartbeatInterval);
+  }
+
+  private handleStaleConnection(): void {
+    this.disconnect(true); // Force disconnect
+    
+    // Attempt to reconnect if we have a conversation ID
+    if (this.conversationId) {
+      console.log('[WebSocket] 🔄 Attempting to reconnect due to stale connection');
+      this.connect(this.conversationId);
+    }
+  }
+
+  private stopHeartbeatMonitoring(): void {
+    if (this.heartbeatCheckTimer) {
+      clearInterval(this.heartbeatCheckTimer);
+      this.heartbeatCheckTimer = null;
+    }
+  }
+
+  private handleHeartbeat(): void {
+    this.lastHeartbeat = Date.now();
+    this.missedHeartbeats = 0;
+    console.log('[WebSocket] ❤️ Heartbeat received');
+  }
+
+  // Add this method to handle heartbeat messages
+  private handleHeartbeatMessage(): void {
+    this.lastHeartbeat = Date.now();
+    this.missedHeartbeats = 0;
+    
+    // Send a pong response back to the server
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const pongMessage = {
+        type: 'heartbeat',
+        event: 'pong',
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('[WebSocket] ❤️ Sending heartbeat response');
+      this.ws.send(JSON.stringify(pongMessage));
+    }
+  }
+
   // Private methods
   private notifyMessageCallbacks(message: WebSocketMessage): void {
     console.log(`[WebSocket] 📢 Notifying ${this.messageCallbacks.length} message callback(s)`);
@@ -386,6 +436,51 @@ class WebSocketService {
       }
     };
   }
+
+  private handleMessageEvent = (event: MessageEvent) => {
+    try {
+      this.messagesReceivedCount++;
+      const data: WebSocketMessage = JSON.parse(event.data);
+      
+      console.log(`[WebSocket] 📨 Message received (#${this.messagesReceivedCount}):`, data);
+      console.log(`[WebSocket] 📊 Message type: ${data.type}, Event: ${data.event || 'N/A'}`);
+      
+      // Handle heartbeat messages first
+      if (data.type === 'heartbeat') {
+        console.log(`[WebSocket] ❤️ Heartbeat received`);
+        this.lastHeartbeat = Date.now();
+        this.missedHeartbeats = 0;
+        
+        // Send heartbeat response
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          const pongMessage = {
+            type: 'heartbeat',
+            event: 'pong',
+            timestamp: new Date().toISOString()
+          };
+          console.log('[WebSocket] ❤️ Sending heartbeat response');
+          this.ws.send(JSON.stringify(pongMessage));
+        }
+        return; // Don't propagate heartbeat messages to callbacks
+      }
+      
+      // Handle other message types
+      if (data.type === 'message' && data.message) {
+        console.log(`[WebSocket] 💬 New message from ${data.message.sender_name}: "${data.message.content?.substring(0, 50)}${data.message.content?.length > 50 ? '...' : ''}"`);
+      } else if (data.type === 'typing') {
+        console.log(`[WebSocket] ⌨️ Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
+      } else if (data.type === 'read') {
+        console.log(`[WebSocket] 👁️ Read receipt from ${data.username} for message ${data.message_id}`);
+      } else if (data.type === 'presence') {
+        console.log(`[WebSocket] 👤 Presence update: ${data.username} is ${data.event}`);
+      }
+      
+      this.notifyMessageCallbacks(data);
+    } catch (error) {
+      console.error('[WebSocket] ❌ Error parsing message:', error);
+      console.error('[WebSocket] 📄 Raw message data:', event.data);
+    }
+  };
 }
 
 // Export singleton instance
