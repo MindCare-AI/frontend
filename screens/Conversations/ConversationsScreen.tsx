@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   Animated,
   Text,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
@@ -20,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useConversations } from '../../hooks/useConversations';
 import { useAuth } from '../../contexts/AuthContext';
 import { createShadow } from '../../styles/global';
+import { getAllUsers, createConversation, createGroupConversation } from '../../API/conversations';
 
 // Import the Conversation type from types/navigation
 import { Conversation } from '../../types/navigation';
@@ -49,6 +51,8 @@ import ConversationItem from '../../components/Conversations/ConversationItem';
 import ConversationHeader from '../../components/Conversations/ConversationHeader';
 import EmptyConversationsList from '../../components/Conversations/EmptyConversationsList';
 import FloatingButton from '../../components/Conversations/FloatingButton';
+import ConversationTypeModal from '../../components/Chat/ConversationTypeModal';
+import UserSelectionModal from '../../components/Chat/UserSelectionModal';
 
 interface RootStackParamList {
   Splash: undefined;
@@ -117,6 +121,25 @@ const AnimatedConversationItem = ({
   );
 };
 
+// Add this interface with other type definitions
+interface User {
+  id: string | number;
+  username: string;
+  email?: string;
+  full_name?: string;
+  user_type?: 'patient' | 'therapist';
+}
+
+// Add this interface near the top with other type definitions
+interface ConversationCreateResponse {
+  id: string | number;
+  name?: string;
+  is_group: boolean;
+  participants: Participant[];
+  created_at: string;
+  other_user_name?: string;
+}
+
 const ConversationsScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { user } = useAuth();
@@ -134,6 +157,12 @@ const ConversationsScreen = () => {
     error,
     refreshConversations
   } = useConversations();
+
+  // Modal states
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedConversationType, setSelectedConversationType] = useState<'group' | 'direct'>('direct');
+  const [creating, setCreating] = useState(false);
 
   // Apply entrance animation when conversations load
   useEffect(() => {
@@ -217,9 +246,102 @@ const ConversationsScreen = () => {
   };
 
   const handleNewConversation = () => {
-    navigation.navigate('NewConversation');
+    setShowTypeModal(true);
   };
   
+  const handleSelectConversationType = (type: 'group' | 'direct') => {
+    setSelectedConversationType(type);
+    setShowUserModal(true);
+  };
+
+  const handleCreateConversation = async (
+    selectedUsers: User[],
+    groupName?: string,
+    groupDescription?: string
+  ) => {
+    if (!user) return;
+
+    setCreating(true);
+    try {
+      let newConversation: ConversationCreateResponse;
+
+      if (selectedConversationType === 'direct') {
+        // Create one-to-one conversation
+        const participant = selectedUsers[0];
+        newConversation = await createConversation(participant.id);
+        
+        console.log('[ConversationsScreen] ✅ Direct conversation created:', newConversation);
+        
+        // Close modals first
+        setShowUserModal(false);
+        setShowTypeModal(false);
+        
+        Alert.alert(
+          'Success',
+          `Direct conversation with ${participant.username} created successfully!`,
+          [
+            {
+              text: 'Open Chat',
+              onPress: () => {
+                navigation.navigate('ChatScreen', {
+                  conversationId: newConversation.id,
+                  conversationTitle: participant.username,
+                  isGroup: false
+                });
+              }
+            },
+            { text: 'OK' }
+          ]
+        );
+      } else {
+        // Create group conversation
+        const participantIds = selectedUsers.map(u => u.id);
+        newConversation = await createGroupConversation(
+          groupName || '',
+          groupDescription || '',
+          participantIds
+        );
+        
+        console.log('[ConversationsScreen] ✅ Group conversation created:', newConversation);
+        
+        // Close modals first
+        setShowUserModal(false);
+        setShowTypeModal(false);
+        
+        Alert.alert(
+          'Success',
+          `Group "${groupName}" created successfully!`,
+          [
+            {
+              text: 'Open Chat',
+              onPress: () => {
+                navigation.navigate('ChatScreen', {
+                  conversationId: newConversation.id,
+                  conversationTitle: groupName || 'Group Chat',
+                  isGroup: true
+                });
+              }
+            },
+            { text: 'OK' }
+          ]
+        );
+      }
+
+      // Refresh conversations list after successful creation
+      console.log('[ConversationsScreen] 🔄 Refreshing conversations after creation...');
+      await refreshConversations();
+      
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+      Alert.alert(
+        'Error',
+        'Failed to create conversation. Please try again.'
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const getFilterButtonStyle = (mode: FilterMode) => {
     return [
       styles.filterButton,
@@ -350,6 +472,23 @@ const ConversationsScreen = () => {
           </Animated.View>
           
           <FloatingButton onPress={handleNewConversation} />
+          
+          {/* Conversation type selection modal */}
+          <ConversationTypeModal
+            visible={showTypeModal}
+            onClose={() => setShowTypeModal(false)}
+            onSelectType={handleSelectConversationType}
+          />
+
+          {/* User selection modal for creating conversations */}
+          <UserSelectionModal
+            visible={showUserModal}
+            onClose={() => setShowUserModal(false)}
+            conversationType={selectedConversationType}
+            onCreateConversation={handleCreateConversation}
+            currentUserId={user?.id || 0}
+            creating={creating}
+          />
         </LinearGradient>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -423,6 +562,89 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#666666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  conversationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  conversationAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E5E5E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  conversationAvatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  conversationInfo: {
+    flex: 1,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  unreadBadge: {
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  unreadText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '600',
   },
 });
