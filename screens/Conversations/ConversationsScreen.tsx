@@ -19,9 +19,33 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useConversations } from '../../hooks/useConversations';
 import { useAuth } from '../../contexts/AuthContext';
+import { createShadow } from '../../styles/global';
 
-// Import directly from ConversationItem to ensure type consistency
-import ConversationItem, { Conversation } from '../../components/Conversations/ConversationItem';
+// Import the Conversation type from types/navigation
+import { Conversation } from '../../types/navigation';
+
+// Define types not included in the navigation types
+interface Participant {
+  id: string | number;
+  full_name?: string;
+  username?: string;
+  profile_pic?: string;
+}
+
+// Extend the Conversation type with properties we need, omitting 'participants' to redefine it
+type ExtendedConversation = Omit<Conversation, 'participants'> & {
+  is_group: boolean;
+  name?: string;
+  participants: Participant[];
+  other_user_name?: string;
+  other_participant?: {
+    id: number;
+    username?: string;
+    full_name?: string;
+  };
+};
+
+import ConversationItem from '../../components/Conversations/ConversationItem';
 import ConversationHeader from '../../components/Conversations/ConversationHeader';
 import EmptyConversationsList from '../../components/Conversations/EmptyConversationsList';
 import FloatingButton from '../../components/Conversations/FloatingButton';
@@ -31,7 +55,11 @@ interface RootStackParamList {
   Onboarding: undefined;
   Auth: undefined;
   App: undefined;
-  ChatScreen: { conversationId: string | number };
+  ChatScreen: { 
+    conversationId: string | number;
+    conversationTitle?: string;
+    isGroup?: boolean;
+  };
   NewConversation: undefined;
   Settings: undefined;
   [key: string]: object | undefined; // Add index signature for other screens
@@ -127,7 +155,7 @@ const ConversationsScreen = () => {
 
   // Filter conversations based on search query and selected filter mode
   const filteredConversations = useCallback(() => {
-    let filteredList = conversations as Conversation[];
+    let filteredList = conversations as ExtendedConversation[];
     
     // First apply type filter - make sure is_group property is respected
     if (filterMode === 'direct') {
@@ -152,7 +180,7 @@ const ConversationsScreen = () => {
           }
           
           // Then try finding by participant ID
-          const otherParticipant = conversation.participants.find(
+          const otherParticipant = conversation.participants?.find(
             p => p.id !== user?.id
           );
           return otherParticipant?.full_name
@@ -170,8 +198,22 @@ const ConversationsScreen = () => {
     return filteredList;
   }, [conversations, searchQuery, user?.id, filterMode]);
 
-  const handleConversationPress = (conversationId: string | number) => {
-    navigation.navigate('ChatScreen', { conversationId });
+  const handleConversationPress = (id: string | number) => {
+    console.log('[ConversationsScreen] → opening chat screen for convo:', id);
+    
+    // Get the conversation details to pass along
+    const conversation = conversations.find(c => c.id === id) as ExtendedConversation;
+    const conversationTitle = conversation?.name || 
+                            conversation?.other_user_name || 
+                            `Chat ${id}`;
+    const isGroup = conversation?.is_group || false;
+    
+    // Navigate with complete details
+    navigation.navigate('ChatScreen', {
+      conversationId: id,
+      conversationTitle: conversationTitle,
+      isGroup: isGroup
+    });
   };
 
   const handleNewConversation = () => {
@@ -341,11 +383,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 48,
     borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    ...createShadow(2, '#000', 0.1),
   },
   searchIcon: {
     marginRight: 8,
@@ -373,19 +411,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 16,
     backgroundColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    ...createShadow(1, '#000', 0.1),
   },
   activeFilterButton: {
     backgroundColor: '#002D62',
-    shadowColor: '#002D62',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
+    ...createShadow(3, '#002D62', 0.3),
   },
   filterButtonText: {
     fontSize: 14,

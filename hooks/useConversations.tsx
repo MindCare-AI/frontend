@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import websocketService, { WebSocketMessage } from '../services/websocketService';
 
 // Import types for our data
 interface Participant {
@@ -165,12 +166,74 @@ export const useConversations = () => {
     }
   }, []);
 
-  // Subscribe to conversation updates (optional - for real-time features)
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    const unsubscribe = websocketService.onMessage((message: WebSocketMessage) => {
+      console.log('Received WebSocket message in conversations:', message);
+      
+      switch (message.type) {
+        case 'message':
+          if (message.event === 'new_message' && message.message) {
+            handleNewMessage(message.message);
+          }
+          break;
+        case 'typing':
+          // Handle typing indicators if needed
+          break;
+        case 'presence':
+          // Handle user presence updates if needed
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Handle new message from WebSocket
+  const handleNewMessage = useCallback((messageData: any) => {
+    console.log('[useConversations] ➕ WebSocket new_message:', messageData);
+
+    setConversations(prev => {
+      // 1) map in the updated last_message/unread_count
+      const updated = prev.map(conv => {
+        if (conv.id.toString() === messageData.conversation_id) {
+          return {
+            ...conv,
+            last_message: {
+              id: messageData.id,
+              content: messageData.content,
+              timestamp: messageData.timestamp,
+              sender_id: messageData.sender_id,
+              is_read: false
+            },
+            unread_count:
+              messageData.sender_id !== user?.id?.toString()
+                ? (conv.unread_count || 0) + 1
+                : conv.unread_count
+          };
+        }
+        return conv;
+      });
+
+      // 2) resort so the most recently active conversation floats to the top
+      return updated.sort((a, b) => {
+        const at = a.last_message?.timestamp
+          ? new Date(a.last_message.timestamp).getTime()
+          : 0;
+        const bt = b.last_message?.timestamp
+          ? new Date(b.last_message.timestamp).getTime()
+          : 0;
+        return bt - at;
+      });
+    });
+  }, [user?.id]);
+
+  // Subscribe to conversation updates (WebSocket integration)
   const subscribeToUpdates = useCallback(() => {
-    // Implement WebSocket connection using WS_BASE_URL from config
-    // This would handle real-time updates for new messages
+    // WebSocket connection will be managed per conversation
+    // This hook just listens for global updates
     return () => {
-      // Cleanup WebSocket connection
+      // Cleanup handled by WebSocket service
     };
   }, []);
 

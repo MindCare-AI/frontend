@@ -102,6 +102,8 @@ export interface Conversation {
   last_message?: Message;
   other_participant?: number;
   other_user_name?: string;
+  is_group?: boolean;
+  name?: string;
 }
 
 declare global {

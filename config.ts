@@ -3,7 +3,7 @@ export const API_BASE_URL = __DEV__
   ? 'http://127.0.0.1:8000' 
   : 'https://api.mindcareai.com';
 
-// Use this for WebSocket connections
+// Use this for WebSocket connections - Updated to handle authentication
 export const WS_BASE_URL = __DEV__ 
   ? 'ws://127.0.0.1:8000' 
   : 'wss://api.mindcareai.com';
@@ -42,4 +42,12 @@ export const OAUTH_CONFIG = {
     scope: 'user:email',
     allowSignup: true
   }
+};
+
+// WebSocket Configuration
+export const WEBSOCKET_CONFIG = {
+  reconnectAttempts: 5,
+  reconnectInterval: 1000,
+  heartbeatInterval: 30000,
+  connectionTimeout: 10000,
 };

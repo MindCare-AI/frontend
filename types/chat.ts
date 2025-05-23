@@ -1,5 +1,22 @@
 // Chatbot related type definitions
-import { MessageType, MessageAttachment, MessageReaction } from './messaging';
+
+// Define types locally instead of importing from missing module
+export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video';
+
+export interface MessageAttachment {
+  id: string;
+  url: string;
+  type: string;
+  name: string;
+  size: number;
+}
+
+export interface MessageReaction {
+  id: string;
+  emoji: string;
+  user_id: string;
+  timestamp: string;
+}
 
 export interface Message {
   id: string;
@@ -14,6 +31,9 @@ export interface Message {
   readBy?: string[];
   edited?: boolean;
   is_bot?: boolean;
+  // WebSocket specific fields
+  conversation_id?: string;
+  websocket_event?: string;
 }
 
 export interface MessageRequest {
@@ -21,6 +41,11 @@ export interface MessageRequest {
   conversation_id: string;
   message_type: MessageType;
   attachment?: MessageAttachment;
+  // WebSocket metadata
+  metadata?: {
+    is_chatbot?: boolean;
+    [key: string]: any;
+  };
 }
 
 export interface ChatbotConversation {
@@ -30,6 +55,8 @@ export interface ChatbotConversation {
   updated_at: string;
   last_message?: Message;
   title?: string;
+  // WebSocket connection status
+  is_websocket_connected?: boolean;
 }
 
 export interface ChatbotState {
@@ -38,4 +65,23 @@ export interface ChatbotState {
   isLoading: boolean;
   isTyping: boolean;
   error: string | null;
+  // WebSocket connection state
+  isConnected: boolean;
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
+}
+
+// WebSocket specific types for chatbot
+export interface ChatbotWebSocketMessage {
+  type: 'message' | 'typing' | 'bot_response';
+  content?: string;
+  message_id?: string;
+  conversation_id?: string;
+  is_bot?: boolean;
+  sender_id?: string;
+  timestamp?: string;
+  metadata?: {
+    is_chatbot: boolean;
+    bot_action?: string;
+    [key: string]: any;
+  };
 }

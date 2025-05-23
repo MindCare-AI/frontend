@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_URL } from '../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import websocketService from '../services/websocketService';
 
 // Types for the API functions
 type ConversationId = string | number;
@@ -88,15 +89,63 @@ export const sendMessage = async (
   isGroup: boolean = false, 
   attachments: any[] = []
 ) => {
+  console.group(`[API] 📤 sendMessage called for conversation: ${conversationId}`);
+
   try {
+    // Get current WS status
+    let isWebSocketConnected = websocketService.isConnected();
+    let currentConversationId = websocketService.getCurrentConversationId();
+    let isCorrectConversation = currentConversationId === conversationId.toString();
+
+    console.log(`[API] 🔍 WebSocket Status Check:`);
+    console.log(`  • Connected: ${isWebSocketConnected}`);
+    console.log(`  • Current conversation: ${currentConversationId}`);
+    console.log(`  • Target conversation: ${conversationId}`);
+    console.log(`  • Match: ${isCorrectConversation}`);
+
+    // If not connected or wrong convo, try a quick reconnect
+    if (!isWebSocketConnected || !isCorrectConversation) {
+      console.log(`[API] 🔄 Attempting WebSocket connect for conversation ${conversationId}`);
+      try {
+        await websocketService.connect(conversationId.toString());
+      } catch (connErr) {
+        console.warn(`[API] ⚠️ WebSocket reconnection failed:`, connErr);
+      }
+      isWebSocketConnected = websocketService.isConnected();
+      isCorrectConversation = websocketService.getCurrentConversationId() === conversationId.toString();
+    }
+
+    // Now send via WS if it’s up and on the right convo
+    if (isWebSocketConnected && isCorrectConversation) {
+      console.log(`[API] 🌐 Sending via WebSocket…`);
+      websocketService.sendMessage({
+        content,
+        message_type: 'text',
+        metadata: { source: 'API_wrapper' },
+        ...(attachments.length > 0 && { media_id: attachments[0]?.id })
+      });
+      console.log(`[API] ✅ Message sent via WebSocket`);
+      return {
+        id: `temp-${Date.now()}`,
+        content,
+        conversation: conversationId,
+        message_type: 'text',
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+        via: 'websocket'
+      };
+    }
+
+    console.log(`[API] 📍 WebSocket not available, using REST API`);
     const config = await getAuthHeaders();
-    
-    // Define the endpoint based on conversation type
     const isGroupConversation = isGroup || await isGroupType(conversationId);
-    
+
     const endpoint = isGroupConversation
       ? `${API_URL}/messaging/groups/messages/`
       : `${API_URL}/messaging/one_to_one/messages/`;
+
+    console.log(`[API] 📍 Using endpoint: ${endpoint}`);
+    console.log(`[API] 📦 Conversation type: ${isGroupConversation ? 'group' : 'one-to-one'}`);
       
     const payload = {
       content,
@@ -104,12 +153,76 @@ export const sendMessage = async (
       message_type: 'text',
       attachments: attachments || [],
     };
+    
+    console.log(`[API] 📤 Sending payload:`, payload);
       
     const response = await axios.post(endpoint, payload, config);
-    return response.data;
+    
+    console.log(`[API] ✅ REST API response received:`, response.data);
+    console.log(`[API] 📊 Response status: ${response.status}`);
+    
+    return {
+      ...(typeof response.data === 'object' && response.data !== null ? response.data : {}),
+      via: 'rest_api'
+    };
+    
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('[API] ❌ Error sending message:', error);
+    console.error('[API] 📋 Error details:', {
+      conversationId,
+      content: content.substring(0, 50),
+      isGroup,
+      attachments: attachments.length
+    });
     throw error;
+  } finally {
+    console.groupEnd();
+  }
+};
+
+// Send typing indicator
+export const sendTypingIndicator = async (conversationId: ConversationId, isTyping: boolean) => {
+  console.log(`[API] ⌨️ sendTypingIndicator: ${isTyping ? 'started' : 'stopped'} for conversation ${conversationId}`);
+  
+  try {
+    // Use WebSocket if connected
+    if (websocketService.isConnected() && 
+        websocketService.getCurrentConversationId() === conversationId.toString()) {
+      console.log(`[API] 🌐 Sending typing indicator via WebSocket`);
+      websocketService.sendTyping(isTyping);
+      return;
+    }
+
+    console.log(`[API] 🌐 Sending typing indicator via REST API`);
+    // Fallback to REST API
+    const config = await getAuthHeaders();
+    await axios.post(
+      `${API_URL}/messaging/one_to_one/${conversationId}/typing/`,
+      {},
+      config
+    );
+    console.log(`[API] ✅ Typing indicator sent via REST API`);
+  } catch (error) {
+    console.error('[API] ❌ Error sending typing indicator:', error);
+  }
+};
+
+// Mark message as read
+export const markMessageAsRead = async (messageId: string) => {
+  console.log(`[API] 👁️ markMessageAsRead: ${messageId}`);
+  
+  try {
+    // Use WebSocket if connected
+    if (websocketService.isConnected()) {
+      console.log(`[API] 🌐 Sending read receipt via WebSocket`);
+      websocketService.sendReadReceipt(messageId);
+      return;
+    }
+
+    console.log(`[API] ⚠️ WebSocket not connected, read receipt not sent`);
+    // Note: REST API endpoint for read receipts would need to be implemented
+  } catch (error) {
+    console.error('[API] ❌ Error marking message as read:', error);
   }
 };
 
