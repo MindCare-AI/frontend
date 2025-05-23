@@ -15,7 +15,7 @@ const getAuthHeaders = () => {
 
 export const getAppointments = async (params: any = {}) => {
   console.log("getAppointments params:", params);
-  const url = `${API_URL}/appointments`;
+  const url = `${API_URL}/appointments/`;
   console.log("getAppointments URL:", url);
   
   // Make a simple request without any filters
@@ -27,15 +27,79 @@ export const getAppointments = async (params: any = {}) => {
   return resp.data;
 };
 
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  user_type: string;
+  phone_number: string | null;
+  date_of_birth: string | null;
+  preferences: {
+    dark_mode: boolean;
+    language: string;
+    email_notifications: boolean;
+    in_app_notifications: boolean;
+    disabled_notification_types: string[];
+    notification_preferences: any;
+  };
+  settings: any;
+  therapist_profile: any;
+  profile_id: number;
+}
+
+interface ApiError {
+  response?: {
+    data: unknown;
+  };
+  message: string;
+}
+
 export const createAppointment = async (data: {
   therapist: number;
   appointment_date: string;
+  duration?: string;
   notes?: string;
 }) => {
-  const resp = await axios.post(`${API_URL}/appointments`, data, {
-    headers: getAuthHeaders(),
-  });
-  return resp.data;
+  // Get current user profile function
+  const getCurrentUserProfile = async (): Promise<UserProfile> => {
+    try {
+      const resp = await axios.get<UserProfile>(`${API_URL}/users/me/`, {
+        headers: getAuthHeaders(),
+      });
+      console.log('getCurrentUserProfile response:', resp.data);
+      return resp.data;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      throw new Error('Unable to fetch user profile');
+    }
+  };
+
+  try {
+    // Get current user's profile
+    const userProfile = await getCurrentUserProfile();
+
+    // Check if user has a valid profile_id
+    if (typeof userProfile.profile_id !== "number") {
+      throw new Error('User must have a valid profile_id to create appointments');
+    }
+
+    const appointmentData = {
+      patient: userProfile.profile_id, // Use profile_id from user profile
+      therapist: data.therapist,
+      appointment_date: data.appointment_date,
+      duration: data.duration || "60", // Default 60 minutes if not provided
+      notes: data.notes || "",
+    };
+
+    const resp = await axios.post(`${API_URL}/appointments/`, appointmentData, {
+      headers: getAuthHeaders(),
+    });
+    return resp.data;
+  } catch (error) {
+    const apiError = error as ApiError;
+    console.error('Appointment creation error:', apiError.response?.data || apiError.message);
+    throw error;
+  }
 };
 
 export const cancelAppointment = async (id: number) => {
@@ -63,7 +127,7 @@ export const rescheduleAppointment = async (id: number, data: {
   appointment_date: string;
   notes?: string;
 }) => {
-  const resp = await axios.patch(
+  const resp = await axios.put(
     `${API_URL}/appointments/${id}/`,
     data,
     { headers: getAuthHeaders() }
@@ -73,9 +137,12 @@ export const rescheduleAppointment = async (id: number, data: {
 
 export async function updateAppointmentDate(appointmentId: number, newDate: string) {
   // Adjust endpoint and payload as per your backend
-  return fetch(`/api/appointments/${appointmentId}/reschedule`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  return fetch(`${API_URL}/appointments/${appointmentId}/`, {
+    method: "PUT",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({ new_date: newDate }),
   }).then(res => {
     if (!res.ok) throw new Error("Failed to reschedule")

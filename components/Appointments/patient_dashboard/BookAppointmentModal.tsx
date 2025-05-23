@@ -123,10 +123,15 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
       const selectedSlot = timeSlots.find((slot) => slot.value === timeSlot);
       if (!selectedSlot) throw new Error('Invalid time slot selected');
 
+      // Format appointment_date as "YYYY-MM-DD HH:MM"
       const formattedDate = format(date, 'yyyy-MM-dd');
+      const appointmentDate = `${formattedDate} ${selectedSlot.time}`; // "YYYY-MM-DD HH:MM"
+
       await createAppointment({
         therapist: parseInt(therapist),
-        appointment_date: `${formattedDate}T${selectedSlot.time}:00`
+        appointment_date: appointmentDate,
+        duration: 60,
+        // notes: "..." // Add notes if you have a notes field in the UI
       });
 
       onClose();
