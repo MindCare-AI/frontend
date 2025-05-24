@@ -102,11 +102,27 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         // Only add if it's for the current conversation and not a duplicate
         if (data.message.conversation_id === conversationId.toString()) {
           setMessages(prevMessages => {
-            // Check if message already exists
-            const exists = prevMessages.some(msg => msg.id === newMessage.id);
-            if (exists) {
-              console.log(`[useMessages] Message ${newMessage.id} already exists, skipping`);
+            // Check if message already exists by ID
+            const existsById = prevMessages.some(msg => msg.id === newMessage.id);
+            if (existsById) {
+              console.log(`[useMessages] Message ${newMessage.id} already exists by ID, skipping`);
               return prevMessages;
+            }
+            
+            // Check if we have a temporary message with matching content and sender that should be replaced
+            // This handles the case where we already added a temp message but now received the real one
+            const tempMessageIndex = prevMessages.findIndex(msg => 
+              msg.id.toString().startsWith('temp-') && 
+              msg.content === newMessage.content && 
+              msg.sender_id.toString() === newMessage.sender_id.toString()
+            );
+            
+            if (tempMessageIndex !== -1) {
+              console.log(`[useMessages] Found temporary message to replace with ID ${prevMessages[tempMessageIndex].id}`);
+              // Replace the temporary message with the real one from the server
+              return prevMessages.map((msg, idx) => 
+                idx === tempMessageIndex ? newMessage : msg
+              );
             }
 
             console.log(`[useMessages] Adding message ${newMessage.id} to conversation ${conversationId}`);
@@ -156,9 +172,12 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
 
     console.log(`[useMessages] Sending message: "${content}"`);
 
+    // Generate a unique, timestamped ID for the temporary message
+    const tempId = `temp-${Date.now()}`;
+    
     // Create temporary message for immediate UI feedback
     const tempMessage: Message = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       content,
       sender_id: user?.id || '',
       sender_name: user?.username || 'You',
@@ -174,15 +193,24 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
       // Send via API (which will use WebSocket if available)
       const response = await apiSendMessage(conversationId, content);
       console.log(`[useMessages] Message sent successfully:`, response);
-
-      // Update temp message status
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === tempMessage.id 
-            ? { ...msg, id: response.id || msg.id, status: 'sent' }
-            : msg
-        )
-      );
+      
+      // Only update the temp message if it still exists and hasn't been replaced by WebSocket
+      setMessages(prev => {
+        // Check if the temp message still exists or if WebSocket already replaced it
+        const tempMessageExists = prev.some(msg => msg.id === tempId);
+        
+        if (tempMessageExists) {
+          console.log(`[useMessages] Updating temporary message ${tempId} with server response`);
+          return prev.map(msg => 
+            msg.id === tempId
+              ? { ...msg, id: response.id || msg.id, status: 'sent' }
+              : msg
+          );
+        } else {
+          console.log(`[useMessages] Temporary message ${tempId} already processed by WebSocket`);
+          return prev;
+        }
+      });
     } catch (error) {
       console.error(`[useMessages] Failed to send message:`, error);
       
@@ -224,17 +252,30 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
     );
 
     try {
-      await sendMessage(message.content);
+      // Generate a new temporary ID for the retry to avoid conflicts
+      const originalMessageContent = message.content;
       
-      // Remove the failed message since sendMessage will add a new one
+      // Remove the failed message before sending to avoid duplication
       setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      
+      // Now send the message with fresh temporary ID
+      await sendMessage(originalMessageContent);
     } catch (error) {
-      // Revert to failed status
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === messageId ? { ...msg, status: 'failed' } : msg
-        )
-      );
+      // If sending fails again, restore the failed message
+      setMessages(prev => {
+        // Check if the message still exists (might have been replaced by WebSocket response)
+        const exists = prev.some(msg => msg.id === messageId || 
+                                       (msg.content === message.content && 
+                                        msg.sender_id === message.sender_id));
+        
+        if (exists) {
+          console.log(`[useMessages] Message already exists, not restoring failed state`);
+          return prev;
+        }
+        
+        console.log(`[useMessages] Restoring failed message: ${messageId}`);
+        return [...prev, { ...message, status: 'failed' }];
+      });
       throw error;
     }
   }, [messages, sendMessage]);
