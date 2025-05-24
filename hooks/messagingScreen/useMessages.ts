@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { sendMessage as apiSendMessage, getMessages } from '../API/conversations';
-import websocketService from '../services/websocketService';
-import { useAuth } from '../contexts/AuthContext';
+import { sendMessage as apiSendMessage } from '../../API/conversations';
+import websocketService from '../../services/websocketService';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Message {
   id: string | number;
@@ -44,22 +46,38 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         setError(null);
         console.log(`[useMessages] Loading messages for conversation: ${conversationId}`);
         
-        const response = await getMessages(conversationId);
-        const messageList = response.results || [];
+        // Use the group endpoint that now includes messages
+        const token = await AsyncStorage.getItem('accessToken');
+        const response = await fetch(`${API_URL}/messaging/groups/${conversationId}/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch group data: ${response.status}`);
+        }
+
+        const groupData = await response.json();
+        const messageList = groupData.messages || [];
         
-        // Ensure messages are in ascending order by timestamp and have proper sender_id mapping
+        console.log(`[useMessages] Group data:`, groupData);
+        console.log(`[useMessages] Raw messages:`, messageList);
+
+        // Map messages to our Message interface
         const sortedMessages = messageList
           .map((msg: any) => ({
             id: msg.id,
             content: msg.content,
-            sender_id: msg.sender_id || msg.sender || (msg.sender_detail ? msg.sender_detail.id : null),
-            sender_name: msg.sender_name || (msg.sender_detail ? msg.sender_detail.username : 'Unknown'),
+            sender_id: msg.sender, // API uses 'sender' field
+            sender_name: msg.sender_name || 'Unknown', // May need to fetch from participants
             timestamp: msg.timestamp,
             message_type: msg.message_type || 'text',
             status: 'sent' as const,
             is_bot: msg.is_bot || false,
           }))
-          .sort((a: { timestamp: string | number | Date; }, b: { timestamp: string | number | Date; }) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         
         console.log(`[useMessages] Loaded ${sortedMessages.length} messages`);
         console.log(`[useMessages] First message sender_id:`, sortedMessages[0]?.sender_id);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getConversations } from '../API/conversations';
+import { getConversations } from '../../API/conversations';
 
 interface Conversation {
   id: string | number;

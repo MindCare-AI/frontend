@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import websocketService, { WebSocketMessage } from '../services/websocketService';
+import websocketService, { WebSocketMessage } from '../../services/websocketService';
 
 // Import types for our data
 interface Participant {
@@ -35,7 +35,7 @@ type ConversationsApiResponse = {
 };
 
 // Import the API function with a different name to avoid conflict
-import { getConversations as apiGetConversations } from '../API/conversations';
+import { getConversations as apiGetConversations } from '../../API/conversations';
 
 export const useConversations = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);

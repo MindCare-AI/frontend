@@ -18,7 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useConversations } from '../../hooks/useConversations';
+import { useConversations } from '../../hooks/messagingScreen/useConversations';
 import { useAuth } from '../../contexts/AuthContext';
 import { createShadow } from '../../styles/global';
 import { getAllUsers, createConversation, createGroupConversation } from '../../API/conversations';

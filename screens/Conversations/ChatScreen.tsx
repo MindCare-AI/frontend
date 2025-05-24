@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useMessages } from '../../hooks/useMessages';
+import { useMessages } from '../../hooks/messagingScreen/useMessages';
 import MessagesList from '../../components/Chat/MessagesList';
 import ChatHeader from '../../components/Chat/ChatHeader';
 import MessageInput from '../../components/Chat/MessageInput';
