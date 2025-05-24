@@ -476,3 +476,31 @@ export const removeParticipant = async (groupId: ConversationId, userId: UserId)
     throw error;
   }
 };
+
+// Delete a conversation (handles both one-to-one and group)
+export const deleteConversation = async (conversationId: ConversationId): Promise<void> => {
+  try {
+    console.log(`[API] 🗑️ Deleting conversation: ${conversationId}`);
+    const config = await getAuthHeaders();
+    
+    // First determine if it's a group or one-to-one conversation
+    const isGroupConversation = await isGroupType(conversationId);
+    
+    const endpoint = isGroupConversation
+      ? `${API_URL}/messaging/groups/${conversationId}/`
+      : `${API_URL}/messaging/one_to_one/${conversationId}/`;
+    
+    console.log(`[API] 🗑️ Using delete endpoint: ${endpoint}`);
+    
+    const response = await axios.delete(endpoint, config);
+    
+    if (response.status === 200 || response.status === 204) {
+      console.log(`[API] ✅ Conversation ${conversationId} deleted successfully`);
+    } else {
+      throw new Error(`Failed to delete conversation: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('[API] ❌ Error deleting conversation:', error);
+    throw error;
+  }
+};

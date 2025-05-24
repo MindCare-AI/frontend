@@ -23,6 +23,7 @@ import DashboardScreenT from '../screens/Appointments/therapist/DashboardScreenT
 import ConversationsScreen from '../screens/Conversations/ConversationsScreen';
 // Import ChatScreen
 import ChatScreen from '../screens/Conversations/ChatScreen';
+import MessagingNavigator from './MessagingNavigator';
 
 // Import types or define them
 import { AppStackParamList } from './types';
@@ -142,7 +143,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="Messaging"
-        component={MessagingStack}
+        component={MessagingNavigator}
         options={{ 
           tabBarLabel: 'Messages',
           headerShown: false
@@ -157,20 +158,6 @@ const TabNavigator = () => {
         }}
       />
     </Tab.Navigator>
-  );
-};
-
-// Create a messaging stack navigator to handle screens within the messaging section
-const MessagingStack = () => {
-  return (
-    <MessagingStackNavigator.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <MessagingStackNavigator.Screen name="ConversationsList" component={ConversationsScreen} />
-      <MessagingStackNavigator.Screen name="ChatScreen" component={ChatScreen} />
-    </MessagingStackNavigator.Navigator>
   );
 };
 

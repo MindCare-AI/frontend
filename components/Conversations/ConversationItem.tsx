@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
+import { createBoxShadow } from '../../utils/shadows';
+import { useLongPress } from '../../hooks/Journal/useLongPress';
 
 // Types for the component props
 export interface Participant {
@@ -50,16 +52,33 @@ export interface ConversationItemProps {
   conversation: Conversation;
   userId: string | number;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ 
   conversation, 
   userId, 
-  onPress 
+  onPress,
+  onLongPress
 }) => {
   // Animation ref
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
   const opacityAnim = useRef(new Animated.Value(0.8)).current;
+  
+  // Use the long press hook with 1 second threshold
+  const longPressHandlers = useLongPress({
+    onLongPress: () => {
+      console.log('[ConversationItem] Long press detected on conversation:', conversation.id);
+      if (onLongPress) {
+        onLongPress();
+      }
+    },
+    onPress: () => {
+      console.log('[ConversationItem] Regular press on conversation:', conversation.id);
+      onPress();
+    },
+    threshold: 1000 // 1 second
+  });
   
   useEffect(() => {
     // Start animation when component mounts
@@ -155,8 +174,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           hasUnread && styles.unreadContainer,
           conversation.is_group ? styles.groupContainer : styles.directContainer
         ]} 
-        onPress={onPress}
         activeOpacity={0.7}
+        {...longPressHandlers}
       >
         <View style={styles.avatarContainer}>
           {profileImage ? (
@@ -224,11 +243,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     marginVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    ...createBoxShadow(0, 2, 4, 'rgba(0, 0, 0, 0.1)', 2),
   },
   directContainer: {
     borderLeftColor: '#3498db',
@@ -240,10 +255,7 @@ const styles = StyleSheet.create({
   },
   unreadContainer: {
     backgroundColor: '#F0F7FF',
-    shadowColor: '#002D62',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    ...createBoxShadow(0, 2, 6, 'rgba(0, 45, 98, 0.2)', 4),
   },
   avatarContainer: {
     position: 'relative',

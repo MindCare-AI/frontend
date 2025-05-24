@@ -21,7 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useConversations } from '../../hooks/messagingScreen/useConversations';
 import { useAuth } from '../../contexts/AuthContext';
 import { createShadow } from '../../styles/global';
-import { getAllUsers, createConversation, createGroupConversation } from '../../API/conversations';
+import { getAllUsers, createConversation, createGroupConversation, deleteConversation } from '../../API/conversations';
 
 // Import the Conversation type from types/navigation
 import { Conversation } from '../../types/navigation';
@@ -66,7 +66,8 @@ interface RootStackParamList {
   };
   NewConversation: undefined;
   Settings: undefined;
-  [key: string]: object | undefined; // Add index signature for other screens
+  MessagingSettings: { conversationId?: string; conversationType?: 'one_to_one' | 'group' };
+  [key: string]: object | undefined;
 }
 
 // Filter modes for conversation types
@@ -78,15 +79,21 @@ const AnimatedConversationItem = ({
   item, 
   index, 
   userId, 
-  onPress 
+  onPress,
+  onLongPress,
+  deletingConversationId // Add this prop
 }: { 
   item: any; 
   index: number; 
   userId: string | number;
   onPress: (id: string | number) => void;
+  onLongPress?: () => void;
+  deletingConversationId: string | number | null; // Add this type
 }) => {
   const itemFadeAnim = useRef(new Animated.Value(0)).current;
   const itemTranslateY = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const isDeleting = deletingConversationId === item.id;
   
   useEffect(() => {
     // Stagger the animation based on item index
@@ -108,15 +115,28 @@ const AnimatedConversationItem = ({
   }, [index]);
   
   return (
-    <Animated.View style={{
-      opacity: itemFadeAnim,
-      transform: [{ translateY: itemTranslateY }]
-    }}>
+    <Animated.View
+      style={{
+        opacity: isDeleting ? 0.5 : itemFadeAnim,
+        transform: [{ scale: scaleAnim }]
+      }}
+    >
       <ConversationItem
         conversation={item as any}
         userId={userId}
-        onPress={() => onPress(item.id)}
+        onPress={() => {
+          if (!isDeleting) {
+            onPress(item.id);
+          }
+        }}
+        onLongPress={onLongPress}
       />
+      {isDeleting && (
+        <View style={styles.deletingOverlay}>
+          <ActivityIndicator size="small" color="#FFFFFF" />
+          <Text style={styles.deletingText}>Deleting...</Text>
+        </View>
+      )}
     </Animated.View>
   );
 };
@@ -145,6 +165,7 @@ const ConversationsScreen = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [deletingConversationId, setDeletingConversationId] = useState<string | number | null>(null);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -342,6 +363,86 @@ const ConversationsScreen = () => {
     }
   };
 
+  const handleConversationLongPress = (conversation: ExtendedConversation) => {
+    const conversationName = conversation.is_group ? conversation.name : conversation.other_user_name;
+    
+    Alert.alert(
+      'Conversation Options',
+      `What would you like to do with "${conversationName}"?`,
+      [
+        {
+          text: 'Delete Conversation',
+          style: 'destructive',
+          onPress: () => handleDeleteConversation(conversation)
+        },
+        {
+          text: 'Settings',
+          onPress: () => navigation.navigate('MessagingSettings', {
+            conversationId: conversation.id.toString(),
+            conversationType: conversation.is_group ? 'group' : 'one_to_one'
+          })
+        },
+        {
+          text: 'Open Chat',
+          onPress: () => handleConversationPress(conversation.id)
+        },
+        { 
+          text: 'Cancel', 
+          style: 'cancel' 
+        }
+      ]
+    );
+  };
+
+  const handleDeleteConversation = (conversation: ExtendedConversation) => {
+    const conversationName = conversation.is_group ? conversation.name : conversation.other_user_name;
+    
+    Alert.alert(
+      'Delete Conversation',
+      `Are you sure you want to delete the conversation with "${conversationName}"? This action cannot be undone and will remove all messages.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingConversationId(conversation.id);
+              console.log(`[ConversationsScreen] 🗑️ Deleting conversation: ${conversation.id}`);
+              
+              await deleteConversation(conversation.id);
+              
+              console.log(`[ConversationsScreen] ✅ Conversation deleted successfully`);
+              
+              // Show success message
+              Alert.alert(
+                'Success',
+                'Conversation deleted successfully.',
+                [{ text: 'OK' }]
+              );
+              
+              // Refresh the conversations list
+              await refreshConversations();
+              
+            } catch (error) {
+              console.error('[ConversationsScreen] ❌ Error deleting conversation:', error);
+              Alert.alert(
+                'Error',
+                'Failed to delete conversation. Please try again.',
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setDeletingConversationId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const getFilterButtonStyle = (mode: FilterMode) => {
     return [
       styles.filterButton,
@@ -376,7 +477,9 @@ const ConversationsScreen = () => {
         style={styles.keyboardAvoidingView}
       >
         <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={styles.gradient}>
-          <ConversationHeader />
+          <ConversationHeader 
+            onSettingsPress={() => navigation.navigate('MessagingSettings', {})}
+          />
           
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
@@ -425,20 +528,13 @@ const ConversationsScreen = () => {
             <FlatList
               data={filteredConversations()}
               keyExtractor={(item: any) => {
-                // Create a genuinely unique key by combining multiple properties
                 const typePrefix = item.is_group ? 'group' : 'one2one';
-                
-                // Include timestamp to differentiate between items with same ID
                 const timestamp = item.last_message?.timestamp 
                   ? new Date(item.last_message.timestamp).getTime() 
                   : 0;
-                  
-                // Add some participant information for further uniqueness
                 const participantInfo = item.participants 
                   ? item.participants.map((p: {id: string | number}) => p.id).join('_')
                   : '';
-                  
-                // Combine all data points into a unique string
                 return `${typePrefix}_${item.id}_${timestamp}_${participantInfo}`;
               }}
               renderItem={({ item, index }: { item: any, index: number }) => (
@@ -447,6 +543,8 @@ const ConversationsScreen = () => {
                   index={index} 
                   userId={user?.id || ''}
                   onPress={handleConversationPress}
+                  onLongPress={() => handleConversationLongPress(item)}
+                  deletingConversationId={deletingConversationId} // Pass the prop here
                 />
               )}
               contentContainerStyle={styles.listContent}
@@ -645,6 +743,23 @@ const styles = StyleSheet.create({
   unreadText: {
     color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '600',
+  },
+  deletingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(220, 53, 69, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    borderRadius: 12,
+  },
+  deletingText: {
+    color: '#FFFFFF',
+    marginLeft: 8,
     fontWeight: '600',
   },
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { sendMessage as apiSendMessage } from '../../API/conversations';
+import { sendMessage as apiSendMessage, getConversationById } from '../../API/conversations';
 import websocketService from '../../services/websocketService';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
@@ -46,9 +46,29 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         setError(null);
         console.log(`[useMessages] Loading messages for conversation: ${conversationId}`);
         
-        // Use the group endpoint that now includes messages
+        // First, determine if this is a group or one-to-one conversation
+        let isGroup = false;
+        let endpoint = '';
+        
+        try {
+          // Try to get conversation details to determine type
+          const conversationDetails = await getConversationById(conversationId);
+          isGroup = conversationDetails.is_group || false;
+          console.log(`[useMessages] Conversation ${conversationId} is ${isGroup ? 'group' : 'one-to-one'}`);
+        } catch (error) {
+          console.warn(`[useMessages] Could not determine conversation type, defaulting to one-to-one:`, error);
+          isGroup = false;
+        }
+
+        // Use the appropriate endpoint based on conversation type
+        endpoint = isGroup 
+          ? `${API_URL}/messaging/groups/${conversationId}/`
+          : `${API_URL}/messaging/one_to_one/${conversationId}/`;
+
+        console.log(`[useMessages] Using endpoint: ${endpoint}`);
+
         const token = await AsyncStorage.getItem('accessToken');
-        const response = await fetch(`${API_URL}/messaging/groups/${conversationId}/`, {
+        const response = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -56,13 +76,13 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch group data: ${response.status}`);
+          throw new Error(`Failed to fetch conversation data: ${response.status}`);
         }
 
-        const groupData = await response.json();
-        const messageList = groupData.messages || [];
+        const conversationData = await response.json();
+        const messageList = conversationData.messages || [];
         
-        console.log(`[useMessages] Group data:`, groupData);
+        console.log(`[useMessages] Conversation data:`, conversationData);
         console.log(`[useMessages] Raw messages:`, messageList);
 
         // Map messages to our Message interface
