@@ -8,6 +8,36 @@ type ConversationId = string | number;
 type UserId = string | number;
 type Pagination = { page?: number; limit?: number };
 
+// API Response types
+interface ApiResponse<T> {
+  results?: T[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+}
+
+interface ConversationData {
+  id: string | number;
+  is_group?: boolean;
+  participants?: any[];
+  last_message?: {
+    content?: string;
+    timestamp?: string;
+    sender_name?: string;
+    [key: string]: any;
+  };
+  created_at: string;
+  updated_at?: string;
+  name?: string;
+  other_user_name?: string;
+  other_participant?: {
+    id: number;
+    username?: string;
+    full_name?: string;
+  };
+  [key: string]: any;
+}
+
 // Get the auth token from storage
 const getAuthHeaders = async () => {
   try {
@@ -69,8 +99,8 @@ export const getConversations = async (pagination?: Pagination) => {
     
     // Fetch both one-to-one and group conversations
     const [oneToOneResponse, groupResponse] = await Promise.all([
-      axios.get(`${API_URL}/messaging/one_to_one/${queryString}`, config),
-      axios.get(`${API_URL}/messaging/groups/${queryString}`, config)
+      axios.get<ApiResponse<ConversationData>>(`${API_URL}/messaging/one_to_one/${queryString}`, config),
+      axios.get<ApiResponse<ConversationData>>(`${API_URL}/messaging/groups/${queryString}`, config)
     ]);
     
     console.log(`[API] ✅ Fetched conversations:`, {
@@ -78,15 +108,34 @@ export const getConversations = async (pagination?: Pagination) => {
       groups: groupResponse.data?.results?.length || 0
     });
     
+    // Helper function to transform last_message to expected format
+    const transformLastMessage = (lastMessage: any) => {
+      if (!lastMessage) return undefined;
+      
+      return {
+        content: lastMessage.content || '',
+        timestamp: lastMessage.timestamp || new Date().toISOString(),
+        sender_name: lastMessage.sender_name || lastMessage.sender?.username || 'Unknown'
+      };
+    };
+    
     // Combine and format conversations
-    const oneToOneConversations = (oneToOneResponse.data?.results || []).map((conv: any) => ({
+    const oneToOneConversations = (oneToOneResponse.data?.results || []).map((conv: ConversationData) => ({
       ...conv,
-      is_group: false
+      is_group: false,
+      created_at: conv.created_at || new Date().toISOString(),
+      updated_at: conv.updated_at || conv.created_at || new Date().toISOString(),
+      participants: conv.participants || [], // Ensure participants is always an array
+      last_message: transformLastMessage(conv.last_message)
     }));
     
-    const groupConversations = (groupResponse.data?.results || []).map((conv: any) => ({
+    const groupConversations = (groupResponse.data?.results || []).map((conv: ConversationData) => ({
       ...conv,
-      is_group: true
+      is_group: true,
+      created_at: conv.created_at || new Date().toISOString(),
+      updated_at: conv.updated_at || conv.created_at || new Date().toISOString(),
+      participants: conv.participants || [], // Ensure participants is always an array
+      last_message: transformLastMessage(conv.last_message)
     }));
     
     // Merge all conversations and sort by last message timestamp
@@ -124,7 +173,7 @@ export const getMessages = async (conversationId: ConversationId) => {
     
     console.log(`[API] 📋 Fetching messages from: ${endpoint}`);
     
-    const response = await axios.get(endpoint, config);
+    const response = await axios.get<ApiResponse<any>>(endpoint, config);
     
     console.log(`[API] ✅ Fetched ${response.data?.results?.length || 0} messages`);
     

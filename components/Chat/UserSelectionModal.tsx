@@ -63,9 +63,13 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
     try {
       setLoading(true);
       const response = await getAllUsers();
-      // Filter out current user
-      const filteredUsers = response.filter((user: User) => user.id !== currentUserId);
-      setUsers(filteredUsers);
+      // Ensure response is an array before filtering
+      if (Array.isArray(response)) {
+        const filteredUsers = response.filter((user: User) => user.id !== currentUserId);
+        setUsers(filteredUsers);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       Alert.alert('Error', 'Failed to load users');
