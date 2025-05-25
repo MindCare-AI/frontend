@@ -1,17 +1,42 @@
 // Define all the types used in the application
 
-export type AppointmentStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Rescheduled';
+/**
+ * Appointment status flow:
+ * pending -> confirmed -> completed
+ * Any status can be canceled
+ */
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'canceled' | 'rescheduled';
 
 export interface Appointment {
-  id: number;
+  appointment_date: any;
+  id: number | string;
   patientName: string;
   patientId?: number;
   time: string;
   date?: string;
-  status: string;
+  status: AppointmentStatus;
   notes?: string;
   isExpanded?: boolean;
   video_session_link?: string;
+  confirmation_date?: string;
+  confirmed_by?: string;
+  completion_date?: string;
+  completed_by?: string;
+}
+
+export interface AppointmentResponse {
+  id: number | string;
+  appointment_id: string;
+  appointment_date: string;
+  patient_name: string;
+  status: AppointmentStatus;
+  confirmed_by?: string;
+  confirmation_date?: string;
+  video_session_link?: string;
+  conversation_created?: boolean;
+  duration?: string;
+  completed_by?: string;
+  completion_date?: string;
 }
 
 export interface WaitingListEntry {

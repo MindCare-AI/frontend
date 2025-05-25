@@ -1,281 +1,169 @@
-import axios from 'axios';
-import { API_URL } from '../../config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from "axios";
+import { API_URL } from "../../config";
 
-// Base URLs for therapist appointment endpoints
-const APPOINTMENTS_URL = `${API_URL}/appointments`;
-const THERAPIST_URL = `${API_URL}/therapist`;
-const WAITING_LIST_URL = `${API_URL}/appointments/waiting-list`;
+interface AppointmentResponse {
+  appointment?: {
+    id: number;
+    appointment_date: string;
+    status: string;
+    notes?: string;
+  };
+  id?: number;
+  appointment_date?: string;
+  status?: string;
+  notes?: string;
+}
 
 /**
- * Get appointments for the current therapist
- * @param params Query parameters (today, upcoming, status, etc.)
+ * Appointment Status Flow:
+ * 
+ * 1. pending - Initial state when appointment is first created
+ * 2. confirmed - After therapist confirms the appointment
+ * 3. completed - After therapist marks the appointment as completed
+ * 
+ * Note: Appointments can also be canceled or rescheduled at various stages
  */
-export const getTherapistAppointments = async (params = {}) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.get(`${THERAPIST_URL}/appointments/`, {
-      params,
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching therapist appointments:', error);
-    throw error;
-  }
+
+// Helper to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("accessToken");
+  console.log("[therapist.ts] Auth token used:", token);
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+};
+
+// --- Appointment APIs ---
+
+export const getAppointments = async (params: any = {}) => {
+  console.log("[therapist.ts] getAppointments params:", params);
+  const url = `${API_URL}/appointments/`;
+  console.log("[therapist.ts] getAppointments URL:", url);
+
+  // Make a simple request without any filters
+  const resp = await axios.get(url, {
+    headers: getAuthHeaders()
+  });
+  console.log("[therapist.ts] Appointments response:", resp.data);
+
+  return resp.data;
 };
 
 /**
- * Confirm an appointment
- */
-export const confirmAppointment = async (appointmentId: number) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${APPOINTMENTS_URL}/${appointmentId}/confirm/`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error confirming appointment ${appointmentId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Complete an appointment
- */
-export const completeAppointment = async (appointmentId: number) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${APPOINTMENTS_URL}/${appointmentId}/complete/`,
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error completing appointment ${appointmentId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Reschedule an appointment
+ * Reschedules an existing appointment
+ * @param appointmentId - The ID of the appointment to reschedule
+ * @param appointmentDate - New date and time (format: YYYY-MM-DD HH:MM)
+ * @param notes - Optional notes about why the appointment was rescheduled
+ * @returns The updated appointment data
  */
 export const rescheduleAppointment = async (
-  appointmentId: number,
-  newDateTime: string
+  appointmentId: number | string,
+  appointmentDate: string,
+  notes?: string
 ) => {
+  console.log(`[therapist.ts] Rescheduling appointment ${appointmentId} to ${appointmentDate}`);
+  
+  const url = `${API_URL}/appointments/${appointmentId}/`;
+  console.log("[therapist.ts] Reschedule URL:", url);
+  
+  const requestBody = {
+    appointment_date: appointmentDate,
+    notes: notes || "Appointment rescheduled"
+  };
+  
   try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${APPOINTMENTS_URL}/${appointmentId}/reschedule/`,
-      { new_appointment_date: newDateTime },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error rescheduling appointment ${appointmentId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get session notes
- */
-export const getSessionNotes = async (params = {}) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.get(`${THERAPIST_URL}/session-notes/`, {
-      params,
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+    const response = await axios.patch(url, requestBody, {
+      headers: getAuthHeaders()
     });
-    
+    console.log("[therapist.ts] Reschedule response:", response.data);
     return response.data;
-  } catch (error) {
-    console.error('Error fetching session notes:', error);
+  } catch (error: any) {
+    console.error("[therapist.ts] Reschedule error:", error.response?.data || error.message);
     throw error;
   }
 };
 
 /**
- * Create session note
- */
-export const createSessionNote = async (noteData: {
-  patient: number;
-  appointment?: number;
-  notes: string;
-  session_date?: string;
-}) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${THERAPIST_URL}/session-notes/`,
-      noteData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error creating session note:', error);
-    throw error;
-  }
-};
-
-/**
- * Update session note
- */
-export const updateSessionNote = async (noteId: number, noteData: {
-  notes: string;
-  session_date?: string;
-}) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.patch(
-      `${THERAPIST_URL}/session-notes/${noteId}/`,
-      noteData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error updating session note ${noteId}:`, error);
-    throw error;
-  }
-};
-
-/**
- * Get therapist's waiting list
- */
-export const getTherapistWaitingList = async () => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.get(`${THERAPIST_URL}/waiting-list/`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+ * Confirms an appointment
+ * @param appointmentId - The ID of the appointment to confirm
+ * @returns The confirmed appointment data
+    const response = await axios.post(url, {}, {
+      headers: getAuthHeaders()
     });
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching therapist waiting list:', error);
+    console.log("[therapist.ts] Confirm response:", response.data);
+    // Ensure we return the appointment data in a consistent format
+    return (response.data as AppointmentResponse).appointment || response.data;
+export const confirmAppointment = async (appointmentId: number | string) => {
+  console.log(`[therapist.ts] Confirming appointment ${appointmentId}`);
+  
+  const url = `${API_URL}/appointments/${appointmentId}/confirm/`;
+  console.log("[therapist.ts] Confirm URL:", url);
+  
+  try {
+    const response = await axios.post(url, {}, {
+      headers: getAuthHeaders()
+    });
+    console.log("[therapist.ts] Confirm response:", response.data);
+    // Ensure we return the appointment data in a consistent format
+    return response.data.appointment || response.data;
+  } catch (error: any) {
+    console.error("[therapist.ts] Confirm error:", error.response?.data || error.message);
     throw error;
   }
 };
 
 /**
- * Notify a patient from waiting list
+ * Cancels an existing appointment
+ * @param id - The ID of the appointment to cancel
+ * @returns The canceled appointment data
+ * 
+ * Status Change: any status → canceled
  */
-export const notifyWaitingListPatient = async (entryId: number) => {
+export const cancelAppointment = async (id: number) => {
+  console.log(`[therapist.ts] Canceling appointment ${id}`);
+  
+  const url = `${API_URL}/appointments/${id}/cancel/`;
+  console.log("[therapist.ts] Cancel URL:", url);
+  
   try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${WAITING_LIST_URL}/${entryId}/notify/`,
+    const resp = await axios.post(
+      url,
       {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
+      { headers: getAuthHeaders() }
     );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error notifying waiting list patient ${entryId}:`, error);
+    console.log("[therapist.ts] Cancel response:", resp.data);
+    return resp.data;
+  } catch (error: any) {
+    console.error("[therapist.ts] Cancel error:", error.response?.data || error.message);
     throw error;
   }
 };
 
 /**
- * Update therapist availability
+ * Marks an appointment as completed
+ * @param appointmentId - The ID of the appointment to mark as completed
+ * @returns The completed appointment data
+ * 
+ * Note: Only verified therapists can complete appointments that are in 'confirmed' status.
+ * Once completed, the appointment cannot be modified further.
+ * 
+ * Status Change: confirmed → completed
  */
-export const updateTherapistAvailability = async (availabilityData: {
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-}) => {
+export const completeAppointment = async (appointmentId: number | string) => {
+  console.log(`[therapist.ts] Completing appointment ${appointmentId}`);
+  
+  const url = `${API_URL}/appointments/${appointmentId}/complete/`;
+  console.log("[therapist.ts] Complete URL:", url);
+  
   try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.post(
-      `${THERAPIST_URL}/availability/`,
-      availabilityData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
+    const response = await axios.post(url, {}, {
+      headers: getAuthHeaders()
+    });
+    console.log("[therapist.ts] Complete response:", response.data);
     return response.data;
-  } catch (error) {
-    console.error('Error updating therapist availability:', error);
-    throw error;
-  }
-};
-
-/**
- * Delete therapist availability slot
- */
-export const deleteAvailabilitySlot = async (slotId: number) => {
-  try {
-    const token = await AsyncStorage.getItem('accessToken');
-    
-    const response = await axios.delete(
-      `${THERAPIST_URL}/availability/${slotId}/`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-    
-    return response.data;
-  } catch (error) {
-    console.error(`Error deleting availability slot ${slotId}:`, error);
+  } catch (error: any) {
+    console.error("[therapist.ts] Complete error:", error.response?.data || error.message);
     throw error;
   }
 };

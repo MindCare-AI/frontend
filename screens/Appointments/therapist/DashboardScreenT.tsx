@@ -21,15 +21,12 @@ const DashboardScreenT: React.FC = () => {
     waitingList,
     sessionNotes,
     timeSlots,
+    loading,
+    refreshAppointments,
     confirmAppointment,
     completeAppointment,
     rescheduleAppointment,
-    toggleAppointmentExpand,
-    notifyPatient,
-    removeFromWaitingList,
-    updateSessionNote,
-    addTimeSlot,
-    removeTimeSlot,
+    cancelAppointment
   } = useAppContext();
 
   const [rescheduleModalVisible, setRescheduleModalVisible] = useState(false);
@@ -51,6 +48,26 @@ const DashboardScreenT: React.FC = () => {
     setEditNoteModalVisible(true);
   };
 
+  // Add these dummy functions to satisfy props requirements or update them with real functionality
+  const handleToggleExpand = (id: number) => {
+    console.log(`Toggle expand for appointment ${id}`);
+    // Implementation could update the appointment's isExpanded property
+  };
+
+  const handleVideoLink = (id: number) => {
+    console.log(`Open video link for appointment ${id}`);
+    // Find the appointment and open its video link
+    const appointment = upcomingAppointments.find(a => Number(a.id) === id);
+    if (appointment?.video_session_link) {
+      window.open(appointment.video_session_link, '_blank');
+    }
+  };
+
+  const handleEditDetails = (id: number) => {
+    console.log(`Edit details for appointment ${id}`);
+    // Implementation could open a modal to edit appointment details
+  };
+
   // Render the dashboard content
   const renderDashboardContent = () => {
     if (isLargeScreen) {
@@ -69,6 +86,7 @@ const DashboardScreenT: React.FC = () => {
                       onConfirm={confirmAppointment}
                       onComplete={completeAppointment}
                       onReschedule={handleReschedulePress}
+                      onCancel={cancelAppointment}
                     />
                   ))
                 ) : (
@@ -110,34 +128,17 @@ const DashboardScreenT: React.FC = () => {
                     <UpcomingAppointmentCard
                       key={appointment.id}
                       appointment={appointment}
-                      onToggleExpand={toggleAppointmentExpand}
+                      onToggleExpand={handleToggleExpand}
+                      onVideoLink={handleVideoLink}
+                      onEditDetails={handleEditDetails}
+                      onConfirm={confirmAppointment}
+                      onCancel={cancelAppointment}
                     />
                   ))
                 ) : (
                   <EmptyState
                     icon="calendar"
                     message="No upcoming appointments."
-                  />
-                )}
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <SectionHeader title="Waiting List" icon="clock" />
-              <View style={styles.sectionContent}>
-                {waitingList.length > 0 ? (
-                  waitingList.map((entry) => (
-                    <WaitingListCard
-                      key={entry.id}
-                      entry={entry}
-                      onNotify={notifyPatient}
-                      onRemove={removeFromWaitingList}
-                    />
-                  ))
-                ) : (
-                  <EmptyState
-                    icon="clock"
-                    message="No patients on the waiting list."
                   />
                 )}
               </View>
@@ -160,6 +161,7 @@ const DashboardScreenT: React.FC = () => {
                     onConfirm={confirmAppointment}
                     onComplete={completeAppointment}
                     onReschedule={handleReschedulePress}
+                    onCancel={cancelAppointment}
                   />
                 ))
               ) : (
@@ -179,34 +181,17 @@ const DashboardScreenT: React.FC = () => {
                   <UpcomingAppointmentCard
                     key={appointment.id}
                     appointment={appointment}
-                    onToggleExpand={toggleAppointmentExpand}
+                    onToggleExpand={handleToggleExpand}
+                    onVideoLink={handleVideoLink}
+                    onEditDetails={handleEditDetails}
+                    onConfirm={confirmAppointment}
+                    onCancel={cancelAppointment}
                   />
                 ))
               ) : (
                 <EmptyState
                   icon="calendar"
                   message="No upcoming appointments."
-                />
-              )}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <SectionHeader title="Waiting List" icon="clock" />
-            <View style={styles.sectionContent}>
-              {waitingList.length > 0 ? (
-                waitingList.map((entry) => (
-                  <WaitingListCard
-                    key={entry.id}
-                    entry={entry}
-                    onNotify={notifyPatient}
-                    onRemove={removeFromWaitingList}
-                  />
-                ))
-              ) : (
-                <EmptyState
-                  icon="clock"
-                  message="No patients on the waiting list."
                 />
               )}
             </View>
@@ -241,6 +226,7 @@ const DashboardScreenT: React.FC = () => {
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
           <Text style={styles.title}>My Schedule</Text>
+          {loading && <Text style={styles.subtitle}>Loading...</Text>}
         </View>
 
         {renderDashboardContent()}
@@ -248,9 +234,10 @@ const DashboardScreenT: React.FC = () => {
 
       <FAB
         style={styles.fab}
-        icon="clock"
+        icon="refresh"
         color="white"
-        onPress={() => setAvailabilityModalVisible(true)}
+        onPress={refreshAppointments}
+        loading={loading}
       />
 
       <RescheduleModal
@@ -264,16 +251,20 @@ const DashboardScreenT: React.FC = () => {
         visible={editNoteModalVisible}
         note={selectedNote}
         onDismiss={() => setEditNoteModalVisible(false)}
-        onSave={updateSessionNote}
+        onSave={(updatedNote) => {
+          // Handle saving the updated note
+          // This could involve calling an API or updating local state
+          setEditNoteModalVisible(false);
+        }}
       />
 
-      <AvailabilityModal
+      {/* <AvailabilityModal
         visible={availabilityModalVisible}
         timeSlots={timeSlots}
         onDismiss={() => setAvailabilityModalVisible(false)}
         onAddTimeSlot={addTimeSlot}
         onRemoveTimeSlot={removeTimeSlot}
-      />
+      /> */}
     </SafeAreaView>
   );
 };
@@ -281,7 +272,7 @@ const DashboardScreenT: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F5F7FF', // Light blue-ish background
   },
   scrollView: {
     flex: 1,
@@ -292,7 +283,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#003366',
+    color: '#3F51B5', // Indigo
   },
   twoColumnContainer: {
     flexDirection: 'row',
@@ -307,11 +298,11 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'white',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: '#3F51B5',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
@@ -324,7 +315,12 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#003366',
+    backgroundColor: '#3F51B5', // Indigo
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#5C6BC0', // Lighter indigo
+    marginTop: 4,
   },
 });
 
