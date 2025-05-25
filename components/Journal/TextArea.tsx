@@ -4,16 +4,21 @@ import { colors, spacing, borderRadius, fontSizes } from "./theme"
 interface TextAreaProps extends TextInputProps {
   label?: string
   error?: string
-  containerStyle?: ViewStyle
   height?: number
+  containerStyle?: ViewStyle
 }
 
-export function TextArea({ label, error, containerStyle, style, height = 150, ...rest }: TextAreaProps) {
+export function TextArea({ label, error, height = 120, containerStyle, style, ...rest }: TextAreaProps) {
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
-        style={[styles.input, { height }, error ? styles.inputError : {}, style]}
+        style={[
+          styles.textArea,
+          { height },
+          error ? styles.textAreaError : {},
+          style
+        ]}
         multiline
         textAlignVertical="top"
         placeholderTextColor={colors.gray}
@@ -34,7 +39,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     color: colors.darkGray,
   },
-  input: {
+  textArea: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.lightGray,
@@ -43,7 +48,7 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.md,
     color: colors.black,
   },
-  inputError: {
+  textAreaError: {
     borderColor: colors.danger,
   },
   errorText: {

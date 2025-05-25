@@ -1,10 +1,13 @@
+import type { RouteProp } from "@react-navigation/native";
+import type { StackNavigationProp } from "@react-navigation/stack";
+
 //navigation/types.tsx
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
   Auth: { screen?: string; params?: object };
   App: { screen?: keyof AppStackParamList; params?: object };
-  Appointments: { screen: keyof AppointmentStackParamList; params?: undefined }; // Simplified to align with expected structure
+  Appointments: { screen: keyof AppointmentStackParamList; params?: undefined };
   BookAppointment: undefined;
   Messaging: undefined;
   Chat: {
@@ -23,7 +26,7 @@ export type AppStackParamList = {
   MoodTracker: undefined;
   Appointments: undefined;
   Journal: undefined;
-  Messaging: undefined; // Add this line
+  Messaging: undefined;
 };
 
 export type AuthStackParamList = {
@@ -76,6 +79,7 @@ export type MessagingStackParamList = {
   GroupMembers: { id: string };
   Settings: undefined;
   NotificationSettings: undefined;
+  MessagingSettings: { conversationId?: string; conversationType?: 'one_to_one' | 'group' };
   Messaging: undefined;
 };
 
@@ -116,6 +120,7 @@ export type MediaGalleryScreenNavigationProp = StackNavigationProp<MessagingStac
 export type GroupMembersScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "GroupMembers">;
 export type SettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Settings">;
 export type NotificationSettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NotificationSettings">;
+export type MessagingSettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "MessagingSettings">;
 
 // Messaging Screen Route Props
 export type ChatScreenRouteProp = RouteProp<MessagingStackParamList, "Chat">;
@@ -123,6 +128,4 @@ export type ProfileScreenRouteProp = RouteProp<MessagingStackParamList, "Profile
 export type MediaGalleryScreenRouteProp = RouteProp<MessagingStackParamList, "MediaGallery">;
 export type GroupMembersScreenRouteProp = RouteProp<MessagingStackParamList, "GroupMembers">;
 export type SearchScreenRouteProp = RouteProp<MessagingStackParamList, "Search">;
-
-import type { RouteProp } from "@react-navigation/native";
-import type { StackNavigationProp } from "@react-navigation/stack";
+export type MessagingSettingsScreenRouteProp = RouteProp<MessagingStackParamList, "MessagingSettings">;

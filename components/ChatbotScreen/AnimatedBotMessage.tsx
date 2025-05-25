@@ -1,92 +1,186 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Image, Platform, Text } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  SlideInLeft,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Animated, StyleSheet } from 'react-native';
+import { ChatbotMessage } from '../../types/chatbot';
 
 interface AnimatedBotMessageProps {
-  children?: React.ReactNode; // children is now optional
-  isTyping?: boolean;
-  message: string; // added property to receive message text
+  message: ChatbotMessage;
+  index: number;
 }
 
-export const AnimatedBotMessage: React.FC<AnimatedBotMessageProps> = ({
-  children,
-  isTyping = false,
-  message,
-}) => {
-  const scale = useSharedValue(0.95);
-  const opacity = useSharedValue(0);
+export const AnimatedBotMessage: React.FC<AnimatedBotMessageProps> = ({ message, index }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    scale.value = withSpring(1, {
-      damping: 15,
-      stiffness: 150,
-    });
-    opacity.value = withTiming(1, { duration: 300 });
-  }, []);
+    // Reset animations first
+    fadeAnim.setValue(0);
+    slideAnim.setValue(20);
+    
+    // Start animation with a small delay based on index
+    const delay = Math.min(index * 100, 500); // Cap delay at 500ms
+    
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
 
-  const avatarStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
+    return () => clearTimeout(timer);
+  }, [message.id]); // Only re-animate when message ID changes
+
+  const isBot = message.is_bot;
+  const isUser = !isBot;
+
+  // Format timestamp consistently
+  const formatTimestamp = (timestamp: string | Date) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false
+      });
+    } catch (error) {
+      return '';
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <Animated.View
-        style={[styles.avatarContainer, avatarStyle]}
-      >
-        <Image
-          source={{ uri: 'https://i.imgur.com/7kQEsHU.png' }} // Common bot avatar image
-          style={styles.avatar}
-        />
-      </Animated.View>
+    <Animated.View
+      style={[
+        styles.messageContainer,
+        isUser ? styles.userContainer : styles.botContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      {isBot && (
+        <View style={styles.botAvatarContainer}>
+          <View style={styles.botAvatar}>
+            <Text style={styles.botAvatarText}>🤖</Text>
+          </View>
+        </View>
+      )}
       
-      <Animated.View
-        entering={SlideInLeft.springify().damping(15)}
-        style={styles.messageContainer}
-      >
-        <Text>{message}</Text>
-        {children}
-      </Animated.View>
-    </View>
+      <View style={[
+        styles.messageBubble,
+        isUser ? styles.userBubble : styles.botBubble,
+      ]}>
+        <Text style={[
+          styles.messageText,
+          isUser ? styles.userText : styles.botText,
+        ]}>
+          {message.content}
+        </Text>
+        
+        <Text style={[
+          styles.timestamp,
+          isUser ? styles.userTimestamp : styles.botTimestamp,
+        ]}>
+          {formatTimestamp(message.timestamp)}
+        </Text>
+      </View>
+      
+      {isUser && (
+        <View style={styles.userAvatarContainer}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.userAvatarText}>👤</Text>
+          </View>
+        </View>
+      )}
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginVertical: 8,
-    marginHorizontal: 16,
-    gap: 12,
-  },
-  avatarContainer: {
-    padding: 2,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
   messageContainer: {
-    flex: 1,
+    flexDirection: 'row',
+    marginVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: 'flex-start',
+  },
+  userContainer: {
+    justifyContent: 'flex-end',
+  },
+  botContainer: {
+    justifyContent: 'flex-start',
+  },
+  botAvatarContainer: {
+    marginRight: 8,
+    marginTop: 4,
+  },
+  userAvatarContainer: {
+    marginLeft: 8,
+    marginTop: 4,
+  },
+  botAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botAvatarText: {
+    fontSize: 14,
+  },
+  userAvatarText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+  },
+  messageBubble: {
+    maxWidth: '75%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    marginBottom: 2,
+  },
+  botBubble: {
+    backgroundColor: '#F3F4F6',
+    borderBottomLeftRadius: 4,
+  },
+  userBubble: {
+    backgroundColor: '#4A90E2',
+    borderBottomRightRadius: 4,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  botText: {
+    color: '#111827',
+  },
+  userText: {
+    color: '#FFFFFF',
+  },
+  timestamp: {
+    fontSize: 11,
+    opacity: 0.6,
+  },
+  botTimestamp: {
+    color: '#6B7280',
+  },
+  userTimestamp: {
+    color: '#FFFFFF',
   },
 });

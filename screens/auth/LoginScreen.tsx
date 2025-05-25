@@ -26,7 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { gsap } from 'gsap';
 import { resetOnboardingStatus } from '../../lib/onboarding';
 import { setCachedToken } from '../../lib/utils';
-import { getShadowStyles } from '../../styles/global';
+import { createShadow } from '../../styles/global';
 
 type LoginScreenProps = {
   navigation: NavigationProp<RootStackParamList>;
@@ -551,7 +551,6 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 };
 
 const styles = StyleSheet.create({
-  // ... styles remain unchanged
   container: {
     flex: 1,
     backgroundColor: "#E4F0F6",
@@ -577,8 +576,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 24,
     borderRadius: 12,
-    ...getShadowStyles(5),
-    // Remove deprecated shadow properties
+    ...createShadow(5),
   },
   title: {
     fontSize: 26,
@@ -631,11 +629,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
+    ...createShadow(4),
     marginTop: 6,
   },
   loginButtonText: {
@@ -667,11 +661,7 @@ const styles = StyleSheet.create({
     borderColor: '#CFCFCF',
     marginVertical: 8,
     backgroundColor: '#FFFFFF',
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    ...createShadow(1, '#000', 0.1),
   },
   socialButtonText: {
     marginLeft: 12,
@@ -697,7 +687,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '80%',
     maxWidth: 300,
-    ...getShadowStyles(5),
+    ...createShadow(5),
   },
   loadingText: {
     marginTop: 16,

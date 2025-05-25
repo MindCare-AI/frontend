@@ -41,7 +41,7 @@
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "expo": "~52.0.42",
+    "expo": "~52.0.46",
     "expo-av": "^15.0.2",
     "expo-document-picker": "^13.0.3",
     "expo-haptics": "^14.0.1",
@@ -87,13 +87,14 @@
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "~0.19.13",
     "react-navigation": "^5.0.0",
+    "react-redux": "^9.2.0",
     "react-router-dom": "^7.5.3",
     "styled-components": "^6.1.17",
     "tailwind-merge": "^3.2.0",
     "tailwind-rn": "^4.2.0",
     "uuid": "^11.1.0",
     "yup": "^1.6.1",
-    "zustand": "^5.0.3"
+    "zustand": "^4.4.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

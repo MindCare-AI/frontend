@@ -1,6 +1,42 @@
 import axios from 'axios';
 import { API_URL } from '../../config';
-import { ChatbotResponse, ChatbotConversationResponse } from '../../types/chatbot';
+import { 
+  CreateChatbotConversationResponse, 
+  SendChatbotMessageResponse,
+  ChatbotConversationListResponse,
+  ChatbotMessage 
+} from '../../types/chatbot';
+
+/**
+ * Gets all chatbot conversations for the current user
+ */
+export const getChatbotConversations = async (
+  token: string
+): Promise<ChatbotConversationListResponse> => {
+  try {
+    console.log('Getting chatbot conversations with token:', token ? `${token.substring(0, 10)}...` : 'No token!');
+    
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await axios.get<ChatbotConversationListResponse>(
+      `${API_URL}/chatbot/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    console.log('Conversations response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting chatbot conversations:', error);
+    throw error;
+  }
+};
 
 /**
  * Creates a new chatbot conversation
@@ -9,7 +45,7 @@ export const createChatbotConversation = async (
   userId: number,
   title: string,
   token: string
-): Promise<ChatbotConversationResponse> => {
+): Promise<CreateChatbotConversationResponse> => {
   try {
     console.log('Creating chatbot conversation with token:', token ? `${token.substring(0, 10)}...` : 'No token!');
     
@@ -17,11 +53,12 @@ export const createChatbotConversation = async (
       throw new Error('No authentication token available');
     }
 
-    const response = await axios.post<ChatbotConversationResponse>(
+    const response = await axios.post<CreateChatbotConversationResponse>(
       `${API_URL}/chatbot/`,
       {
         user: userId,
-        title: title
+        title: title,
+        is_active: true
       },
       {
         headers: {
@@ -48,13 +85,13 @@ export const sendChatbotMessage = async (
   conversationId: number,
   content: string,
   token: string
-): Promise<ChatbotResponse | null> => {
+): Promise<SendChatbotMessageResponse | null> => {
   try {
     if (!token) {
       throw new Error('No authentication token available');
     }
 
-    const response = await axios.post<ChatbotResponse>(
+    const response = await axios.post<SendChatbotMessageResponse>(
       `${API_URL}/chatbot/${conversationId}/send_message/`,
       { content },
       {
@@ -73,14 +110,18 @@ export const sendChatbotMessage = async (
 };
 
 /**
- * Gets the message history for a conversation
+ * Gets a specific chatbot conversation with its messages
  */
-export const getChatbotHistory = async (
+export const getChatbotConversation = async (
   conversationId: number,
   token: string
-): Promise<any[]> => {
+): Promise<CreateChatbotConversationResponse> => {
   try {
-    const response = await axios.get(
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await axios.get<CreateChatbotConversationResponse>(
       `${API_URL}/chatbot/${conversationId}/`,
       {
         headers: {
@@ -90,9 +131,27 @@ export const getChatbotHistory = async (
       }
     );
 
-    // Type assertion and safe access
-    const responseData = response.data as any;
-    return responseData?.messages || [];
+    return response.data;
+  } catch (error) {
+    console.error('Error getting chatbot conversation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets the message history for a conversation
+ */
+export const getChatbotHistory = async (
+  conversationId: number,
+  token: string
+): Promise<ChatbotMessage[]> => {
+  try {
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const conversation = await getChatbotConversation(conversationId, token);
+    return conversation.recent_messages || [];
   } catch (error) {
     console.error('Error getting chatbot history:', error);
     throw error;

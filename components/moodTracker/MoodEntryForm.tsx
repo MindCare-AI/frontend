@@ -244,6 +244,7 @@ const MoodEntryForm: React.FC<MoodEntryFormProps> = ({
                 loading={isSubmitting}
                 disabled={isSubmitting}
                 buttonColor={colors.primary}
+                labelStyle={{ color: colors.white }} // Add white text
               >
                 {initialValues ? 'Update' : 'Save'}
               </Button>
