@@ -164,6 +164,7 @@ function MoodScreenContent() {
             onPress={() => setMoodModalVisible(true)}
             style={[styles.addButton, { backgroundColor: colors.primary }]}
             icon="plus"
+            labelStyle={{ color: colors.white }} // <-- ensure white text
           >
             Track Mood
           </Button>
@@ -237,15 +238,9 @@ function MoodScreenContent() {
             />
           </Modal>
         </Portal>
+
         
-        {/* Floating action button */}
-        <FAB
-          icon="plus"
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          color={colors.white}
-          onPress={() => setMoodModalVisible(true)}
-          visible={!moodModalVisible}
-        />
+        
       </LinearGradient>
     </View>
   );
@@ -298,10 +293,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   modalContent: {
-    margin: 20,
+    margin: 5, // Further reduced margin
     borderRadius: 16,
-    padding: 8,
-    maxHeight: '80%',
+    padding: 20, // Increased padding
+    maxHeight: '98%', // Use almost entire screen height
+    minHeight: 600, // Increased minimum height for emoji pickers
     backgroundColor: 'white',
   },
   closeButton: {

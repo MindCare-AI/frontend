@@ -1,166 +1,243 @@
-import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
-import Animated, {
-  FadeIn,
-  SlideInRight,
-  SlideInLeft,
-  Layout,
-} from 'react-native-reanimated';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { ChatbotMessage } from '../../types/chatbot';
 
 interface ChatMessageBubbleProps {
-  message: string;
-  isBot?: boolean;
-  timestamp?: Date;
-  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  message: ChatbotMessage;
+  onRetry?: (messageId: string) => void;
 }
 
 export const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   message,
-  isBot = false,
-  timestamp,
-  status = 'sent',
+  onRetry,
 }) => {
-  const entering = isBot ? SlideInLeft : SlideInRight;
+  const [pressScale] = useState(new Animated.Value(1));
+  const isBot = message.is_bot;
+  const isUser = !isBot;
+  const isFailed = message.status === 'failed';
+  const isSending = message.status === 'sending';
 
-  const getStatusText = () => {
-    switch (status) {
-      case 'sending':
-        return '●●●';
-      case 'sent':
-        return '✓';
-      case 'delivered':
-        return '✓✓';
-      case 'read':
-        return '✓✓';
-      default:
-        return '';
-    }
+  const handlePressIn = () => {
+    Animated.spring(pressScale, {
+      toValue: 0.98,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const getStatusColor = () => {
-    switch (status) {
-      case 'sending':
-        return '#9CA3AF';
-      case 'read':
-        return '#3B82F6';
-      default:
-        return '#6B7280';
+  const handlePressOut = () => {
+    Animated.spring(pressScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleRetry = () => {
+    if (onRetry && isFailed) {
+      onRetry(message.id.toString());
     }
   };
 
   return (
-    <Animated.View
-      entering={entering.duration(300)}
-      layout={Layout.springify()}
-      style={[
-        styles.container,
-        isBot ? styles.botContainer : styles.userContainer,
-      ]}
-    >
-      <View
+    <View style={[
+      styles.messageContainer,
+      isUser ? styles.userContainer : styles.botContainer,
+    ]}>
+      {isBot && (
+        <View style={styles.botAvatarContainer}>
+          <View style={styles.botAvatar}>
+            <Text style={styles.botAvatarText}>🤖</Text>
+          </View>
+        </View>
+      )}
+      
+      <Animated.View
         style={[
-          styles.bubble,
-          isBot ? styles.botBubble : styles.userBubble,
+          styles.messageBubble,
+          isUser ? styles.userBubble : styles.botBubble,
+          isFailed && styles.failedBubble,
+          { transform: [{ scale: pressScale }] },
         ]}
+        onTouchStart={handlePressIn}
+        onTouchEnd={handlePressOut}
       >
-        <Animated.Text
-          entering={FadeIn.duration(200)}
-          style={[
-            styles.message,
-            isBot ? styles.botMessage : styles.userMessage,
-          ]}
-        >
-          {message}
-        </Animated.Text>
-
-        <View style={styles.metadata}>
-          {timestamp && (
-            <Text style={styles.timestamp}>
-              {timestamp.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          )}
+        <Text style={[
+          styles.messageText,
+          isUser ? styles.userText : styles.botText,
+          isFailed && styles.failedText,
+        ]}>
+          {message.content}
+        </Text>
+        
+        <View style={styles.messageFooter}>
+          <Text style={[
+            styles.timestamp,
+            isUser ? styles.userTimestamp : styles.botTimestamp,
+          ]}>
+            {new Date(message.timestamp).toLocaleTimeString([], { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </Text>
           
-          {!isBot && (
-            <Text
-              style={[
-                styles.status,
-                { color: getStatusColor() },
-              ]}
-            >
-              {getStatusText()}
-            </Text>
+          {isUser && (
+            <View style={styles.statusContainer}>
+              {isSending && (
+                <Ionicons 
+                  name="time-outline" 
+                  size={14} 
+                  color="#FFFFFF" 
+                  style={styles.statusIcon}
+                />
+              )}
+              {message.status === 'sent' && (
+                <Ionicons 
+                  name="checkmark" 
+                  size={14} 
+                  color="#FFFFFF" 
+                  style={styles.statusIcon}
+                />
+              )}
+              {isFailed && (
+                <TouchableOpacity onPress={handleRetry} style={styles.retryButton}>
+                  <Ionicons 
+                    name="refresh" 
+                    size={14} 
+                    color="#FF6B6B" 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           )}
         </View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+      
+      {isUser && (
+        <View style={styles.userAvatarContainer}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.userAvatarText}>👤</Text>
+          </View>
+        </View>
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 4,
-    marginHorizontal: 16,
-    maxWidth: '80%',
-  },
-  botContainer: {
-    alignSelf: 'flex-start',
+  messageContainer: {
+    flexDirection: 'row',
+    marginVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: 'flex-end',
   },
   userContainer: {
-    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
   },
-  bubble: {
-    borderRadius: 20,
+  botContainer: {
+    justifyContent: 'flex-start',
+  },
+  botAvatarContainer: {
+    marginRight: 12,
+    marginBottom: 4,
+  },
+  userAvatarContainer: {
+    marginLeft: 12,
+    marginBottom: 4,
+  },
+  botAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E4F0F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#002D62',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  userAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#002D62',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  botAvatarText: {
+    fontSize: 18,
+  },
+  userAvatarText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  messageBubble: {
+    maxWidth: '75%',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-      },
-    }),
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
   },
   botBubble: {
-    backgroundColor: '#F3F4F6',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 6,
+    borderColor: '#E4F0F6',
+    borderWidth: 1.5,
   },
   userBubble: {
     backgroundColor: '#002D62',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
   },
-  message: {
+  failedBubble: {
+    backgroundColor: '#FFE6E6',
+    borderColor: '#FF6B6B',
+  },
+  messageText: {
     fontSize: 16,
     lineHeight: 24,
+    marginBottom: 6,
   },
-  botMessage: {
-    color: '#1F2937',
+  botText: {
+    color: '#333333',
   },
-  userMessage: {
+  userText: {
     color: '#FFFFFF',
   },
-  metadata: {
+  failedText: {
+    color: '#D32F2F',
+  },
+  messageFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-    gap: 4,
   },
   timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
+    opacity: 0.7,
   },
-  status: {
-    fontSize: 12,
-    fontWeight: '500',
+  botTimestamp: {
+    color: '#666666',
+  },
+  userTimestamp: {
+    color: '#FFFFFF',
+  },
+  statusContainer: {
+    marginLeft: 8,
+  },
+  statusIcon: {
+    opacity: 0.8,
+  },
+  retryButton: {
+    padding: 2,
   },
 });

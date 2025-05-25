@@ -1,16 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 import { 
-  ChatbotConversation, 
-  ChatbotMessage, 
-  ChatbotResponse,
-  CreateChatbotConversationResponse,
-  SendChatbotMessageResponse 
+  CreateChatbotConversationResponse, 
+  SendChatbotMessageResponse,
+  ChatbotConversation 
 } from '../types/chatbot';
 
 // Get auth headers for API requests
 const getAuthHeaders = async () => {
   try {
+    // Use consistent token key
     const token = await AsyncStorage.getItem('accessToken');
     return {
       headers: {
@@ -26,21 +25,26 @@ const getAuthHeaders = async () => {
 
 class ChatService {
   private baseUrl: string;
+  private currentConversation: ChatbotConversation | null = null;
 
   constructor() {
     this.baseUrl = `${API_URL}/chatbot`;
   }
 
+  setCurrentConversation(conversation: ChatbotConversation) {
+    this.currentConversation = conversation;
+  }
+
   // Create a new chatbot conversation
-  async createConversation(title?: string): Promise<CreateChatbotConversationResponse> {
+  async createConversation(title: string): Promise<CreateChatbotConversationResponse> {
     try {
       console.log('[ChatService] 🆕 Creating new chatbot conversation');
       const config = await getAuthHeaders();
       
-      const response = await fetch(`${this.baseUrl}/conversations/`, {
+      const response = await fetch(`${this.baseUrl}/`, {
         method: 'POST',
         ...config,
-        body: JSON.stringify({ title: title || 'New Chat' })
+        body: JSON.stringify({ title, is_active: true })
       });
 
       if (!response.ok) {
@@ -52,8 +56,17 @@ class ChatService {
       
       return {
         id: data.id,
+        user: data.user,
         title: data.title,
-        messages: data.messages || []
+        created_at: data.created_at,
+        last_activity: data.last_activity,
+        is_active: data.is_active,
+        last_message: data.last_message,
+        message_count: data.message_count,
+        latest_summary: data.latest_summary,
+        last_message_at: data.last_message_at,
+        participants: data.participants,
+        recent_messages: data.recent_messages || []
       };
     } catch (error) {
       console.error('[ChatService] ❌ Error creating conversation:', error);
@@ -87,7 +100,7 @@ class ChatService {
   }
 
   // Get a specific chatbot conversation by ID
-  async getConversation(conversationId: string | number): Promise<ChatbotResponse> {
+  async getConversation(conversationId: string | number): Promise<ChatbotConversation> {
     try {
       console.log('[ChatService] 📋 Fetching conversation:', conversationId);
       const config = await getAuthHeaders();
@@ -112,12 +125,16 @@ class ChatService {
   }
 
   // Send a message to the chatbot
-  async sendMessage(conversationId: string | number, content: string): Promise<SendChatbotMessageResponse> {
+  async sendMessage(content: string): Promise<SendChatbotMessageResponse | null> {
+    if (!this.currentConversation) {
+      throw new Error('No active conversation');
+    }
+
     try {
-      console.log('[ChatService] 📤 Sending message to conversation:', conversationId);
+      console.log('[ChatService] 📤 Sending message to conversation:', this.currentConversation.id);
       const config = await getAuthHeaders();
       
-      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/messages/`, {
+      const response = await fetch(`${this.baseUrl}/${this.currentConversation.id}/send_message/`, {
         method: 'POST',
         ...config,
         body: JSON.stringify({ content })
@@ -131,16 +148,33 @@ class ChatService {
       console.log('[ChatService] ✅ Message sent, received response:', data);
       
       return {
-        user_message: {
-          id: data.user_message?.id || '',
-          content: data.user_message?.content || content,
-          timestamp: data.user_message?.timestamp || new Date().toISOString()
-        },
-        bot_response: {
-          id: data.bot_response?.id || '',
-          content: data.bot_response?.content || '',
-          timestamp: data.bot_response?.timestamp || new Date().toISOString()
-        }
+        id: data.id,
+        conversation_id: data.conversation_id,
+        timestamp: data.timestamp,
+        user_message: data.user_message ? {
+          id: data.user_message.id,
+          content: data.user_message.content,
+          timestamp: data.user_message.timestamp,
+          message_type: data.user_message.message_type || 'text',
+          is_bot: false,
+          sender: data.user_message.sender,
+          sender_name: data.user_message.sender_name,
+          metadata: data.user_message.metadata,
+          parent_message: data.user_message.parent_message,
+          chatbot_method: data.user_message.chatbot_method,
+        } : undefined,
+        bot_response: data.bot_response ? {
+          id: data.bot_response.id,
+          content: data.bot_response.content,
+          timestamp: data.bot_response.timestamp,
+          message_type: data.bot_response.message_type || 'text',
+          is_bot: true,
+          sender: data.bot_response.sender,
+          sender_name: data.bot_response.sender_name,
+          metadata: data.bot_response.metadata,
+          parent_message: data.bot_response.parent_message,
+          chatbot_method: data.bot_response.chatbot_method,
+        } : undefined
       };
     } catch (error) {
       console.error('[ChatService] ❌ Error sending message:', error);

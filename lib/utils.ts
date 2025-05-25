@@ -1,9 +1,9 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export const setCachedToken = (token: string) => {
@@ -13,13 +13,14 @@ export const setCachedToken = (token: string) => {
 
 export const getAuthToken = async (): Promise<string | null> => {
   try {
-    const token = await AsyncStorage.getItem('accessToken');
+    // Use consistent token key
+    const token = await AsyncStorage.getItem("accessToken");
     if (!token) {
-      console.warn('Auth token not found');
+      console.warn("Auth token not found");
     }
     return token;
   } catch (error) {
-    console.error('Error retrieving auth token:', error);
+    console.error("Error retrieving auth token:", error);
     return null;
   }
 };

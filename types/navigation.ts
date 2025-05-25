@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Appointments: undefined;
   PatientDashboard: undefined; // Added
   TherapistDashboard: undefined; // Added
+  Mood: undefined; // Add the Mood screen route
 };
 
 export type AppTabParamList = {

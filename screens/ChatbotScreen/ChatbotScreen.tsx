@@ -1,404 +1,475 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, StyleSheet, SafeAreaView,
-  ActivityIndicator, StatusBar, Keyboard, Image
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Animated,
+  ActivityIndicator,
 } from 'react-native';
-import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
-import TypingIndicator from '../../components/ChatbotScreen/TypingIndicator';
-import { ChatMessageBubble } from '../../components/ChatbotScreen/ChatMessageBubble';
-import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage';
-import { useTheme } from '../../theme/ThemeProvider';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
+import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage';
+import { TypingIndicator } from '../../components/ChatbotScreen/TypingIndicator';
 
-export default function ChatbotScreen() {
+const ChatbotScreen: React.FC = () => {
   const {
     messages,
     isLoading,
     error,
     sendMessage,
+    clearHistory,
     isTyping,
     retryMessage,
-    clearHistory
   } = useChatbot();
-  
-  const [input, setInput] = React.useState('');
-  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
-  const { colors } = useTheme();
-  const dark = React.useMemo(() => {
-    return colors.background === '#121212' || colors.primary === '#002D62';
-  }, [colors]);
-  
-  const scrollViewRef = useRef<ScrollView | null>(null);
-  const navigation = useNavigation();
-  
-  // Theme-based styles
-  const dynamicStyles = {
-    container: {
-      backgroundColor: dark ? colors.darkBackground : colors.lightBackground
-    },
-    header: {
-      backgroundColor: dark ? colors.primaryDark : colors.primary,
-      borderBottomColor: dark ? '#2C2C2C' : '#E5E5E5'
-    },
-    headerTitle: {
-      color: '#FFFFFF'
-    },
-    inputContainer: {
-      backgroundColor: dark ? '#1E1E1E' : '#FFFFFF',
-      borderTopColor: dark ? '#2C2C2C' : '#E5E5E5'
-    },
-    input: {
-      backgroundColor: dark ? '#2C2C2C' : '#F5F5F5',
-      color: dark ? '#FFFFFF' : '#000000'
-    },
-    sendButton: {
-      backgroundColor: colors.primary
+
+  const [inputText, setInputText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const inputRef = useRef<TextInput>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  };
+  }, [isLoading, fadeAnim, slideAnim]);
 
-  // Listen for keyboard events
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => setKeyboardVisible(true)
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setKeyboardVisible(false)
-    );
-
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollViewRef.current && messages.length > 0) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+    if (messages.length > 0 && flatListRef.current) {
+      // Use a slight delay to ensure the FlatList has rendered the new message
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
+      
+      return () => clearTimeout(timer);
     }
-  }, [messages, isTyping]);
+  }, [messages.length]);
 
-  // Helper to handle sending a message
-  const handleSendMessage = () => {
-    if (!input.trim()) return;
-    sendMessage(input.trim());
-    setInput('');
+  // Auto-scroll when typing indicator appears
+  useEffect(() => {
+    if (isTyping && flatListRef.current) {
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTyping]);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || isSending) return;
+
+    setIsSending(true);
+    const messageText = inputText.trim();
+    setInputText('');
+    
+    try {
+      await sendMessage(messageText);
+    } catch (err) {
+      console.error('Error sending message:', err);
+    } finally {
+      setIsSending(false);
+    }
   };
-  
-  // Loading state
+
+  const handleRetry = async (messageId: string) => {
+    try {
+      await retryMessage(messageId);
+    } catch (err) {
+      console.error('Error retrying message:', err);
+    }
+  };
+
+  // Sort messages by timestamp and remove duplicates
+  const sortedMessages = React.useMemo(() => {
+    if (!Array.isArray(messages)) return [];
+    
+    // Remove duplicates based on ID
+    const uniqueMessages = messages.filter((message, index, self) => 
+      index === self.findIndex(m => m.id === message.id)
+    );
+    
+    // Sort by timestamp (oldest first for correct chronological order)
+    return uniqueMessages.sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeA - timeB;
+    });
+  }, [messages]);
+
+  const renderMessage = ({ item, index }: { item: any; index: number }) => (
+    <AnimatedBotMessage
+      message={item}
+      index={index}
+    />
+  );
+
+  const renderTypingIndicator = () => {
+    if (!isTyping) return null;
+    return <TypingIndicator visible={isTyping} />;
+  };
+
+  const renderLoadingScreen = () => (
+    <View style={styles.loadingContainer}>
+      <Animated.View style={[
+        styles.loadingContent,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}>
+        <View style={styles.loadingBotContainer}>
+          <View style={styles.loadingBot}>
+            <Text style={styles.loadingBotEmoji}>🤖</Text>
+          </View>
+        </View>
+        
+        <Text style={styles.loadingTitle}>MindCare AI</Text>
+        <Text style={styles.loadingSubtitle}>Your AI companion is ready to help</Text>
+        
+        <View style={styles.loadingDotsContainer}>
+          <ActivityIndicator size="small" color="#4A90E2" />
+        </View>
+      </Animated.View>
+    </View>
+  );
+
   if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.container, dynamicStyles.container]}>
-        <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Animated.Text 
-            entering={FadeIn.duration(500)}
-            style={styles.loadingText}
-          >
-            Connecting to your AI assistant...
-          </Animated.Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-  
-  // Error state
-  if (error) {
-    return (
-      <SafeAreaView style={[styles.container, dynamicStyles.container]}>
-        <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.retryButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+    return renderLoadingScreen();
   }
 
   return (
-    <SafeAreaView style={[styles.container, dynamicStyles.container]}>
-      <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+    <SafeAreaView style={styles.container}>
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
       >
-        <View style={[styles.header, dynamicStyles.header]}>
+        {/* Modern Header */}
+        <View style={styles.header}>
           <View style={styles.headerContent}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, dynamicStyles.headerTitle]}>
-              Samantha AI
-            </Text>
-            <TouchableOpacity onPress={clearHistory} style={styles.clearButton}>
-              <Ionicons name="refresh-outline" size={24} color="#FFFFFF" />
+            <View style={styles.headerLeft}>
+              <View style={styles.headerAvatar}>
+                <Text style={styles.headerAvatarText}>🤖</Text>
+              </View>
+              <View style={styles.headerInfo}>
+                <Text style={styles.headerTitle}>MindCare AI</Text>
+                <View style={styles.statusContainer}>
+                  <View style={styles.onlineIndicator} />
+                  <Text style={styles.headerSubtitle}>Online</Text>
+                </View>
+              </View>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={clearHistory}
+            >
+              <Ionicons name="refresh-outline" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.messagesContainer}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
+        {/* Messages Container */}
+        <KeyboardAvoidingView
+          style={styles.messagesContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          {messages.length === 0 && (
-            <Animated.View 
-              entering={FadeIn.duration(800)}
-              style={styles.emptyStateContainer}
-            >
-              <View style={styles.emptyStateIconContainer}>
-                <Ionicons 
-                  name="chatbubble-ellipses" 
-                  size={100} 
-                  color={colors.primary} 
-                />
-              </View>
-              <Text style={styles.emptyStateTitle}>Welcome to Samantha AI</Text>
-              <Text style={styles.emptyStateText}>
-                I'm your personal mental health assistant. How can I help you today?
-              </Text>
-            </Animated.View>
-          )}
-
-          {messages.map((msg) => (
-            <View 
-              key={msg.id} 
-              style={[
-                styles.messageRow,
-                msg.is_bot ? styles.botMessageRow : styles.userMessageRow
-              ]}
-            >
-              {msg.is_bot ? (
-                <AnimatedBotMessage message={msg.content}>
-                  <ChatMessageBubble
-                    message={msg.content}
-                    isBot={true}
-                    timestamp={new Date(msg.timestamp)}
-                  />
-                </AnimatedBotMessage>
-              ) : (
-                <ChatMessageBubble
-                  message={msg.content}
-                  isBot={false}
-                  timestamp={new Date(msg.timestamp)}
-                  status={msg.status === 'failed' ? undefined : msg.status}
-                />
-              )}
-            </View>
-          ))}
-
-          {isTyping && (
-            <View style={styles.typingContainer}>
-              <TypingIndicator visible={isTyping} />
-            </View>
-          )}
-          
-          {/* Add extra space at bottom for better scrolling experience */}
-          <View style={{ height: 20 }} />
-        </ScrollView>
-
-        <Animated.View 
-          style={[styles.inputContainer, dynamicStyles.inputContainer]}
-          entering={FadeIn}
-          exiting={FadeOut}
-        >
-          <TextInput
-            style={[styles.input, dynamicStyles.input]}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type a message..."
-            placeholderTextColor={dark ? '#AAAAAA' : '#888888'}
-            returnKeyType="send"
-            onSubmitEditing={handleSendMessage}
-            multiline={true}
-            maxLength={1000}
-            numberOfLines={5}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              dynamicStyles.sendButton,
-              !input.trim() && styles.sendButtonDisabled
+          <FlatList
+            ref={flatListRef}
+            data={sortedMessages}
+            renderItem={renderMessage}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            style={styles.messagesList}
+            contentContainerStyle={[
+              styles.messagesContent,
+              sortedMessages.length === 0 && styles.emptyMessagesContent
             ]}
-            onPress={handleSendMessage}
-            disabled={!input.trim()}
-          >
-            <Ionicons name="send" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Animated.View>
-      </KeyboardAvoidingView>
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews={false}
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            getItemLayout={undefined} // Let FlatList calculate item heights dynamically
+            ListFooterComponent={renderTypingIndicator}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyStateBot}>
+                  <Text style={styles.emptyStateBotEmoji}>🤖</Text>
+                </View>
+                <Text style={styles.emptyStateTitle}>Hello! I'm MindCare AI</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                  I'm here to help you with mental health support and guidance. 
+                  Feel free to ask me anything!
+                </Text>
+              </View>
+            )}
+            onContentSizeChange={() => {
+              // Only auto-scroll if we have messages
+              if (sortedMessages.length > 0) {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }
+            }}
+          />
+
+          {/* Modern Input Area */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                ref={inputRef}
+                style={styles.textInput}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Message MindCare AI..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                maxLength={1000}
+                onSubmitEditing={Platform.OS === 'ios' ? undefined : handleSend}
+                blurOnSubmit={false}
+                returnKeyType="send"
+              />
+              
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (!inputText.trim() || isSending) && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || isSending}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5'
-  },
-  keyboardAvoidingView: {
-    flex: 1
-  },
-  header: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#002D62',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  backButton: {
-    padding: 8
-  },
-  clearButton: {
-    padding: 8
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#FFFFFF',
-    flex: 1
-  },
-  messagesContainer: {
-    padding: 16,
-    paddingBottom: 20,
-    flexGrow: 1
-  },
-  messageRow: {
-    marginVertical: 4
-  },
-  botMessageRow: {
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start'
-  },
-  userMessageRow: {
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end'
-  },
-  typingContainer: {
-    marginLeft: 10,
-    marginTop: 8,
-    alignSelf: 'flex-start'
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
-    alignItems: 'center'
   },
-  input: {
+  content: {
     flex: 1,
-    marginRight: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 24,
-    fontSize: 16,
-    maxHeight: 120,
-    minHeight: 40
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#002D62',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  sendButtonDisabled: {
-    opacity: 0.5
-  },
-  sendButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold'
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    backgroundColor: '#FFFFFF',
   },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 20,
-    textAlign: 'center'
+  loadingContent: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
   },
-  errorContainer: {
-    flex: 1,
+  loadingBotContainer: {
+    marginBottom: 30,
+  },
+  loadingBot: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
   },
-  errorText: {
-    fontSize: 16,
+  loadingBotEmoji: {
+    fontSize: 30,
+  },
+  loadingTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 8,
     textAlign: 'center',
-    marginVertical: 20
   },
-  retryButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  loadingSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  loadingDotsContainer: {
+    marginTop: 20,
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    backgroundColor: '#002D62'
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold'
+  headerAvatarText: {
+    fontSize: 20,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messagesContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  messagesList: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingVertical: 16,
+    flexGrow: 1,
+  },
+  emptyMessagesContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  inputContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 48,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
+    maxHeight: 120,
+    paddingVertical: 8,
+    paddingRight: 12,
+    lineHeight: 20,
+  },
+  sendButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#D1D5DB',
   },
   emptyStateContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    marginVertical: 40
+    paddingHorizontal: 40,
+    paddingVertical: 60,
   },
-  emptyStateIconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(0, 45, 98, 0.1)',
+  emptyStateBot: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  emptyStateBotEmoji: {
+    fontSize: 40,
   },
   emptyStateTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12
-  },
-  emptyStateText: {
-    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
     textAlign: 'center',
-    opacity: 0.7,
-    maxWidth: '80%'
-  }
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
 });
+
+export default ChatbotScreen;

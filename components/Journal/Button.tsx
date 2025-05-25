@@ -69,6 +69,8 @@ export function Button({
       case "outline":
       case "ghost":
         return colors.primary
+      case "secondary":
+        return colors.textPrimary // Use dark text for light secondary background
       default:
         return colors.white
     }

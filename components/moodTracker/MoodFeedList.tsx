@@ -140,8 +140,6 @@ const MoodFeedList: React.FC<MoodFeedListProps> = ({
     </Card>
   );
 
-  console.log("Display logs length:", displayLogs.length);
-
   return (
     <View style={styles.container}>
       <FlatList

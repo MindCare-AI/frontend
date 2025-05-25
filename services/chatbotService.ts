@@ -1,22 +1,180 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ChatbotMessage, ChatbotConversation } from '../types/chatbot';
+import { 
+  ChatbotConversation, 
+  ChatbotMessage, 
+  CreateChatbotConversationResponse 
+} from '../types/chatbot';
+import { 
+  getChatbotConversations, 
+  createChatbotConversation, 
+  sendChatbotMessage, 
+  getChatbotHistory,
+  getChatbotConversation
+} from '../hooks/ChatbotScreen/useChatbotApi';
+
+// Get auth headers for API requests
+const getAuthHeaders = async () => {
+  try {
+    // Use consistent token key
+    const token = await AsyncStorage.getItem('accessToken');
+    if (!token) {
+      throw new Error('No access token found');
+    }
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  } catch (error) {
+    console.error('Error getting auth headers:', error);
+    throw error;
+  }
+};
 
 class ChatbotService {
   private currentConversation: ChatbotConversation | null = null;
-  private readonly STORAGE_KEY = 'chatbot_conversation';
-  private readonly MESSAGES_STORAGE_KEY = 'chatbot_messages';
+  private conversations: ChatbotConversation[] = [];
 
-  // Initialize the service
-  async initialize(): Promise<void> {
+  constructor() {
+    this.loadConversationFromStorage();
+  }
+
+  // Create a new chatbot conversation
+  async createConversation(title: string = 'New Conversation'): Promise<CreateChatbotConversationResponse> {
     try {
-      const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
-      if (stored) {
-        this.currentConversation = JSON.parse(stored);
-        console.log('[ChatbotService] Restored conversation:', this.currentConversation?.id);
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
       }
+
+      // Get user ID from storage or another source
+      const userDataStr = await AsyncStorage.getItem('user');
+      const userData = userDataStr ? JSON.parse(userDataStr) : null;
+      
+      if (!userData?.id) {
+        throw new Error('User ID not found');
+      }
+
+      const conversation = await createChatbotConversation(userData.id, title, token);
+      
+      // Convert to our ChatbotConversation type
+      const chatbotConversation: ChatbotConversation = {
+        id: conversation.id,
+        user: conversation.user,
+        title: conversation.title,
+        created_at: conversation.created_at,
+        last_activity: conversation.last_activity,
+        is_active: conversation.is_active,
+        last_message: conversation.last_message,
+        message_count: conversation.message_count,
+        latest_summary: conversation.latest_summary,
+        last_message_at: conversation.last_message_at,
+        participants: conversation.participants,
+        recent_messages: conversation.recent_messages
+      };
+
+      this.currentConversation = chatbotConversation;
+      await this.saveConversationToStorage();
+      
+      return conversation;
     } catch (error) {
-      console.error('[ChatbotService] Error initializing:', error);
+      console.error('Error creating conversation:', error);
+      throw error;
     }
+  }
+
+  // Get all chatbot conversations for the current user
+  async getAllConversations(): Promise<ChatbotConversation[]> {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await getChatbotConversations(token);
+      this.conversations = response.results;
+      return this.conversations;
+    } catch (error) {
+      console.error('Error getting conversations:', error);
+      throw error;
+    }
+  }
+
+  // Send a message to the current conversation
+  async sendMessage(content: string): Promise<any> {
+    if (!this.currentConversation) {
+      throw new Error('No active conversation');
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await sendChatbotMessage(
+        Number(this.currentConversation.id), 
+        content, 
+        token
+      );
+      
+      return response;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  }
+
+  // Get chat history for a conversation
+  async getChatHistory(conversationId: string): Promise<ChatbotMessage[]> {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const messages = await getChatbotHistory(Number(conversationId), token);
+      return messages;
+    } catch (error) {
+      console.error('Error getting chat history:', error);
+      throw error;
+    }
+  }
+
+  // Get a specific conversation
+  async getConversation(conversationId: string): Promise<ChatbotConversation> {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const conversation = await getChatbotConversation(Number(conversationId), token);
+      
+      return {
+        id: conversation.id,
+        user: conversation.user,
+        title: conversation.title,
+        created_at: conversation.created_at,
+        last_activity: conversation.last_activity,
+        is_active: conversation.is_active,
+        last_message: conversation.last_message,
+        message_count: conversation.message_count,
+        latest_summary: conversation.latest_summary,
+        last_message_at: conversation.last_message_at,
+        participants: conversation.participants,
+        recent_messages: conversation.recent_messages
+      };
+    } catch (error) {
+      console.error('Error getting conversation:', error);
+      throw error;
+    }
+  }
+
+  // Clear conversation history (you might need to implement this in the backend)
+  async clearHistory(conversationId: string): Promise<void> {
+    // For now, just clear local storage
+    this.currentConversation = null;
+    await AsyncStorage.removeItem('currentChatbotConversation');
   }
 
   // Get current conversation
@@ -24,109 +182,41 @@ class ChatbotService {
     return this.currentConversation;
   }
 
-  // Set current conversation and persist it
-  async setCurrentConversation(conversation: ChatbotConversation): Promise<void> {
+  // Set current conversation
+  setCurrentConversation(conversation: ChatbotConversation | null): void {
     this.currentConversation = conversation;
-    try {
-      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(conversation));
-      console.log('[ChatbotService] Conversation saved:', conversation.id);
-    } catch (error) {
-      console.error('[ChatbotService] Error saving conversation:', error);
-    }
+    this.saveConversationToStorage();
   }
 
-  // Get chat history for a conversation
-  async getChatHistory(conversationId: string): Promise<ChatbotMessage[]> {
+  // Load conversation from local storage
+  private async loadConversationFromStorage(): Promise<void> {
     try {
-      const key = `${this.MESSAGES_STORAGE_KEY}_${conversationId}`;
-      const stored = await AsyncStorage.getItem(key);
-      if (stored) {
-        const messages = JSON.parse(stored);
-        console.log('[ChatbotService] Loaded', messages.length, 'messages for conversation', conversationId);
-        return messages;
+      const conversationStr = await AsyncStorage.getItem('currentChatbotConversation');
+      if (conversationStr) {
+        this.currentConversation = JSON.parse(conversationStr);
       }
-      return [];
     } catch (error) {
-      console.error('[ChatbotService] Error loading chat history:', error);
-      return [];
+      console.error('Error loading conversation from storage:', error);
     }
   }
 
-  // Save chat history for a conversation
-  async saveChatHistory(conversationId: string, messages: ChatbotMessage[]): Promise<void> {
+  // Save conversation to local storage
+  private async saveConversationToStorage(): Promise<void> {
     try {
-      const key = `${this.MESSAGES_STORAGE_KEY}_${conversationId}`;
-      await AsyncStorage.setItem(key, JSON.stringify(messages));
-      console.log('[ChatbotService] Saved', messages.length, 'messages for conversation', conversationId);
-    } catch (error) {
-      console.error('[ChatbotService] Error saving chat history:', error);
-    }
-  }
-
-  // Add a message to chat history
-  async addMessageToHistory(conversationId: string, message: ChatbotMessage): Promise<void> {
-    try {
-      const currentHistory = await this.getChatHistory(conversationId);
-      const updatedHistory = [...currentHistory, message];
-      await this.saveChatHistory(conversationId, updatedHistory);
-    } catch (error) {
-      console.error('[ChatbotService] Error adding message to history:', error);
-    }
-  }
-
-  // Clear chat history for a conversation
-  async clearHistory(conversationId: string): Promise<void> {
-    try {
-      const key = `${this.MESSAGES_STORAGE_KEY}_${conversationId}`;
-      await AsyncStorage.removeItem(key);
-      console.log('[ChatbotService] Cleared history for conversation', conversationId);
-    } catch (error) {
-      console.error('[ChatbotService] Error clearing history:', error);
-    }
-  }
-
-  // Clear all chatbot data
-  async clearAllData(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(this.STORAGE_KEY);
-      
-      // Get all keys and remove chatbot message keys
-      const allKeys = await AsyncStorage.getAllKeys();
-      const messageKeys = allKeys.filter(key => key.startsWith(this.MESSAGES_STORAGE_KEY));
-      
-      if (messageKeys.length > 0) {
-        await AsyncStorage.multiRemove(messageKeys);
+      if (this.currentConversation) {
+        await AsyncStorage.setItem(
+          'currentChatbotConversation',
+          JSON.stringify(this.currentConversation)
+        );
+      } else {
+        await AsyncStorage.removeItem('currentChatbotConversation');
       }
-      
-      this.currentConversation = null;
-      console.log('[ChatbotService] Cleared all chatbot data');
     } catch (error) {
-      console.error('[ChatbotService] Error clearing all data:', error);
-    }
-  }
-
-  // Create a new conversation
-  createNewConversation(userId: string, title: string = 'New Conversation'): ChatbotConversation {
-    const conversation: ChatbotConversation = {
-      id: `chatbot_${Date.now()}`,
-      user_id: userId,
-      title,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
-    this.setCurrentConversation(conversation);
-    return conversation;
-  }
-
-  // Update conversation timestamp
-  async updateConversationTimestamp(conversationId: string): Promise<void> {
-    if (this.currentConversation?.id === conversationId) {
-      this.currentConversation.updated_at = new Date().toISOString();
-      await this.setCurrentConversation(this.currentConversation);
+      console.error('Error saving conversation to storage:', error);
     }
   }
 }
 
 // Export singleton instance
-export default new ChatbotService();
+export const chatService = new ChatbotService();
+export default chatService;
