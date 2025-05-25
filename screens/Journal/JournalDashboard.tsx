@@ -398,7 +398,7 @@ export default function JournalDashboard() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerContent}>
           <Text style={styles.title}>My Journals</Text>
           <Text style={styles.subtitle}>{journals.length} {journals.length === 1 ? 'journal' : 'journals'}</Text>
         </View>
@@ -706,23 +706,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
     backgroundColor: colors.white,
-    ...shadows.sm,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    borderRadius: 20,
+    padding: 24,
+    // Enhanced shadows for better depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    // Add subtle border for definition
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.04)',
+  },
+  headerContent: {
+    alignItems: 'center',
   },
   title: {
-    fontSize: fontSizes.xxl,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: '700',
     color: colors.textPrimary,
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: fontSizes.md,
+    fontSize: 16,
     color: colors.textSecondary,
-    marginTop: spacing.xs,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   journalList: {
     padding: horizontalPadding,
@@ -813,6 +827,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingTop: 16,
+    gap: 12,
+  },
+  footerButton: {
+    flex: 1,
+    minHeight: 48, // Ensure proper touch target
   },
   rightButtons: {
     flexDirection: "row",

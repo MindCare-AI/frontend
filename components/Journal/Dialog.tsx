@@ -157,13 +157,22 @@ const styles = StyleSheet.create({
     width: "100%",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 16, // Add horizontal padding
+    paddingVertical: 32, // Add vertical padding
   },
   container: {
-    width: Platform.OS === "web" ? Math.min(width * 0.8, 500) : width * 0.9,
-    maxHeight: height * 0.8,
+    width: Platform.OS === "web" ? Math.min(width * 0.8, 500) : width * 0.92, // Slightly wider
+    maxHeight: height * 0.85, // Increased max height
+    minHeight: 400, // Ensure minimum height
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
     overflow: "hidden",
+    // Add shadow for better visual depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
   },
   header: {
     flexDirection: "row",
@@ -190,15 +199,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   content: {
-    maxHeight: height * 0.6,
+    maxHeight: height * 0.55, // Reduced content height to make room for footer
+    flex: 1, // Allow content to grow
   },
   contentContainer: {
     padding: spacing.lg,
+    paddingBottom: spacing.xl, // Extra bottom padding
   },
   footer: {
     padding: spacing.lg,
+    paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.lightGray,
     backgroundColor: colors.background,
+    gap: spacing.md, // Add spacing between footer elements
+    minHeight: 80, // Ensure minimum footer height for buttons
   },
 })

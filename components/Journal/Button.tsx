@@ -138,10 +138,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: borderRadius.md,
+    minHeight: 48, // Ensure minimum touch target
+    paddingHorizontal: spacing.lg, // Increased horizontal padding
+    paddingVertical: spacing.sm, // Ensure proper vertical padding
+    // Enhanced shadow for better depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   text: {
     fontWeight: "600",
     textAlign: "center",
+    fontSize: fontSizes.md, // Ensure readable text size
   },
   fullWidth: {
     width: "100%",
