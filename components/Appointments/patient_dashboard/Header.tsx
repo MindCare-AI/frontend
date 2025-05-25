@@ -25,7 +25,7 @@ const Header: React.FC = () => {
         paddingHorizontal: useBreakpointValue({ base: 16, md: 32 }),
         paddingBottom: useBreakpointValue({ base: 12, md: 20 }),
         borderBottomWidth: 1,
-        borderBottomColor: isDarkMode ? nbTheme.colors.gray[700] : "#E2E8F0",
+        borderBottomColor: isDarkMode ? nbTheme.colors.gray[700] : "#F0F0F0",
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
@@ -49,7 +49,7 @@ const Header: React.FC = () => {
             style={{ 
               fontSize: useBreakpointValue({ base: 18, md: 20 }), 
               fontWeight: "bold", 
-              color: nbTheme.colors.primary[500] 
+              color: "#002D62" // Updated to match settings color
             }}
           >
             My Appointments
@@ -95,12 +95,12 @@ const Header: React.FC = () => {
               width: useBreakpointValue({ base: 32, md: 40 }),
               height: useBreakpointValue({ base: 32, md: 40 }),
               borderRadius: 20,
-              backgroundColor: nbTheme.colors.primary[100],
+              backgroundColor: "#E4F0F6",
               justifyContent: "center",
               alignItems: "center",
             }}
           >
-            <Ionicons name="person" size={20} color={nbTheme.colors.primary[500]} />
+            <Ionicons name="person" size={20} color="#002D62" />
           </Pressable>
 
           {/* Mobile Menu Button */}
@@ -111,7 +111,7 @@ const Header: React.FC = () => {
               }}
               style={{ padding: 8, marginLeft: 8 }}
             >
-              <Ionicons name="menu" size={24} color={nbTheme.colors.primary[500]} />
+              <Ionicons name="menu" size={24} color="#002D62" />
             </Pressable>
           )}
         </View>
@@ -128,7 +128,6 @@ type NavItemProps = {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onPress }) => {
-  const nbTheme = useNativeBase()
   const { isDarkMode } = useTheme()
 
   return (
@@ -143,12 +142,12 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onPress }) => 
       <Ionicons
         name={icon as any}
         size={16}
-        color={isActive ? nbTheme.colors.primary[500] : isDarkMode ? "#A0AEC0" : "#718096"}
+        color={isActive ? "#002D62" : isDarkMode ? "#A0AEC0" : "#718096"}
         style={{ marginRight: 4 }}
       />
       <Text
         style={{
-          color: isActive ? nbTheme.colors.primary[500] : isDarkMode ? "#A0AEC0" : "#718096",
+          color: isActive ? "#002D62" : isDarkMode ? "#A0AEC0" : "#718096",
           fontWeight: isActive ? "500" : "normal",
         }}
       >

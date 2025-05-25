@@ -2,10 +2,10 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, Pressable, ActivityIndicator } from "react-native"
+import { View, Text, Pressable, ActivityIndicator, StyleSheet } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useAppointments } from "../../../contexts/AppointmentContext"
-import { submitFeedback } from "../../../API/appointments/appointments" // Import API
+import { useAppointments } from "../../../contexts/appoint_patient/AppointmentContext"
+import { submitAppointmentFeedback } from "../../../API/Appointment/patient"
 import { Modal, Button, TextArea } from "./ui"
 
 type FeedbackModalProps = {
@@ -34,11 +34,10 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
       setIsSubmitting(true)
       setError(null)
       
-      await submitFeedback({
-        appointment_id: selectedAppointment.id,
-        rating,
-        comments: comment
-      })
+      await submitAppointmentFeedback(
+        selectedAppointment.id,
+        { rating, comments: comment }
+      )
       
       setSuccess(true)
       
@@ -100,26 +99,21 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
       title="Share Your Experience" 
       footer={footer}
     >
-      <View style={{ gap: 24, padding: 16 }}>
-        <View style={{ gap: 8 }}>
-          <Text style={{ fontSize: 16, fontWeight: "600" }}>
-            Appointment with {selectedAppointment.therapist}
+      <View style={styles.container}>
+        <View style={styles.appointmentInfo}>
+          <Text style={styles.therapistName}>
+            Appointment with {selectedAppointment?.therapist}
           </Text>
-          <Text style={{ fontSize: 14, color: "#4A5568" }}>
-            {selectedAppointment.date}
+          <Text style={styles.dateText}>
+            {selectedAppointment?.date}
           </Text>
         </View>
 
-        <View style={{ gap: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: "500" }}>
+        <View style={styles.ratingContainer}>
+          <Text style={styles.ratingTitle}>
             How would you rate your experience?
           </Text>
-          <View style={{ 
-            flexDirection: "row", 
-            justifyContent: "center", 
-            gap: 8,
-            paddingVertical: 8 
-          }}>
+          <View style={styles.starsContainer}>
             {[1, 2, 3, 4, 5].map((star) => (
               <Pressable 
                 key={star} 
@@ -141,12 +135,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
               </Pressable>
             ))}
           </View>
-          <Text style={{ 
-            textAlign: "center", 
-            fontSize: 14, 
-            color: "#4A5568",
-            marginTop: 4 
-          }}>
+          <Text style={styles.ratingText}>
             {rating === 0 ? "Select a rating" : 
              rating === 1 ? "Poor" :
              rating === 2 ? "Fair" :
@@ -164,11 +153,53 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
           }}
           placeholder="Share your thoughts about the appointment..."
           numberOfLines={4}
-          style={{ minHeight: 100 }}
+          style={styles.textArea}
         />
       </View>
     </Modal>
   )
 }
+
+const styles = StyleSheet.create({
+  container: { 
+    gap: 24, 
+    padding: 16 
+  },
+  appointmentInfo: { 
+    gap: 8 
+  },
+  therapistName: { 
+    fontSize: 16, 
+    fontWeight: "600", 
+    color: "#333" 
+  },
+  dateText: { 
+    fontSize: 14, 
+    color: "#666" 
+  },
+  ratingContainer: { 
+    gap: 12 
+  },
+  ratingTitle: { 
+    fontSize: 15, 
+    fontWeight: "500",
+    color: "#333" 
+  },
+  starsContainer: { 
+    flexDirection: "row", 
+    justifyContent: "center", 
+    gap: 8,
+    paddingVertical: 8 
+  },
+  ratingText: { 
+    textAlign: "center", 
+    fontSize: 14, 
+    color: "#666",
+    marginTop: 4 
+  },
+  textArea: { 
+    minHeight: 100 
+  }
+})
 
 export default FeedbackModal

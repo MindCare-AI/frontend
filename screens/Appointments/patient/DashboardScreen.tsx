@@ -4,13 +4,14 @@ import { useState, useCallback } from "react"
 import { Platform, ScrollView, View } from "react-native"
 import { Box, Fab, Icon, useBreakpointValue, VStack, HStack, useSafeArea } from "native-base"
 import { Ionicons } from "@expo/vector-icons"
-import { useAppointments } from "../../contexts/AppointmentContext"
-import { useTheme } from "../../theme/ThemeProvider"
-import AppointmentTabs from "../../components/Appointments/patient_dashboard/AppointmentTabs"
-import BookAppointmentModal from "../../components/Appointments/patient_dashboard/BookAppointmentModal"
-import WaitingListModal from "../../components/Appointments/patient_dashboard/WaitingListModal"
-import FeedbackModal from "../../components/Appointments/patient_dashboard/FeedbackModal"
-import Header from "../../components/Appointments/patient_dashboard/Header"
+import { useAppointments } from "../../../contexts/appoint_patient/AppointmentContext"
+import { useTheme } from "../../../theme/ThemeProvider"
+import AppointmentTabs from "../../../components/Appointments/patient_dashboard/AppointmentTabs"
+import BookAppointmentModal from "../../../components/Appointments/patient_dashboard/BookAppointmentModal"
+import WaitingListModal from "../../../components/Appointments/patient_dashboard/WaitingListModal"
+import FeedbackModal from "../../../components/Appointments/patient_dashboard/FeedbackModal"
+import Header from "../../../components/Appointments/patient_dashboard/Header"
+import { LinearGradient } from "expo-linear-gradient"
 
 const DashboardScreen = () => {
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
@@ -72,7 +73,7 @@ const DashboardScreen = () => {
   return (
     <Box 
       flex={1} 
-      bg={isDarkMode ? colors.background.dark : colors.background.light}
+      bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
       safeArea
     >
       {/* Fixed Header */}
@@ -82,7 +83,7 @@ const DashboardScreen = () => {
         left={0} 
         right={0} 
         zIndex={10}
-        bg={isDarkMode ? colors.background.dark : colors.background.light}
+        bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
       >
         <Header />
       </Box>
@@ -92,17 +93,19 @@ const DashboardScreen = () => {
         flex={1}
         pt={70} // Add padding top to account for header height
       >
-        <Box 
-          width="100%" 
-          maxWidth={520} 
-          alignSelf="center"
-          flex={1}
-        >
-          <AppointmentTabs 
-            key={refreshKey} // Add key to force remount on refresh
-            onOpenFeedback={handleOpenFeedback} 
-          />
-        </Box>
+        <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={{flex: 1, width: "100%"}}>
+          <Box 
+            width="100%" 
+            maxWidth={520} 
+            alignSelf="center"
+            flex={1}
+          >
+            <AppointmentTabs 
+              key={refreshKey} // Add key to force remount on refresh
+              onOpenFeedback={handleOpenFeedback} 
+            />
+          </Box>
+        </LinearGradient>
       </Box>
 
       {/* Fixed Bottom Button */}
@@ -111,7 +114,7 @@ const DashboardScreen = () => {
         bottom={0}
         left={0}
         right={0}
-        bg={isDarkMode ? colors.background.dark : colors.background.light}
+        bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
         borderTopWidth={1}
         borderTopColor={isDarkMode ? "#2D3748" : "#E2E8F0"}
         px={0}
@@ -125,7 +128,7 @@ const DashboardScreen = () => {
           maxWidth={400}
           alignItems="center"
           style={{
-            shadowColor: '#3182CE',
+            shadowColor: '#002D62',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.18,
             shadowRadius: 12,
@@ -138,7 +141,7 @@ const DashboardScreen = () => {
             size={useBreakpointValue({ base: "md", md: "lg" })}
             icon={<Icon color="white" as={Ionicons} name="add" size="sm" />}
             label={Platform.OS !== "web" ? undefined : "Book New Appointment"}
-            bg="primary.500"
+            bg="#002D62"
             onPress={handleOpenBooking}
             width={"100%"}
             minWidth={isMobile ? undefined : 200}

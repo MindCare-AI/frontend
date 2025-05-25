@@ -1,10 +1,66 @@
 import type React from "react"
 import { View, Text, ActivityIndicator, StyleSheet, Platform } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useAppointments } from "../../../contexts/AppointmentContext"
-import { removeFromWaitingList } from "../../../API/appointments/waitingList" // Import API
-import type { WaitingListEntryType } from "../../../types/appointmentTypes"
+import { useAppointments } from "../../../contexts/appoint_patient/AppointmentContext"
+import { removeFromWaitingList } from "../../../API/Appointment/patient"
+import type { WaitingListEntryType } from "../../../types/appoint_patient/appointmentTypes"
 import { Card, CardHeader, CardContent, Badge, Button, ScrollView } from "./ui"
+
+const styles = StyleSheet.create({
+  card: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    elevation: 4,
+    marginBottom: 20,
+    overflow: 'hidden',
+    padding: 0,
+  },
+  cardContent: {
+    padding: 24,
+  },
+  statusBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    fontWeight: '700',
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  timeSlotBadge: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 6,
+    backgroundColor: '#F0EAFF', // Updated to match settings screen light purple
+  },
+  actionButton: {
+    minWidth: 120,
+    borderRadius: 999,
+    paddingVertical: 12,
+    fontWeight: '700',
+    fontSize: 16,
+    marginTop: 8,
+    borderColor: "#002D62", // Updated to match settings screen
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666', // Updated to match settings screen
+  },
+})
 
 type WaitingListProps = {
   entries: WaitingListEntryType[];
@@ -142,61 +198,6 @@ const WaitingListCard: React.FC<WaitingListCardProps> = ({ entry, onCancel }) =>
         return "help-circle-outline"
     }
   }
-
-  const styles = StyleSheet.create({
-    card: {
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-      borderRadius: 20,
-      backgroundColor: '#fff',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.10,
-      shadowRadius: 12,
-      elevation: 4,
-      marginBottom: 20,
-      overflow: 'hidden',
-      padding: 0,
-    },
-    cardContent: {
-      padding: 24,
-    },
-    statusBadge: {
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      fontWeight: '700',
-      fontSize: 15,
-      marginLeft: 8,
-    },
-    timeSlotBadge: {
-      borderRadius: 12,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      fontWeight: '600',
-      fontSize: 14,
-      marginLeft: 6,
-      backgroundColor: '#F3F4F6',
-    },
-    actionButton: {
-      minWidth: 120,
-      borderRadius: 999,
-      paddingVertical: 12,
-      fontWeight: '700',
-      fontSize: 16,
-      marginTop: 8,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: '#4A5568',
-    },
-  })
 
   return (
     <Card style={styles.card}>

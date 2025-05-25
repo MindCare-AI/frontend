@@ -142,3 +142,54 @@ export const formatDateRange = (startDate: Date | string, endDate: Date | string
     return `${format(start, 'MMMM d, yyyy h:mm a')} - ${format(end, 'MMMM d, yyyy h:mm a')}`;
   }
 };
+
+/**
+ * Check if a date string is within 15 minutes of the current time
+ * @param dateString ISO date string
+ * @returns boolean
+ */
+export const isWithin15Minutes = (dateString: string): boolean => {
+  const appointmentDate = new Date(dateString);
+  const now = new Date();
+  
+  // Calculate time difference in milliseconds
+  const timeDifference = appointmentDate.getTime() - now.getTime();
+  
+  // Convert to minutes
+  const minutesDifference = timeDifference / (1000 * 60);
+  
+  // Check if appointment is within 15 minutes (but not in the past)
+  return minutesDifference >= 0 && minutesDifference <= 15;
+};
+
+/**
+ * Format a time string from 24-hour format to 12-hour format
+ * @param time24h Time in 24-hour format (HH:MM)
+ * @returns Time in 12-hour format (h:MM AM/PM)
+ */
+export const formatTime12h = (time24h: string): string => {
+  const [hours, minutes] = time24h.split(':').map(Number);
+  
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+  
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
+/**
+ * Format a time string from 12-hour format to 24-hour format
+ * @param time12h Time in 12-hour format (h:MM AM/PM)
+ * @returns Time in 24-hour format (HH:MM)
+ */
+export const formatTime24h = (time12h: string): string => {
+  const [time, period] = time12h.split(' ');
+  let [hours, minutes] = time.split(':').map(Number);
+  
+  if (period.toLowerCase() === 'pm' && hours < 12) {
+    hours += 12;
+  } else if (period.toLowerCase() === 'am' && hours === 12) {
+    hours = 0;
+  }
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};

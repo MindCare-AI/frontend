@@ -1,160 +1,179 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Card, Text, Chip, Button } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { WaitingListEntry } from '../../../types/appoint_therapist/index';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Card } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
+import { WaitingListEntryType } from "../../../types/appoint_patient/appointmentTypes";
 
 interface WaitingListCardProps {
-  entry: WaitingListEntry;
-  onNotify: (id: number) => void;
-  onRemove: (id: number) => void;
+  entry: WaitingListEntryType;
+  onViewDetails: () => void;
+  onAccept: () => void;
+  onReject: () => void;
 }
 
 const WaitingListCard: React.FC<WaitingListCardProps> = ({
   entry,
-  onNotify,
-  onRemove,
+  onViewDetails,
+  onAccept,
+  onReject,
 }) => {
   return (
     <Card style={[styles.card, entry.isExpired && styles.expiredCard]}>
       <Card.Content>
         <View style={styles.header}>
-          <View style={styles.nameContainer}>
-            <Text style={styles.patientName}>{entry.patientName}</Text>
-            {entry.isExpired && (
-              <Chip
-                mode="outlined"
-                textStyle={{ color: '#F44336' }}
-                style={styles.expiredChip}
-              >
-                Expired
-              </Chip>
-            )}
+          <View style={styles.patientInfo}>
+            <Text style={styles.patientName}>{entry.therapist}</Text>
+            <Text style={styles.date}>Requested: {entry.requestedDate}</Text>
           </View>
-          <Chip
-            mode="outlined"
-            textStyle={{ color: entry.status === 'Notified' ? '#2196F3' : '#FFC107' }}
-            style={[
-              styles.statusChip,
-              {
-                borderColor: entry.status === 'Notified' ? '#2196F3' : '#FFC107',
-              },
-            ]}
-          >
-            {entry.status}
-          </Chip>
-        </View>
-
-        <View style={styles.dateContainer}>
-          <MaterialCommunityIcons name="calendar" size={16} color="#666" />
-          <Text style={styles.date}>Requested: {entry.requestedDate}</Text>
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>{entry.status}</Text>
+          </View>
         </View>
 
         <View style={styles.timeSlots}>
-          {entry.preferredTimeSlots.map((slot, index) => (
-            <Chip key={index} style={styles.timeSlotChip} textStyle={styles.timeSlotText}>
-              {slot}
-            </Chip>
-          ))}
+          <Text style={styles.timeSlotsLabel}>Preferred Times:</Text>
+          <View style={styles.timeSlotsContainer}>
+            {entry.preferredTimeSlots.map((slot, index) => (
+              <Text key={index} style={styles.timeSlot}>
+                {slot}
+              </Text>
+            ))}
+          </View>
         </View>
 
-        <View style={styles.actions}>
-          {entry.status === 'Pending' && (
-            <Button
-              mode="contained"
-              onPress={() => onNotify(entry.id)}
-              style={styles.actionButton}
-              icon="bell"
-              buttonColor="#003366"
-              textColor="white"
-            >
-              Notify Patient
-            </Button>
-          )}
-          <Button
-            mode="outlined"
-            onPress={() => onRemove(entry.id)}
-            style={styles.removeButton}
-            icon="delete"
-            textColor="#F44336"
-          >
-            Remove
-          </Button>
-        </View>
+        {entry.isExpired && (
+          <View style={styles.expiredNotice}>
+            <Ionicons name="time" size={16} color="#e53e3e" />
+            <Text style={styles.expiredText}>Request expired</Text>
+          </View>
+        )}
       </Card.Content>
+
+      <Card.Actions style={styles.actions}>
+        <TouchableOpacity style={styles.button} onPress={onViewDetails}>
+          <Text style={styles.buttonText}>Details</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.acceptButton]}
+          onPress={onAccept}
+          disabled={entry.isExpired}
+        >
+          <Text style={styles.acceptButtonText}>Accept</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.rejectButton]}
+          onPress={onReject}
+        >
+          <Text style={styles.rejectButtonText}>Reject</Text>
+        </TouchableOpacity>
+      </Card.Actions>
     </Card>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 12,
+    marginVertical: 8,
+    borderRadius: 8,
     elevation: 2,
+    backgroundColor: "#fff",
   },
   expiredCard: {
-    borderColor: '#FFCDD2',
-    borderWidth: 1,
-    backgroundColor: '#FFEBEE',
+    opacity: 0.7,
+    backgroundColor: "#f5f5f5",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+  patientInfo: {
+    flex: 1,
   },
   patientName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  expiredChip: {
-    height: 24,
-    borderColor: '#F44336',
-  },
-  statusChip: {
-    height: 28,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    fontWeight: "bold",
   },
   date: {
     fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
+    color: "#666",
+    marginTop: 4,
   },
-  timeSlots: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
+  statusContainer: {
+    backgroundColor: "#e6f7ff",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  timeSlotChip: {
-    marginRight: 4,
-    marginBottom: 4,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  timeSlotText: {
+  statusText: {
+    color: "#0072c6",
+    fontWeight: "500",
     fontSize: 12,
   },
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  timeSlots: {
+    marginTop: 8,
   },
-  actionButton: {
+  timeSlotsLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  timeSlotsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  timeSlot: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
     marginRight: 8,
     marginBottom: 8,
+    fontSize: 12,
   },
-  removeButton: {
-    borderColor: '#F44336',
-    marginBottom: 8,
+  expiredNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    backgroundColor: "#fff5f5",
+    padding: 8,
+    borderRadius: 4,
+  },
+  expiredText: {
+    color: "#e53e3e",
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  actions: {
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    justifyContent: "flex-end",
+  },
+  button: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  buttonText: {
+    color: "#666",
+    fontWeight: "500",
+  },
+  acceptButton: {
+    backgroundColor: "#e6f7ff",
+  },
+  acceptButtonText: {
+    color: "#0072c6",
+    fontWeight: "500",
+  },
+  rejectButton: {
+    backgroundColor: "#fff5f5",
+  },
+  rejectButtonText: {
+    color: "#e53e3e",
+    fontWeight: "500",
   },
 });
 
