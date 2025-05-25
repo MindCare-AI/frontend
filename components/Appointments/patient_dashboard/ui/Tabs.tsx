@@ -10,9 +10,19 @@ interface TabsProps {
   initialTab?: string
   onChange?: (key: string) => void
   style?: any
+  // Update these prop types to be more specific
+  activeTextStyle?: { color?: string; [key: string]: any }
+  indicatorStyle?: { backgroundColor?: string; [key: string]: any }
 }
 
-export const Tabs: React.FC<TabsProps> = ({ tabs, initialTab, onChange, style }) => {
+export const Tabs: React.FC<TabsProps> = ({ 
+  tabs, 
+  initialTab, 
+  onChange, 
+  style,
+  activeTextStyle,
+  indicatorStyle 
+}) => {
   const [activeTab, setActiveTab] = useState(initialTab || tabs[0]?.key || "")
   const [tabLayouts, setTabLayouts] = useState<{ [key: string]: { x: number; width: number } }>({})
   const theme = useTheme()
@@ -106,9 +116,12 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, initialTab, onChange, style })
                   style={[
                     styles.tabText,
                     {
-                      color: activeTab === tab.key ? theme.colors.primary[500] : theme.colors.gray[500],
+                      color: activeTab === tab.key ? 
+                        (activeTextStyle?.color || theme.colors.primary[500]) : 
+                        theme.colors.gray[500],
                       fontWeight: activeTab === tab.key ? "600" : "500",
                     },
+                    activeTab === tab.key && activeTextStyle
                   ]}
                 >
                   {tab.title}
@@ -122,10 +135,11 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, initialTab, onChange, style })
             style={[
               styles.indicator,
               {
-                backgroundColor: theme.colors.primary[500],
+                backgroundColor: indicatorStyle?.backgroundColor || theme.colors.primary[500],
                 transform: [{ translateX: indicatorAnim }],
                 width: tabLayouts[activeTab]?.width || 0,
               },
+              indicatorStyle
             ]}
           />
         )}

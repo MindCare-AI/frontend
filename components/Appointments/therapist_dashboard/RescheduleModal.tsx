@@ -1,123 +1,248 @@
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Modal, Portal, Text, Button, RadioButton, Title } from 'react-native-paper';
-import { Appointment } from '../../../types/appoint_therapist/index';
-import { availableTimeSlots } from '../../../contexts/appoint_therapist/AppContext';
+import React, { useState } from "react";
+import { Modal, Text, View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Button } from "react-native-paper";
+
+// Define the time slots directly in this component instead of importing from AppContext
+const availableTimeSlots = [
+  { id: "1", time: "09:00 AM" },
+  { id: "2", time: "10:00 AM" },
+  { id: "3", time: "11:00 AM" },
+  { id: "4", time: "01:00 PM" },
+  { id: "5", time: "02:00 PM" },
+  { id: "6", time: "03:00 PM" },
+  { id: "7", time: "04:00 PM" },
+];
+
+type TimeSlot = {
+  id: string;
+  time: string;
+};
 
 interface RescheduleModalProps {
   visible: boolean;
-  appointment: Appointment | null;
-  onDismiss: () => void;
-  onReschedule: (id: number, newTime: string) => void;
+  onClose: () => void;
+  onReschedule: (date: string, timeSlot: string) => void;
+  currentDate?: string;
 }
 
 const RescheduleModal: React.FC<RescheduleModalProps> = ({
   visible,
-  appointment,
-  onDismiss,
+  onClose,
   onReschedule,
+  currentDate,
 }) => {
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
 
   const handleReschedule = () => {
-    if (appointment && selectedTimeSlot) {
-      onReschedule(appointment.id, selectedTimeSlot);
-      onDismiss();
-      setSelectedTimeSlot(''); // Reset selection after rescheduling
+    if (selectedDate && selectedTimeSlot) {
+      onReschedule(selectedDate, selectedTimeSlot);
+      onClose();
     }
   };
 
+  const handleSelectDate = (date: string) => {
+    setSelectedDate(date);
+  };
+
+  const handleSelectTimeSlot = (timeSlot: string) => {
+    setSelectedTimeSlot(timeSlot);
+  };
+
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.container}
-      >
-        <Title style={styles.title}>Reschedule Appointment</Title>
-        {appointment && (
-          <View style={styles.content}>
-            <Text style={styles.patientName}>{appointment.patientName}</Text>
-            <Text style={styles.currentTime}>Current time: {appointment.time}</Text>
-
-            <Text style={styles.sectionTitle}>Select New Time Slot</Text>
-            <RadioButton.Group
-              onValueChange={(value) => setSelectedTimeSlot(value)}
-              value={selectedTimeSlot}
-            >
-              {availableTimeSlots.map((slot) => (
-                <View key={slot} style={styles.radioItem}>
-                  <RadioButton value={slot} />
-                  <Text onPress={() => setSelectedTimeSlot(slot)}>{slot}</Text>
-                </View>
-              ))}
-            </RadioButton.Group>
-
-            <View style={styles.actions}>
-              <Button
-                mode="outlined"
-                onPress={onDismiss}
-                style={styles.button}
-              >
-                Cancel
-              </Button>
-              <Button
-                mode="contained"
-                onPress={handleReschedule}
-                disabled={!selectedTimeSlot}
-                style={styles.button}
-                buttonColor="#003366"
-              >
-                Reschedule
-              </Button>
-            </View>
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Reschedule Appointment</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
-        )}
-      </Modal>
-    </Portal>
+
+          <ScrollView style={styles.scrollContent}>
+            <View style={styles.dateSelectionContainer}>
+              <Text style={styles.sectionTitle}>Select a new date:</Text>
+              <View style={styles.datesContainer}>
+                {["2023-07-25", "2023-07-26", "2023-07-27", "2023-07-28"].map((date) => (
+                  <TouchableOpacity
+                    key={date}
+                    style={[
+                      styles.dateButton,
+                      selectedDate === date && styles.selectedDateButton,
+                    ]}
+                    onPress={() => handleSelectDate(date)}
+                  >
+                    <Text
+                      style={[
+                        styles.dateButtonText,
+                        selectedDate === date && styles.selectedDateButtonText,
+                      ]}
+                    >
+                      {new Date(date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.timeSelectionContainer}>
+              <Text style={styles.sectionTitle}>Select a new time:</Text>
+              <View style={styles.timeSlotsContainer}>
+                {availableTimeSlots.map((slot: TimeSlot) => (
+                  <TouchableOpacity
+                    key={slot.id}
+                    style={[
+                      styles.timeButton,
+                      selectedTimeSlot === slot.time && styles.selectedTimeButton,
+                    ]}
+                    onPress={() => handleSelectTimeSlot(slot.time)}
+                  >
+                    <Text
+                      style={[
+                        styles.timeButtonText,
+                        selectedTimeSlot === slot.time && styles.selectedTimeButtonText,
+                      ]}
+                    >
+                      {slot.time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <Button
+              mode="outlined"
+              onPress={onClose}
+              style={styles.cancelButton}
+              labelStyle={styles.cancelButtonText}
+            >
+              Cancel
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleReschedule}
+              disabled={!selectedDate || !selectedTimeSlot}
+              style={styles.rescheduleButton}
+            >
+              Reschedule
+            </Button>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'white',
-    padding: 20,
-    margin: 20,
-    borderRadius: 8,
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  title: {
-    marginBottom: 16,
+  modalContent: {
+    backgroundColor: "white",
+    width: "90%",
+    maxWidth: 500,
+    borderRadius: 12,
+    maxHeight: "80%",
   },
-  content: {
-    marginBottom: 16,
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
-  patientName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
   },
-  currentTime: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+  scrollContent: {
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  dateSelectionContainer: {
+    marginBottom: 24,
+  },
+  datesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
     marginBottom: 8,
   },
-  radioItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  selectedDateButton: {
+    borderColor: "#4285f4",
+    backgroundColor: "#e8f0fe",
+  },
+  dateButtonText: {
+    color: "#666",
+  },
+  selectedDateButtonText: {
+    color: "#4285f4",
+    fontWeight: "500",
+  },
+  timeSelectionContainer: {
+    marginBottom: 24,
+  },
+  timeSlotsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  timeButton: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
     marginBottom: 8,
   },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
+  selectedTimeButton: {
+    borderColor: "#4285f4",
+    backgroundColor: "#e8f0fe",
   },
-  button: {
-    marginLeft: 8,
+  timeButtonText: {
+    color: "#666",
+  },
+  selectedTimeButtonText: {
+    color: "#4285f4",
+    fontWeight: "500",
+  },
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  cancelButton: {
+    marginRight: 12,
+    borderColor: "#ccc",
+  },
+  cancelButtonText: {
+    color: "#666",
+  },
+  rescheduleButton: {
+    backgroundColor: "#4285f4",
   },
 });
 

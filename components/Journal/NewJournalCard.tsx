@@ -1,36 +1,68 @@
-import { TouchableOpacity, Text, StyleSheet } from "react-native"
-import { colors, spacing, fontSizes, borderRadius } from "./theme"
+import { TouchableOpacity, Text, StyleSheet, Animated } from "react-native"
+import { colors, spacing, fontSizes, borderRadius, shadows } from "./theme"
+import { useRef } from "react"
 
 interface NewJournalCardProps {
   onPress: () => void
   width: number
 }
 
-// Simple icon for React Native
-const PlusIcon = () => <Text style={{ fontSize: 24, color: colors.gray }}>+</Text>
-
 export function NewJournalCard({ onPress, width }: NewJournalCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start()
+  }
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start()
+  }
+
   return (
-    <TouchableOpacity style={[styles.newJournalCard, { width, height: width }]} onPress={onPress} activeOpacity={0.7}>
-      <PlusIcon />
-      <Text style={styles.newJournalText}>New Journal</Text>
-    </TouchableOpacity>
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        style={[
+          styles.newJournalCard, 
+          { 
+            width, 
+            height: width * 1.1 // Match the journal card proportions
+          }, 
+          shadows.sm
+        ]}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        <Text style={styles.newJournalText}>Create Journal</Text>
+      </TouchableOpacity>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
   newJournalCard: {
-    borderWidth: 1,
-    borderColor: colors.gray,
+    borderWidth: 2,
+    borderColor: colors.primary,
     borderStyle: "dashed",
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: colors.softBlue,
   },
   newJournalText: {
-    marginTop: spacing.sm,
-    color: colors.gray,
-    fontSize: fontSizes.sm,
+    color: colors.primary,
+    fontSize: fontSizes.md,
+    fontWeight: "600",
   },
 })

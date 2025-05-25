@@ -31,7 +31,7 @@ export const MoodApi = {
   getMoodLogs: async (filters?: MoodFilters): Promise<MoodLog[] | PaginatedResponse<MoodLog>> => {
     try {
       const queryString = formatQueryString(filters);
-      const response = await axios.get(`${MOOD_API_BASE}/${queryString}`);
+      const response = await axios.get<PaginatedResponse<MoodLog> | MoodLog[]>(`${MOOD_API_BASE}/${queryString}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching mood logs:', error);

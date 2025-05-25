@@ -9,7 +9,7 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { NativeBaseProvider } from 'native-base';
-import { AppointmentProvider } from './contexts/AppointmentContext';
+import { AppointmentProvider } from './contexts/appoint_patient/AppointmentContext';
 import { AppContextProvider } from './contexts/appoint_therapist/AppContext';
 import { ChatProvider } from './contexts/ChatContext';
 

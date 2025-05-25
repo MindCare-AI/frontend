@@ -8,12 +8,11 @@ import { Appbar } from 'react-native-paper';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Existing imports
-import MessagingNavigator from './MessagingNavigator';
 import MoodNavigator from './mood/MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
-import DashboardScreen from '../screens/Appointments/DashboardScreen';
+import DashboardScreen from '../screens/Appointments/patient/DashboardScreen';
 import JournalNavigator from './Journal';
 
 // New imports
@@ -21,6 +20,10 @@ import ProfileScreen from '../screens/Appointments/therapist/ProfileScreen';
 import SettingsScreen from '../screens/Appointments/therapist/SettingsScreen';
 import AppointmentsScreen from '../screens/Appointments/therapist/AppointmentsScreen';
 import DashboardScreenT from '../screens/Appointments/therapist/DashboardScreenT';
+import ConversationsScreen from '../screens/Conversations/ConversationsScreen';
+// Import ChatScreen
+import ChatScreen from '../screens/Conversations/ChatScreen';
+import MessagingNavigator from './MessagingNavigator';
 
 // Import types or define them
 import { AppStackParamList } from './types';
@@ -36,11 +39,19 @@ type DrawerParamList = {
 
 type RootStackParamList = {
   Main: undefined;
+  ChatScreen: { conversationId: string | number };
+  ConversationDetails: { conversationId: string | number };
+};
+
+type MessagingStackParamList = {
+  ConversationsList: undefined;
+  ChatScreen: { conversationId: string | number };
 };
 
 const Tab = createBottomTabNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const Stack = createStackNavigator<RootStackParamList>();
+const MessagingStackNavigator = createStackNavigator<MessagingStackParamList>();
 
 // Custom header for the stack navigator
 const CustomNavigationBar = ({ navigation, back }: any) => {
@@ -109,7 +120,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={DashboardScreenT}
+        component={DashboardScreen}
         options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
@@ -206,7 +217,7 @@ const DrawerNavigator = () => {
   );
 };
 
-// Main navigator
+// Main stack navigator
 const AppNavigator = () => {
   const dimensions = useWindowDimensions();
   const isLargeScreen = dimensions.width >= 768;
@@ -220,6 +231,20 @@ const AppNavigator = () => {
       <Stack.Screen
         name="Main"
         component={DrawerNavigator}
+        options={{
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="ChatScreen" 
+        component={ChatScreen}
+        options={{
+          headerShown: true,
+        }}
+      />
+      <Stack.Screen 
+        name="ConversationDetails" 
+        component={ChatScreen} // Replace with actual ConversationDetails component
         options={{
           headerShown: true,
         }}

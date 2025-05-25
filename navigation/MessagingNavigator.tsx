@@ -1,42 +1,56 @@
-import type React from "react"
-import { createStackNavigator } from "@react-navigation/stack"
-import type { MessagingStackParamList } from "./types"
+import React from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
+import { MessagingStackParamList } from './types';
+import ConversationsScreen from '../screens/Conversations/ConversationsScreen';
+import ChatScreen from '../screens/Conversations/ChatScreen';
+import MessagingSettingsScreen from '../screens/Messaging/MessagingSettingsScreen';
+import { globalStyles } from '../styles/global';
+import { createBoxShadow } from '../utils/shadows';
 
-// Import screens
-import HomeScreen from "../screens/MessagingScreen/HomeScreen"
-import ChatScreen from "../screens/MessagingScreen/ChatScreen"
-import ProfileScreen from "../screens/MessagingScreen/ProfileScreen"
-import NewConversationScreen from "../screens/MessagingScreen/NewConversationScreen"
-import NewGroupScreen from "../screens/MessagingScreen/NewGroupScreen"
-import SearchScreen from "../screens/MessagingScreen/SearchScreen"
-import MediaGalleryScreen from "../screens/MessagingScreen/MediaGalleryScreen"
-import GroupMembersScreen from "../screens/MessagingScreen/GroupMembersScreen"
-import SettingsScreen from "../screens/MessagingScreen/SettingsScreen"
-import NotificationSettingsScreen from "../screens/MessagingScreen/NotificationSettingsScreen"
+const Stack = createStackNavigator<MessagingStackParamList>();
 
-const Stack = createStackNavigator<MessagingStackParamList>()
-
-export const MessagingNavigator: React.FC = () => {
+const MessagingNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName="Home"
       screenOptions={{
-        headerShown: false,
-        cardStyle: { backgroundColor: "white" },
+        headerStyle: {
+          backgroundColor: globalStyles.colors.primary,
+          ...createBoxShadow(0, 2, 4, 'rgba(0, 0, 0, 0.1)', 2),
+        },
+        headerTintColor: globalStyles.colors.white,
+        headerTitleStyle: {
+          ...globalStyles.h3,
+          color: globalStyles.colors.white,
+        },
       }}
     >
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="NewConversation" component={NewConversationScreen} />
-      <Stack.Screen name="NewGroup" component={NewGroupScreen} />
-      <Stack.Screen name="Search" component={SearchScreen} />
-      <Stack.Screen name="MediaGallery" component={MediaGalleryScreen} />
-      <Stack.Screen name="GroupMembers" component={GroupMembersScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen 
+        name="Home" 
+        component={ConversationsScreen} 
+        options={{ 
+          title: 'Messages',
+          headerShown: false
+        }} 
+      />
+      <Stack.Screen 
+        name="Chat" 
+        component={ChatScreen} 
+        options={({ route }) => ({ 
+          title: 'Chat',
+          headerBackTitleVisible: false
+        })} 
+      />
+      <Stack.Screen 
+        name="MessagingSettings" 
+        component={MessagingSettingsScreen as any}
+        options={({ route }) => ({ 
+          title: route.params?.conversationId ? 'Conversation Settings' : 'Messaging Settings',
+          headerBackTitleVisible: false
+        })} 
+      />
     </Stack.Navigator>
-  )
-}
+  );
+};
 
-export default MessagingNavigator
+export default MessagingNavigator;

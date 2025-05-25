@@ -1,127 +1,236 @@
-import { Message } from '../types/chat';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
+import { 
+  CreateChatbotConversationResponse, 
+  SendChatbotMessageResponse,
+  ChatbotConversation 
+} from '../types/chatbot';
+
+// Get auth headers for API requests
+const getAuthHeaders = async () => {
+  try {
+    // Use consistent token key
+    const token = await AsyncStorage.getItem('accessToken');
+    return {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
+    };
+  } catch (error) {
+    console.error('[ChatService] Error getting auth token:', error);
+    throw error;
+  }
+};
 
 class ChatService {
-  private messageListeners: Function[] = [];
-  private conversations: Map<string, Message[]> = new Map();
-  
-  /**
-   * Add a listener for new messages
-   * @param listener Function to call when a new message is received
-   */
-  public addMessageListener(listener: (message: Message) => void): void {
-    this.messageListeners.push(listener);
+  private baseUrl: string;
+  private currentConversation: ChatbotConversation | null = null;
+
+  constructor() {
+    this.baseUrl = `${API_URL}/chatbot`;
   }
-  
-  /**
-   * Remove a message listener
-   * @param listener Function to remove from listeners
-   */
-  public removeMessageListener(listener: Function): void {
-    this.messageListeners = this.messageListeners.filter(l => l !== listener);
+
+  setCurrentConversation(conversation: ChatbotConversation) {
+    this.currentConversation = conversation;
   }
-  
-  /**
-   * Handle a new message - notify all listeners and update local storage
-   * @param message The new message
-   */
-  public handleNewMessage(message: Message): void {
-    // Notify all listeners
-    this.messageListeners.forEach(listener => listener(message));
-    
-    // Update conversation cache
-    const conversationId = message.id.split('-')[0]; // Assuming message IDs include conversation ID prefix
-    const conversationMessages = this.conversations.get(conversationId) || [];
-    this.conversations.set(conversationId, [...conversationMessages, message]);
-    
-    // Update local storage
-    this.persistMessages(conversationId, [...conversationMessages, message]);
-  }
-  
-  /**
-   * Get messages for a specific conversation
-   * @param conversationId The conversation ID
-   */
-  public async getMessages(conversationId: string): Promise<Message[]> {
-    // Try to get messages from cache first
-    let messages = this.conversations.get(conversationId);
-    
-    // If not in cache, try to get from local storage
-    if (!messages) {
-      try {
-        const storedMessages = await AsyncStorage.getItem(`chat_messages_${conversationId}`);
-        if (storedMessages) {
-          messages = JSON.parse(storedMessages);
-          this.conversations.set(conversationId, messages || []);
-        } else {
-          messages = [];
-        }
-      } catch (error) {
-        console.error('Error retrieving messages from storage:', error);
-        messages = [];
-      }
-    }
-    
-    return messages || [];
-  }
-  
-  /**
-   * Persist messages to local storage
-   * @param conversationId The conversation ID
-   * @param messages Messages to persist
-   */
-  private async persistMessages(conversationId: string, messages: Message[]): Promise<void> {
+
+  // Create a new chatbot conversation
+  async createConversation(title: string): Promise<CreateChatbotConversationResponse> {
     try {
-      await AsyncStorage.setItem(`chat_messages_${conversationId}`, JSON.stringify(messages));
-    } catch (error) {
-      console.error('Error storing messages:', error);
-    }
-  }
-  
-  /**
-   * Fetch messages from API
-   * @param conversationId The conversation ID
-   */
-  public async fetchMessages(conversationId: string): Promise<Message[]> {
-    try {
-      const response = await fetch(`${API_URL}/messaging/conversations/${conversationId}/messages`, {
-        headers: {
-          'Authorization': `Bearer ${await AsyncStorage.getItem('accessToken')}`,
-        },
+      console.log('[ChatService] 🆕 Creating new chatbot conversation');
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/`, {
+        method: 'POST',
+        ...config,
+        body: JSON.stringify({ title, is_active: true })
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch messages');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      const messages: Message[] = data.messages;
+      console.log('[ChatService] ✅ Conversation created:', data);
       
-      // Update cache and storage
-      this.conversations.set(conversationId, messages);
-      this.persistMessages(conversationId, messages);
-      
-      return messages;
+      return {
+        id: data.id,
+        user: data.user,
+        title: data.title,
+        created_at: data.created_at,
+        last_activity: data.last_activity,
+        is_active: data.is_active,
+        last_message: data.last_message,
+        message_count: data.message_count,
+        latest_summary: data.latest_summary,
+        last_message_at: data.last_message_at,
+        participants: data.participants,
+        recent_messages: data.recent_messages || []
+      };
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      return [];
+      console.error('[ChatService] ❌ Error creating conversation:', error);
+      throw error;
     }
   }
-  
-  /**
-   * Clear messages for a conversation
-   * @param conversationId The conversation ID
-   */
-  public async clearMessages(conversationId: string): Promise<void> {
-    this.conversations.delete(conversationId);
+
+  // Get all chatbot conversations for the current user
+  async getConversations(): Promise<ChatbotConversation[]> {
     try {
-      await AsyncStorage.removeItem(`chat_messages_${conversationId}`);
+      console.log('[ChatService] 📋 Fetching chatbot conversations');
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/conversations/`, {
+        method: 'GET',
+        ...config
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[ChatService] ✅ Fetched conversations:', data.results?.length || 0);
+      
+      return data.results || [];
     } catch (error) {
-      console.error('Error removing messages from storage:', error);
+      console.error('[ChatService] ❌ Error fetching conversations:', error);
+      throw error;
+    }
+  }
+
+  // Get a specific chatbot conversation by ID
+  async getConversation(conversationId: string | number): Promise<ChatbotConversation> {
+    try {
+      console.log('[ChatService] 📋 Fetching conversation:', conversationId);
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/`, {
+        method: 'GET',
+        ...config
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[ChatService] ✅ Fetched conversation:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('[ChatService] ❌ Error fetching conversation:', error);
+      throw error;
+    }
+  }
+
+  // Send a message to the chatbot
+  async sendMessage(content: string): Promise<SendChatbotMessageResponse | null> {
+    if (!this.currentConversation) {
+      throw new Error('No active conversation');
+    }
+
+    try {
+      console.log('[ChatService] 📤 Sending message to conversation:', this.currentConversation.id);
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/${this.currentConversation.id}/send_message/`, {
+        method: 'POST',
+        ...config,
+        body: JSON.stringify({ content })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[ChatService] ✅ Message sent, received response:', data);
+      
+      return {
+        id: data.id,
+        conversation_id: data.conversation_id,
+        timestamp: data.timestamp,
+        user_message: data.user_message ? {
+          id: data.user_message.id,
+          content: data.user_message.content,
+          timestamp: data.user_message.timestamp,
+          message_type: data.user_message.message_type || 'text',
+          is_bot: false,
+          sender: data.user_message.sender,
+          sender_name: data.user_message.sender_name,
+          metadata: data.user_message.metadata,
+          parent_message: data.user_message.parent_message,
+          chatbot_method: data.user_message.chatbot_method,
+        } : undefined,
+        bot_response: data.bot_response ? {
+          id: data.bot_response.id,
+          content: data.bot_response.content,
+          timestamp: data.bot_response.timestamp,
+          message_type: data.bot_response.message_type || 'text',
+          is_bot: true,
+          sender: data.bot_response.sender,
+          sender_name: data.bot_response.sender_name,
+          metadata: data.bot_response.metadata,
+          parent_message: data.bot_response.parent_message,
+          chatbot_method: data.bot_response.chatbot_method,
+        } : undefined
+      };
+    } catch (error) {
+      console.error('[ChatService] ❌ Error sending message:', error);
+      throw error;
+    }
+  }
+
+  // Delete a chatbot conversation
+  async deleteConversation(conversationId: string | number): Promise<void> {
+    try {
+      console.log('[ChatService] 🗑️ Deleting conversation:', conversationId);
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/`, {
+        method: 'DELETE',
+        ...config
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      console.log('[ChatService] ✅ Conversation deleted');
+    } catch (error) {
+      console.error('[ChatService] ❌ Error deleting conversation:', error);
+      throw error;
+    }
+  }
+
+  // Update conversation title
+  async updateConversationTitle(conversationId: string | number, title: string): Promise<ChatbotConversation> {
+    try {
+      console.log('[ChatService] ✏️ Updating conversation title:', conversationId);
+      const config = await getAuthHeaders();
+      
+      const response = await fetch(`${this.baseUrl}/conversations/${conversationId}/`, {
+        method: 'PATCH',
+        ...config,
+        body: JSON.stringify({ title })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[ChatService] ✅ Conversation title updated:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('[ChatService] ❌ Error updating conversation title:', error);
+      throw error;
     }
   }
 }
 
-const chatService = new ChatService();
+// Export singleton instance
+export const chatService = new ChatService();
 export default chatService;

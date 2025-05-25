@@ -1,122 +1,19 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Appointment, WaitingListEntry, SessionNote, TimeSlot, NewTimeSlot } from '../../types/appoint_therapist/index';
-
-// Mock data
-const todayAppointmentsMock: Appointment[] = [
-  {
-    id: 1,
-    patientName: "Jane Smith",
-    time: "10:00 AM - 11:00 AM",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    patientName: "Michael Johnson",
-    time: "1:00 PM - 2:00 PM",
-    status: "Confirmed",
-  },
-  {
-    id: 3,
-    patientName: "Emily Davis",
-    time: "3:30 PM - 4:30 PM",
-    status: "Confirmed",
-  },
-];
-
-const upcomingAppointmentsMock: Appointment[] = [
-  {
-    id: 1,
-    patientName: "Robert Wilson",
-    date: "May 10, 2025",
-    time: "2:00 PM - 3:00 PM",
-    notes: "Follow-up session on anxiety management techniques.",
-    isExpanded: false,
-    status: "Confirmed" // Add the required status
-  },
-  {
-    id: 2,
-    patientName: "Sarah Johnson",
-    date: "May 12, 2025",
-    time: "10:30 AM - 11:30 AM",
-    notes: "Initial consultation. Patient reported symptoms of depression.",
-    isExpanded: false,
-    status: "Pending" // Add the required status
-  },
-  {
-    id: 3,
-    patientName: "David Thompson",
-    date: "May 15, 2025",
-    time: "4:00 PM - 5:00 PM",
-    notes: "Third session. Continue working on stress reduction strategies.",
-    isExpanded: false,
-    status: "Confirmed" // Add the required status
-  },
-];
-
-const waitingListMock: WaitingListEntry[] = [
-  {
-    id: 1,
-    patientName: "Thomas Brown",
-    requestedDate: "May 20, 2025",
-    preferredTimeSlots: ["Morning", "Early Afternoon"],
-    status: "Pending",
-    isExpired: false,
-  },
-  {
-    id: 2,
-    patientName: "Lisa Garcia",
-    requestedDate: "May 18, 2025",
-    preferredTimeSlots: ["Late Afternoon"],
-    status: "Notified",
-    isExpired: false,
-  },
-  {
-    id: 3,
-    patientName: "James Wilson",
-    requestedDate: "May 8, 2025",
-    preferredTimeSlots: ["Morning"],
-    status: "Pending",
-    isExpired: true,
-  },
-];
-
-const sessionNotesMock: SessionNote[] = [
-  {
-    id: 1,
-    patientName: "Jane Smith",
-    date: "May 2, 2025",
-    notes: "Patient reported reduced anxiety symptoms. Discussed mindfulness techniques and assigned daily practice. Follow up on progress in next session.",
-  },
-  {
-    id: 2,
-    patientName: "Michael Johnson",
-    date: "May 1, 2025",
-    notes: "Initial assessment completed. Patient experiencing work-related stress and mild insomnia. Recommended sleep hygiene practices and scheduled weekly sessions.",
-  },
-  {
-    id: 3,
-    patientName: "Emily Davis",
-    date: "April 28, 2025",
-    notes: "Continued CBT exercises. Patient showing good progress with thought challenging techniques. Discussed potential triggers and developed coping strategies.",
-  },
-];
-
-const initialTimeSlots: TimeSlot[] = [
-  { id: 1, day: "Monday", startTime: "9:00 AM", endTime: "5:00 PM" },
-  { id: 2, day: "Tuesday", startTime: "10:00 AM", endTime: "6:00 PM" },
-  { id: 3, day: "Wednesday", startTime: "9:00 AM", endTime: "5:00 PM" },
-  { id: 4, day: "Thursday", startTime: "9:00 AM", endTime: "5:00 PM" },
-  { id: 5, day: "Friday", startTime: "9:00 AM", endTime: "3:00 PM" },
-];
-
-// Available time slots for rescheduling
-export const availableTimeSlots = [
-  "9:00 AM - 10:00 AM",
-  "11:00 AM - 12:00 PM",
-  "12:00 PM - 1:00 PM",
-  "2:00 PM - 3:00 PM",
-  "4:30 PM - 5:30 PM",
-];
+import { 
+  getTherapistAppointments, 
+  confirmAppointment as apiConfirmAppointment, 
+  completeAppointment as apiCompleteAppointment,
+  rescheduleAppointment as apiRescheduleAppointment,
+  getSessionNotes,
+  updateSessionNote as apiUpdateSessionNote,
+  getTherapistWaitingList,
+  notifyWaitingListPatient,
+  updateTherapistAvailability,
+  deleteAvailabilitySlot
+} from "../../API/Appointment/therapist";
+import { useAuth } from "../AuthContext";
+import { format } from "date-fns";
 
 // Define the context type
 interface AppContextType {
@@ -125,15 +22,17 @@ interface AppContextType {
   waitingList: WaitingListEntry[];
   sessionNotes: SessionNote[];
   timeSlots: TimeSlot[];
-  confirmAppointment: (id: number) => void;
-  completeAppointment: (id: number) => void;
-  rescheduleAppointment: (id: number, newTime: string) => void;
+  loading: boolean;
+  confirmAppointment: (id: number) => Promise<void>;
+  completeAppointment: (id: number) => Promise<void>;
+  rescheduleAppointment: (id: number, newTime: string) => Promise<void>;
   toggleAppointmentExpand: (id: number) => void;
-  notifyPatient: (id: number) => void;
-  removeFromWaitingList: (id: number) => void;
-  updateSessionNote: (id: number, newNote: string) => void;
-  addTimeSlot: (newSlot: NewTimeSlot) => void;
-  removeTimeSlot: (id: number) => void;
+  notifyPatient: (id: number) => Promise<void>;
+  removeFromWaitingList: (id: number) => Promise<void>;
+  updateSessionNote: (id: number, newNote: string) => Promise<void>;
+  addTimeSlot: (newSlot: NewTimeSlot) => Promise<void>;
+  removeTimeSlot: (id: number) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 // Create the context
@@ -141,37 +40,155 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Create a provider component
 export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>(todayAppointmentsMock);
-  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>(upcomingAppointmentsMock);
-  const [waitingList, setWaitingList] = useState<WaitingListEntry[]>(waitingListMock);
-  const [sessionNotes, setSessionNotes] = useState<SessionNote[]>(sessionNotesMock);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(initialTimeSlots);
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
+  const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
+  const [sessionNotes, setSessionNotes] = useState<SessionNote[]>([]);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  
+  const { user } = useAuth();
+
+  // Fetch data when the component mounts
+  useEffect(() => {
+    if (user?.id) {
+      refreshData();
+    }
+  }, [user?.id]);
+
+  // Function to refresh all data
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      // Get today's appointments
+      const today = new Date();
+      const todayStr = format(today, 'yyyy-MM-dd');
+      
+      const todayResponse = await getTherapistAppointments({ 
+        date: todayStr,
+        status: 'scheduled,confirmed,rescheduled'
+      });
+      
+      const todayAppts = (todayResponse as any).results.map((appointment: any) => ({
+        id: appointment.id,
+        patientName: `${appointment.patient?.first_name || ''} ${appointment.patient?.last_name || ''}`,
+        time: format(new Date(appointment.appointment_date), 'h:mm a - ') + 
+              format(new Date(new Date(appointment.appointment_date).getTime() + 
+                     (appointment.duration ? 
+                      parseInt(appointment.duration.replace(/\D/g,'')) * 60000 : 
+                      60 * 60000)), 'h:mm a'),
+        status: appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1),
+        notes: appointment.notes || '',
+        patientId: appointment.patient?.id
+      }));
+      
+      setTodayAppointments(todayAppts);
+      
+      // Get upcoming appointments
+      const upcomingResponse = await getTherapistAppointments({
+        upcoming: true,
+        status: 'scheduled,confirmed,rescheduled'
+      });
+      
+      const upcomingAppts = (upcomingResponse as any).results.map((appointment: any) => ({
+        id: appointment.id,
+        patientName: `${appointment.patient?.first_name || ''} ${appointment.patient?.last_name || ''}`,
+        date: format(new Date(appointment.appointment_date), 'MMMM d, yyyy'),
+        time: format(new Date(appointment.appointment_date), 'h:mm a - ') + 
+              format(new Date(new Date(appointment.appointment_date).getTime() + 
+                     (appointment.duration ? 
+                      parseInt(appointment.duration.replace(/\D/g,'')) * 60000 : 
+                      60 * 60000)), 'h:mm a'),
+        notes: appointment.notes || '',
+        isExpanded: false,
+        status: appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1),
+        patientId: appointment.patient?.id
+      }));
+      
+      setUpcomingAppointments(upcomingAppts);
+      
+      // Get waiting list
+      const waitingListResponse = await getTherapistWaitingList();
+      
+      const waitingListEntries = (waitingListResponse as any).results.map((entry: any) => ({
+        id: entry.id,
+        patientName: `${entry.patient?.first_name || ''} ${entry.patient?.last_name || ''}`,
+        requestDate: format(new Date(entry.created_at), 'MMMM d, yyyy'),
+        preferredDates: entry.preferred_dates.map((date: string) => 
+          format(new Date(date), 'MMMM d, yyyy')),
+        preferredTimeSlots: entry.preferred_time_slots,
+        status: entry.notified ? 'Notified' : 'Pending',
+        patientId: entry.patient?.id
+      }));
+      
+      setWaitingList(waitingListEntries);
+      
+      // Get session notes
+      const notesResponse = await getSessionNotes();
+      
+      const notes = (notesResponse as any).results.map((note: any) => ({
+        id: note.id,
+        patientName: `${note.patient?.first_name || ''} ${note.patient?.last_name || ''}`,
+        date: note.session_date ? format(new Date(note.session_date), 'MMMM d, yyyy') : 'No date',
+        notes: note.notes,
+        patientId: note.patient?.id
+      }));
+      
+      setSessionNotes(notes);
+      
+      // Would need another API endpoint to get availability slots
+      // For now, we'll leave the existing slots
+      
+    } catch (error) {
+      console.error("Error refreshing therapist data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Function to confirm an appointment
-  const confirmAppointment = (id: number) => {
-    setTodayAppointments(
-      todayAppointments.map((appointment) =>
-        appointment.id === id ? { ...appointment, status: "Confirmed" } : appointment
-      )
-    );
+  const confirmAppointment = async (id: number) => {
+    try {
+      await apiConfirmAppointment(id);
+      await refreshData();
+    } catch (error) {
+      console.error(`Error confirming appointment ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to mark an appointment as completed
-  const completeAppointment = (id: number) => {
-    setTodayAppointments(
-      todayAppointments.map((appointment) =>
-        appointment.id === id ? { ...appointment, status: "Completed" } : appointment
-      )
-    );
+  const completeAppointment = async (id: number) => {
+    try {
+      await apiCompleteAppointment(id);
+      await refreshData();
+    } catch (error) {
+      console.error(`Error completing appointment ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to reschedule an appointment
-  const rescheduleAppointment = (id: number, newTime: string) => {
-    setTodayAppointments(
-      todayAppointments.map((appointment) =>
-        appointment.id === id ? { ...appointment, time: newTime, status: "Rescheduled" } : appointment
-      )
-    );
+  const rescheduleAppointment = async (id: number, newTime: string) => {
+    try {
+      // Parse the new time and create an ISO string
+      // This is a simplified example - would need proper date parsing based on your format
+      const appointment = [...todayAppointments, ...upcomingAppointments]
+        .find(app => app.id === id);
+      
+      if (!appointment) throw new Error(`Appointment ${id} not found`);
+      
+      const dateStr = appointment.date || format(new Date(), 'MMMM d, yyyy');
+      const dateTimeStr = `${dateStr} ${newTime.split(' - ')[0]}`;
+      const dateObj = new Date(dateTimeStr);
+      const isoString = dateObj.toISOString();
+      
+      await apiRescheduleAppointment(id, isoString);
+      await refreshData();
+    } catch (error) {
+      console.error(`Error rescheduling appointment ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to toggle the expanded state of an upcoming appointment
@@ -184,61 +201,93 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   // Function to notify a patient on the waiting list
-  const notifyPatient = (id: number) => {
-    setWaitingList(
-      waitingList.map((entry) =>
-        entry.id === id ? { ...entry, status: "Notified" } : entry
-      )
-    );
+  const notifyPatient = async (id: number) => {
+    try {
+      await notifyWaitingListPatient(id);
+      await refreshData();
+    } catch (error) {
+      console.error(`Error notifying patient ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to remove an entry from the waiting list
-  const removeFromWaitingList = (id: number) => {
-    setWaitingList(waitingList.filter((entry) => entry.id !== id));
+  const removeFromWaitingList = async (id: number) => {
+    try {
+      // This endpoint would need to be added to the API
+      // For now, we'll just refresh the data to simulate removal
+      console.warn("removeFromWaitingList endpoint not implemented in API");
+      await refreshData();
+    } catch (error) {
+      console.error(`Error removing from waiting list ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to update a session note
-  const updateSessionNote = (id: number, newNote: string) => {
-    setSessionNotes(
-      sessionNotes.map((note) =>
-        note.id === id ? { ...note, notes: newNote } : note
-      )
-    );
+  const updateSessionNote = async (id: number, newNote: string) => {
+    try {
+      await apiUpdateSessionNote(id, { notes: newNote });
+      await refreshData();
+    } catch (error) {
+      console.error(`Error updating session note ${id}:`, error);
+      throw error;
+    }
   };
 
   // Function to add a new time slot
-  const addTimeSlot = (newSlot: NewTimeSlot) => {
-    const newId = Math.max(0, ...timeSlots.map((slot) => slot.id)) + 1;
-    setTimeSlots([...timeSlots, { ...newSlot, id: newId }]);
+  const addTimeSlot = async (newSlot: NewTimeSlot) => {
+    try {
+      await updateTherapistAvailability({
+        day_of_week: newSlot.day,
+        start_time: newSlot.startTime,
+        end_time: newSlot.endTime
+      });
+      await refreshData();
+    } catch (error) {
+      console.error("Error adding time slot:", error);
+      throw error;
+    }
   };
 
   // Function to remove a time slot
-  const removeTimeSlot = (id: number) => {
-    setTimeSlots(timeSlots.filter((slot) => slot.id !== id));
+  const removeTimeSlot = async (id: number) => {
+    try {
+      await deleteAvailabilitySlot(id);
+      await refreshData();
+    } catch (error) {
+      console.error(`Error removing time slot ${id}:`, error);
+      throw error;
+    }
   };
 
-  // Create the context value
-  const contextValue: AppContextType = {
-    todayAppointments,
-    upcomingAppointments,
-    waitingList,
-    sessionNotes,
-    timeSlots,
-    confirmAppointment,
-    completeAppointment,
-    rescheduleAppointment,
-    toggleAppointmentExpand,
-    notifyPatient,
-    removeFromWaitingList,
-    updateSessionNote,
-    addTimeSlot,
-    removeTimeSlot,
-  };
-
-  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider
+      value={{
+        todayAppointments,
+        upcomingAppointments,
+        waitingList,
+        sessionNotes,
+        timeSlots,
+        loading,
+        confirmAppointment,
+        completeAppointment,
+        rescheduleAppointment,
+        toggleAppointmentExpand,
+        notifyPatient,
+        removeFromWaitingList,
+        updateSessionNote,
+        addTimeSlot,
+        removeTimeSlot,
+        refreshData
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
 };
 
-// Create a custom hook to use the context
+// Hook to use the context
 export const useAppContext = () => {
   const context = useContext(AppContext);
   if (context === undefined) {

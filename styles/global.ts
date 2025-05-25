@@ -1,6 +1,42 @@
 // styles/global.ts
 import { Dimensions, StyleSheet, Platform } from 'react-native';
 
+/**
+ * Create cross-platform compatible shadow styles
+ * @param elevation - Shadow elevation (1-24)
+ * @param color - Shadow color (default black)
+ * @returns - Platform-specific shadow styles
+ */
+export const createShadow = (
+  elevation: number = 2,
+  color: string = "#000",
+  opacity: number = 0.2
+) => {
+  const height = Math.max(1, Math.round(elevation / 2));
+  
+  return Platform.select({
+    web: {
+      boxShadow: `0px ${height}px ${elevation}px rgba(0, 0, 0, ${opacity})`,
+    },
+    ios: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: height },
+      shadowOpacity: opacity,
+      shadowRadius: Math.max(1, Math.round(elevation / 2)),
+    },
+    android: {
+      elevation: elevation,
+    },
+    default: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: height },
+      shadowOpacity: opacity,
+      shadowRadius: Math.max(1, Math.round(elevation / 2)),
+      elevation: elevation,
+    },
+  });
+};
+
 const { width } = Dimensions.get('window');
 
 // 1. Color Palette
@@ -29,22 +65,6 @@ const colors = {
   inputBackground: '#ffffff',
   border: '#e0e0e0',
   shadow: 'rgba(0, 0, 0, 0.1)',
-};
-
-// Helper function for shadows
-export const getShadowStyles = (elevation: number) => {
-  if (Platform.OS === 'web') {
-    return {
-      boxShadow: `0px ${elevation / 2}px ${elevation}px rgba(0, 0, 0, 0.2)`,
-    };
-  }
-  return {
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: elevation / 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: elevation,
-    elevation,
-  };
 };
 
 // 2. Typography
@@ -131,7 +151,7 @@ const components = {
       backgroundColor: colors.white,
       borderRadius: borderRadius.md,
       padding: spacing.md,
-      ...getShadowStyles(2),
+      ...createShadow(2),
       marginBottom: spacing.sm,
     },
   }),

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useState, useContext, useCallback, useEffect, type ReactNode } from "react"
+import { createContext, useState, useContext, useCallback, type ReactNode } from "react"
 import type { Journal, JournalEntry } from "../../types/Journal/index"
 import {
   fetchJournalEntries,
@@ -44,17 +44,33 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [initialized, setInitialized] = useState(false)
 
   const fetchCategories = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetchJournalCategories()
-      setJournals(response)
       setError(null)
-    } catch (err) {
-      setError("Failed to fetch categories")
+      console.log("Fetching categories...")
+      const response = await fetchJournalCategories()
+      console.log("Categories response:", response)
+      console.log("Categories response type:", typeof response)
+      console.log("Categories response is array:", Array.isArray(response))
+      
+      // Ensure response is an array
+      const categoriesArray = Array.isArray(response) ? response : []
+      console.log("Setting journals to:", categoriesArray)
+      setJournals(categoriesArray)
+    } catch (err: any) {
+      const errorMessage = "Failed to fetch categories"
+      setError(errorMessage)
       console.error("Error fetching categories:", err)
+      
+      // Log more details about the error
+      if (err.response) {
+        console.error("Error response data:", err.response.data)
+        console.error("Error response status:", err.response.status)
+      }
+      
+      setJournals([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -63,13 +79,29 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
   const fetchEntries = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetchJournalEntries()
-      // Ensure response is an array before setting the state
-      setEntries(Array.isArray(response) ? response : [])
       setError(null)
-    } catch (err) {
-      setError("Failed to fetch entries")
+      console.log("Fetching entries...")
+      const response = await fetchJournalEntries()
+      console.log("Entries response:", response)
+      console.log("Entries response type:", typeof response)
+      console.log("Entries response is array:", Array.isArray(response))
+      
+      // Ensure response is an array
+      const entriesArray = Array.isArray(response) ? response : []
+      console.log("Setting entries to:", entriesArray)
+      setEntries(entriesArray)
+    } catch (err: any) {
+      const errorMessage = "Failed to fetch entries"
+      setError(errorMessage)
       console.error("Error fetching entries:", err)
+      
+      // Log more details about the error
+      if (err.response) {
+        console.error("Error response data:", err.response.data)
+        console.error("Error response status:", err.response.status)
+      }
+      
+      setEntries([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -78,13 +110,28 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
   const addJournal = useCallback(async (journal: Omit<Journal, "id" | "created_at" | "updated_at" | "user">) => {
     try {
       setLoading(true)
-      const response = await createJournalCategory(journal)
-      setJournals(prev => Array.isArray(prev) ? [...prev, response] : [response])
       setError(null)
+      console.log("Creating journal with data:", journal)
+      
+      const response = await createJournalCategory(journal)
+      console.log("Journal creation response:", response)
+      
+      setJournals(prev => [...prev, response])
       return response
-    } catch (err) {
-      setError("Failed to add journal")
+    } catch (err: any) {
+      const errorMessage = "Failed to add journal"
+      setError(errorMessage)
       console.error("Error adding journal:", err)
+      
+      // Log more details about the error
+      if (err.response) {
+        console.error("Error response data:", err.response.data)
+        console.error("Error response status:", err.response.status)
+        console.error("Error response headers:", err.response.headers)
+      } else if (err.request) {
+        console.error("Error request:", err.request)
+      }
+      
       throw err
     } finally {
       setLoading(false)
@@ -94,11 +141,9 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
   const updateJournal = useCallback(async (id: number, journal: Partial<Journal>) => {
     try {
       setLoading(true)
-      const response = await updateJournalCategory(id, journal)
-      setJournals(prev => Array.isArray(prev) 
-        ? prev.map(j => j.id === id ? { ...j, ...response } : j)
-        : [response])
       setError(null)
+      const response = await updateJournalCategory(id, journal)
+      setJournals(prev => prev.map(j => j.id === id ? { ...j, ...response } : j))
       return response
     } catch (err) {
       setError("Failed to update journal")
@@ -113,7 +158,7 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true)
       await deleteJournalCategory(id)
-      setJournals(prev => Array.isArray(prev) ? prev.filter(j => j.id !== id) : [])
+      setJournals(prev => prev.filter(j => j.id !== id))
       setError(null)
     } catch (err) {
       setError("Failed to delete journal")
@@ -128,7 +173,7 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true)
       const response = await createJournalEntry(entry)
-      setEntries(prev => Array.isArray(prev) ? [...prev, response] : [response])
+      setEntries(prev => [...prev, response])
       setError(null)
       return response
     } catch (err) {
@@ -144,9 +189,7 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true)
       const response = await updateJournalEntry(id, entry)
-      setEntries(prev => Array.isArray(prev) 
-        ? prev.map(e => e.id === id ? { ...e, ...response } : e) 
-        : [response])
+      setEntries(prev => prev.map(e => e.id === id ? { ...e, ...response } : e))
       setError(null)
       return response
     } catch (err) {
@@ -162,7 +205,7 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true)
       await deleteJournalEntry(id)
-      setEntries(prev => Array.isArray(prev) ? prev.filter(e => e.id !== id) : [])
+      setEntries(prev => prev.filter(e => e.id !== id))
       setError(null)
     } catch (err) {
       setError("Failed to delete entry")
@@ -172,14 +215,6 @@ export const JournalProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    if (!initialized) {
-      Promise.all([fetchCategories(), fetchEntries()])
-        .then(() => setInitialized(true))
-        .catch(console.error)
-    }
-  }, [initialized, fetchCategories, fetchEntries])
 
   const value = {
     journals,

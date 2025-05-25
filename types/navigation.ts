@@ -15,6 +15,7 @@ export type RootStackParamList = {
   Appointments: undefined;
   PatientDashboard: undefined; // Added
   TherapistDashboard: undefined; // Added
+  Mood: undefined; // Add the Mood screen route
 };
 
 export type AppTabParamList = {
@@ -102,6 +103,8 @@ export interface Conversation {
   last_message?: Message;
   other_participant?: number;
   other_user_name?: string;
+  is_group?: boolean;
+  name?: string;
 }
 
 declare global {

@@ -89,6 +89,12 @@ export const updateNotificationSettings = async (
  * Helper function to get the auth token
  */
 const getToken = async (): Promise<string | null> => {
-  const AsyncStorage = await import('@react-native-async-storage/async-storage');
-  return await AsyncStorage.default.getItem('accessToken');
+  try {
+    const AsyncStorage = await import('@react-native-async-storage/async-storage');
+    // Use consistent token key
+    return await AsyncStorage.default.getItem('accessToken');
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
 };

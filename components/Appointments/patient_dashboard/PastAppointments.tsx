@@ -4,7 +4,7 @@ import type React from "react"
 import { useState } from "react"
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import type { AppointmentType } from "../../../types/appointmentTypes"
+import type { AppointmentType } from "../../../types/appoint_patient/appointmentTypes"
 import { Card, CardHeader, CardContent, Badge, Button, ScrollView } from "./ui"
 
 type PastAppointmentsProps = {
@@ -193,6 +193,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontWeight: '700',
     fontSize: 16,
+    backgroundColor: "#002D62", // Updated to match settings screen
   },
   feedbackSubmittedRow: {
     flexDirection: 'row',
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#4A5568',
+    color: "#666", // Updated to match settings screen
   },
 })
 

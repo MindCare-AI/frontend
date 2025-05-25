@@ -1,5 +1,6 @@
 import { ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
  * Combines and merges class names using clsx and tailwind-merge
@@ -25,9 +26,13 @@ export function formatDate(date: Date): string {
  * Gets an authentication token from storage
  */
 export async function getAuthToken(): Promise<string | null> {
-  // In a real app, this would be retrieved from AsyncStorage, localStorage, etc.
-  // For this mock, we'll return a dummy token
-  return 'mock-auth-token';
+  try {
+    const token = await AsyncStorage.getItem('accessToken');
+    return token;
+  } catch (error) {
+    console.error('Error retrieving auth token:', error);
+    return null;
+  }
 }
 
 export function getStatusColor(status: string): string {
