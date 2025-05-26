@@ -186,7 +186,7 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
           <View style={styles.actionSheetContainer}>
             <Text style={styles.actionSheetTitle}>Appointment Options</Text>
             
-            {onConfirm && appointment.status === 'pending' && (
+            {onConfirm && appointment.status === 'scheduled' && (
               <TouchableOpacity
                 style={styles.actionSheetButton}
                 onPress={handleConfirm}
@@ -221,7 +221,7 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
               <Text style={styles.actionSheetButtonText}>Edit Details</Text>
             </TouchableOpacity>
             
-            {onCancel && (appointment.status === 'pending' || appointment.status === 'confirmed') && (
+            {onCancel && (appointment.status === 'scheduled' || appointment.status === 'confirmed') && (
               <TouchableOpacity
                 style={styles.actionSheetButton}
                 onPress={handleCancel}

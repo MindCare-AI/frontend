@@ -5,7 +5,7 @@
  * pending -> confirmed -> completed
  * Any status can be canceled
  */
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'canceled' | 'rescheduled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'canceled' | 'rescheduled' | 'scheduled';
 
 export interface Appointment {
   appointment_date: any;

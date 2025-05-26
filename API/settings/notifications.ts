@@ -5,9 +5,14 @@ import { API_URL } from '../../config';
  * Gets the current user type from the API
  * @returns 'patient' or 'therapist' based on the user's profile
  */
+interface UserData {
+  therapist_profile?: { id: number };
+  profile_id?: number;
+}
+
 export async function getCurrentUserType() {
   try {
-    const response = await axios.get(`${API_URL}/users/me/`);
+    const response = await axios.get<UserData>(`${API_URL}/users/me/`);
     
     // Check if user has therapist_profile
     if (response.data.therapist_profile && response.data.therapist_profile.id) {
@@ -31,9 +36,24 @@ export async function getCurrentUserType() {
  * Saves user notification preferences to the API
  * @param preferences User preference object
  */
+interface UserPreferencesResponse {
+  preferences?: {
+    id: number;
+  };
+}
+
 export async function saveUserPreferences(preferences: any) {
   try {
-    const response = await axios.put(`${API_URL}/users/preferences/`, {
+    // First get the user data to find the preferences ID
+    const userResponse = await axios.get<UserPreferencesResponse>(`${API_URL}/users/me/`);
+    const preferencesId = userResponse.data.preferences?.id;
+    
+    if (!preferencesId) {
+      throw new Error('Could not determine preferences ID');
+    }
+
+    // Use the correct endpoint structure with the ID
+    const response = await axios.put(`${API_URL}/users/preferences/${preferencesId}/`, {
       dark_mode: preferences.dark_mode,
       language: preferences.language,
       email_notifications: preferences.email_notifications,

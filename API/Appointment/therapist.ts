@@ -88,12 +88,7 @@ export const rescheduleAppointment = async (
  * Confirms an appointment
  * @param appointmentId - The ID of the appointment to confirm
  * @returns The confirmed appointment data
-    const response = await axios.post(url, {}, {
-      headers: getAuthHeaders()
-    });
-    console.log("[therapist.ts] Confirm response:", response.data);
-    // Ensure we return the appointment data in a consistent format
-    return (response.data as AppointmentResponse).appointment || response.data;
+ */
 export const confirmAppointment = async (appointmentId: number | string) => {
   console.log(`[therapist.ts] Confirming appointment ${appointmentId}`);
   
@@ -101,7 +96,7 @@ export const confirmAppointment = async (appointmentId: number | string) => {
   console.log("[therapist.ts] Confirm URL:", url);
   
   try {
-    const response = await axios.post(url, {}, {
+    const response = await axios.post<AppointmentResponse>(url, {}, {
       headers: getAuthHeaders()
     });
     console.log("[therapist.ts] Confirm response:", response.data);
