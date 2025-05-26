@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, Text, View, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Button } from "react-native-paper";
+import { Button, TextInput } from "react-native-paper";
+import { Appointment } from "../../../types/appoint_therapist/index";
 
 // Define the time slots directly in this component instead of importing from AppContext
 const availableTimeSlots = [
@@ -21,24 +22,43 @@ type TimeSlot = {
 
 interface RescheduleModalProps {
   visible: boolean;
-  onClose: () => void;
-  onReschedule: (date: string, timeSlot: string) => void;
-  currentDate?: string;
+  appointment: Appointment | null;
+  onDismiss: () => void;
+  onReschedule: (appointmentId: number | string, newDateTime: string, notes?: string) => Promise<Appointment>;
 }
 
 const RescheduleModal: React.FC<RescheduleModalProps> = ({
   visible,
-  onClose,
+  appointment,
+  onDismiss,
   onReschedule,
-  currentDate,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
+  const [notes, setNotes] = useState<string>("Appointment rescheduled");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleReschedule = () => {
-    if (selectedDate && selectedTimeSlot) {
-      onReschedule(selectedDate, selectedTimeSlot);
-      onClose();
+  useEffect(() => {
+    if (appointment) {
+      // Reset fields when appointment changes
+      setNotes("Appointment rescheduled");
+    }
+  }, [appointment]);
+
+  const handleReschedule = async () => {
+    if (appointment && selectedDate && selectedTimeSlot) {
+      setIsSubmitting(true);
+      try {
+        // Format the datetime properly for the API
+        const dateTime = `${selectedDate} ${selectedTimeSlot}`;
+        await onReschedule(appointment.id, dateTime, notes);
+        onDismiss();
+      } catch (error) {
+        console.error("Failed to reschedule appointment:", error);
+        // Handle error (could display an error message)
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -56,12 +76,21 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Reschedule Appointment</Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={onDismiss}>
               <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scrollContent}>
+            {appointment && (
+              <View style={styles.appointmentInfo}>
+                <Text style={styles.patientName}>Patient: {appointment.patientName}</Text>
+                <Text style={styles.currentDateTime}>
+                  Current Date/Time: {appointment.date} {appointment.time}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.dateSelectionContainer}>
               <Text style={styles.sectionTitle}>Select a new date:</Text>
               <View style={styles.datesContainer}>
@@ -115,22 +144,36 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
                 ))}
               </View>
             </View>
+
+            <View style={styles.notesContainer}>
+              <Text style={styles.sectionTitle}>Notes:</Text>
+              <TextInput
+                mode="outlined"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={3}
+                style={styles.notesInput}
+              />
+            </View>
           </ScrollView>
 
           <View style={styles.modalFooter}>
             <Button
               mode="outlined"
-              onPress={onClose}
+              onPress={onDismiss}
               style={styles.cancelButton}
               labelStyle={styles.cancelButtonText}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               mode="contained"
               onPress={handleReschedule}
-              disabled={!selectedDate || !selectedTimeSlot}
+              disabled={!selectedDate || !selectedTimeSlot || isSubmitting}
               style={styles.rescheduleButton}
+              loading={isSubmitting}
             >
               Reschedule
             </Button>
@@ -243,6 +286,27 @@ const styles = StyleSheet.create({
   },
   rescheduleButton: {
     backgroundColor: "#4285f4",
+  },
+  appointmentInfo: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+  },
+  patientName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  currentDateTime: {
+    fontSize: 14,
+    color: "#666",
+  },
+  notesContainer: {
+    marginBottom: 16,
+  },
+  notesInput: {
+    marginTop: 8,
   },
 });
 
