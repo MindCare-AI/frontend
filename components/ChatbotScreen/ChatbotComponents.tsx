@@ -345,7 +345,7 @@ export const EditTitleModal: React.FC<EditTitleModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  // Conversation List Item Styles
+  // Conversation List Item Styles with enhanced animations and shadows
   conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,9 +354,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderRadius: 8,
+    marginHorizontal: 8,
+    marginVertical: 4,
+    transform: [{ scale: 1 }],
   },
   inactiveConversation: {
     opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   conversationContent: {
     flex: 1,
@@ -377,11 +387,13 @@ const styles = StyleSheet.create({
   conversationTime: {
     fontSize: 12,
     color: '#9CA3AF',
+    fontWeight: '500',
   },
   lastMessage: {
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 4,
+    lineHeight: 18,
   },
   conversationFooter: {
     flexDirection: 'row',
@@ -391,20 +403,26 @@ const styles = StyleSheet.create({
   messageCount: {
     fontSize: 12,
     color: '#9CA3AF',
+    fontWeight: '500',
   },
   archivedBadge: {
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 1,
   },
   archivedText: {
     fontSize: 10,
     color: '#92400E',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 
-  // Conversation List Styles
+  // Enhanced Conversation List Styles
   conversationListContainer: {
     flex: 1,
     backgroundColor: '#F8F9FA',
@@ -414,18 +432,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   listTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: '#1F2937',
+    letterSpacing: -0.5,
   },
   newChatButton: {
-    padding: 8,
+    padding: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   listContent: {
     flexGrow: 1,
@@ -475,10 +506,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Message Styles
+  // Enhanced Message Styles with better animations
   messageContainer: {
-    marginVertical: 4,
-    maxWidth: '80%',
+    marginVertical: 6,
+    maxWidth: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   userMessage: {
     alignSelf: 'flex-end',
@@ -491,23 +527,31 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 4,
     marginLeft: 12,
+    fontWeight: '500',
   },
   messageBubble: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   userBubble: {
     backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
   },
   botBubble: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   userText: {
     color: '#FFFFFF',
@@ -516,17 +560,19 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   methodText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
     fontStyle: 'italic',
-    marginTop: 4,
+    marginTop: 6,
+    opacity: 0.8,
   },
   timestamp: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '500',
   },
   userTimestamp: {
-    color: '#E5E7EB',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   botTimestamp: {
     color: '#9CA3AF',

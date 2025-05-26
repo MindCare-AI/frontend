@@ -104,27 +104,6 @@ const ChatbotNavigator: React.FC = () => {
           component={ChatbotScreen}
           options={({ route, navigation }) => ({
             title: 'Conversation',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => {
-                  if (route.params?.conversationId) {
-                    navigation.navigate('ConversationSettings', {
-                      conversationId: route.params.conversationId
-                    });
-                  }
-                }}
-                style={{ 
-                  marginRight: 16,
-                  padding: 8,
-                }}
-              >
-                <Ionicons 
-                  name="settings-outline" 
-                  size={24} 
-                  color={globalStyles.colors.white} 
-                />
-              </TouchableOpacity>
-            ),
           })}
         />
         

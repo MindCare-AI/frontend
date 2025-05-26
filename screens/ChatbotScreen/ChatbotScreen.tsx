@@ -1,5 +1,5 @@
 // screens/ChatbotScreen/ChatbotScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -58,6 +58,8 @@ const ChatbotScreen: React.FC = () => {
   const [messageText, setMessageText] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [fetchingConversation, setFetchingConversation] = useState(false);
+  const [allDataLoaded, setAllDataLoaded] = useState(false);
+  const flatListRef = React.useRef<FlatList>(null);
 
   // Initialize conversation
   useEffect(() => {
@@ -115,6 +117,24 @@ const ChatbotScreen: React.FC = () => {
       initializeConversation();
     }
   }, [conversationId, autoCreate, conversations, setCurrentConversation, fetchMessages, createConversation]);
+
+  // Enhanced loading check function
+  const checkIfAllDataLoaded = useCallback(() => {
+    // Only set allDataLoaded to true when both conversation and messages are fully loaded
+    const conversationLoaded = !fetchingConversation && currentConversation !== null;
+    const messagesLoaded = !loadingMessages && messages.length >= 0; // Allow for empty conversations
+    
+    if (conversationLoaded && messagesLoaded && !allDataLoaded) {
+      // Add a small delay to ensure UI is ready
+      setTimeout(() => {
+        setAllDataLoaded(true);
+      }, 100);
+    }
+  }, [fetchingConversation, currentConversation, loadingMessages, messages.length, allDataLoaded]);
+
+  useEffect(() => {
+    checkIfAllDataLoaded();
+  }, [checkIfAllDataLoaded]);
 
   // Handle send message
   const handleSendMessage = async () => {
@@ -238,8 +258,11 @@ const ChatbotScreen: React.FC = () => {
         {item.is_bot && item.chatbot_method && (
           <Text style={styles.methodText}>Method: {item.chatbot_method}</Text>
         )}
-        <Text style={styles.timestamp}>
-          {new Date(item.timestamp).toLocaleTimeString()}
+        <Text style={[
+          styles.timestamp,
+          item.is_bot ? styles.botTimestamp : styles.userTimestamp
+        ]}>
+          {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
         </Text>
       </View>
     </View>
@@ -284,9 +307,18 @@ const ChatbotScreen: React.FC = () => {
       ]);
     }
   }, [error, clearError]);
+  
+  // Scroll to end when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
 
   // Show loading screen during initial load or when fetching conversation
-  if ((loading && !currentConversation) || (loadingMessages && messages.length === 0) || fetchingConversation) {
+  if ((loading && !currentConversation) || (loadingMessages && messages.length === 0) || fetchingConversation || !allDataLoaded) {
     return (
       <SafeAreaView style={styles.container}>
         {renderHeader()}
@@ -294,7 +326,8 @@ const ChatbotScreen: React.FC = () => {
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>
             {fetchingConversation ? 'Loading conversation...' : 
-             loading ? 'Loading conversation...' : 'Loading messages...'}
+             loading ? 'Initializing chat...' : 
+             loadingMessages ? 'Loading messages...' : 'Setting up...'}
           </Text>
         </View>
       </SafeAreaView>
@@ -311,12 +344,12 @@ const ChatbotScreen: React.FC = () => {
       >
         {/* Messages List */}
         <FlatList
-          data={[...messages].reverse()} // Reverse the messages array for proper display with inverted FlatList
+          ref={flatListRef}
+          data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id.toString()}
           style={styles.messagesList}
           contentContainerStyle={styles.messagesContent}
-          inverted // This makes newest messages appear at bottom (normal chat behavior)
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -331,15 +364,26 @@ const ChatbotScreen: React.FC = () => {
               </View>
             ) : null
           }
+          // Add better performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={15}
+          getItemLayout={(data, index) => ({
+            length: 80,
+            offset: 80 * index,
+            index,
+          })}
         />
-
-        {/* Input Area */}
+        
+        {/* Enhanced Input Component */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
             value={messageText}
             onChangeText={setMessageText}
             placeholder="Type your message..."
+            placeholderTextColor="#9CA3AF"
             multiline
             maxLength={1000}
             editable={!sendingMessage}
@@ -460,8 +504,13 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
     marginTop: 4,
+  },
+  userTimestamp: {
+    color: '#E5E7EB',
+  },
+  botTimestamp: {
+    color: '#9CA3AF',
   },
   loadingMore: {
     padding: 16,

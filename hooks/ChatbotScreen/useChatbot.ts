@@ -198,13 +198,13 @@ export const useChatbot = () => {
         limit: 20,
       });
       
-      // Sort new messages and prepend them (older messages)
+      // Sort new messages by timestamp (oldest first)
       const sortedNewMessages = response.messages.sort((a, b) => 
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       
       updateState({
-        messages: [...sortedNewMessages, ...state.messages], // Prepend older messages
+        messages: [...state.messages, ...sortedNewMessages], // Append older messages at the end
         hasMoreMessages: response.has_more,
         loadingMessages: false,
       });
