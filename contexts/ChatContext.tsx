@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { ChatbotConversation, ChatbotMessage } from '../types/chatbot';
+import { ChatbotConversation, ChatbotMessage } from '../types/chatbot/chatbot';
 import chatbotService from '../services/chatbotService';
 
 interface ChatContextType {

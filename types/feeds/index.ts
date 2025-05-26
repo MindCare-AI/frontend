@@ -65,6 +65,7 @@ export interface Post {
   author: number;
   author_name: string;
   author_profile_pic?: string;
+  author_user_type?: 'patient' | 'therapist';
   content: string;
   post_type: string;
   topics?: string | Topic;

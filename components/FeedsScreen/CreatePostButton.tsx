@@ -22,6 +22,17 @@ interface CreatePostButtonProps {
 }
 
 const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-right" }) => {
+  // Use HomeSettingsScreen color scheme
+  const homeScreenColors = {
+    primary: '#002D62',
+    lightBlue: '#E4F0F6',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#444',
+    borderColor: '#F0F0F0',
+    background: '#FFFFFF',
+  };
+
   const { colors, isDark } = useTheme()
   const { toast } = useToast()
   const [isModalVisible, setIsModalVisible] = useState(false)
@@ -46,18 +57,26 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
     setSelectedTags(selectedTags.filter((t) => t !== tag))
   }
 
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     setIsCreatingPost(true)
     
-    // Simulate API call with timeout
-    setTimeout(() => {
-      // In a real app, you would call an API to create the post
-      console.log({
+    try {
+      // Import the API function
+      const { createPost } = await import('../../API/feeds');
+      
+      // Prepare the post data in the correct format
+      const postData = {
         content: postContent,
+        type: postType,
         topic: selectedTopic,
         tags: selectedTags,
-        type: postType,
-      })
+      };
+
+      console.log('Creating post with data:', postData);
+      
+      // Call the API
+      const result = await createPost(postData);
+      console.log('Post created successfully:', result);
 
       // Reset form and close modal
       setPostContent("")
@@ -65,15 +84,24 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
       setSelectedTags([])
       setPostType("text")
       setIsModalVisible(false)
-      setIsCreatingPost(false)
 
       toast({
         title: "Post created",
         description: "Your post has been published successfully",
         type: "success",
-        duration: 4000, // Longer duration for better visibility
+        duration: 4000,
       })
-    }, 1000) // Simulate network delay
+    } catch (error) {
+      console.error('Error creating post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create post. Please try again.",
+        type: "error",
+        duration: 4000,
+      });
+    } finally {
+      setIsCreatingPost(false)
+    }
   }
 
   const renderButton = () => {
@@ -83,13 +111,13 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
           style={[
             styles.centerButton,
             {
-              backgroundColor: colors.primary,
+              backgroundColor: homeScreenColors.primary,
             },
           ]}
           onPress={() => setIsModalVisible(true)}
         >
-          <Ionicons name="add" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.centerButtonText}>Create Post</Text>
+          <Ionicons name="add" size={24} color={homeScreenColors.white} style={styles.buttonIcon} />
+          <Text style={[styles.centerButtonText, { color: homeScreenColors.white }]}>Create Post</Text>
         </TouchableOpacity>
       )
     }
@@ -99,7 +127,7 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
         style={[
           styles.floatingButton,
           {
-            backgroundColor: colors.primary,
+            backgroundColor: homeScreenColors.primary,
             ...Platform.select({
               ios: {
                 shadowColor: "#000",
@@ -118,7 +146,7 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
         ]}
         onPress={() => setIsModalVisible(true)}
       >
-        <Ionicons name="add" size={24} color="white" />
+        <Ionicons name="add" size={24} color={homeScreenColors.white} />
       </TouchableOpacity>
     )
   }

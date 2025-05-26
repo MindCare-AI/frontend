@@ -28,40 +28,14 @@ export const usePostReactions = (postId: number, initialReaction: string | null 
   }, [postId, userReaction]);
 
   const toggleLike = useCallback(async () => {
-    try {
-      setLoading(true);
-      let response;
-      try {
-        response = await FeedsApi.likePost(postId) as { message: string };
-      } catch (err) {
-        console.log("API error, using fallback response");
-        // Create a fallback response to continue UI flow
-        response = { 
-          message: userReaction === "like" ? "Post unliked" : "Post liked" 
-        };
-      }
-      
-      const newReaction = response.message === "Post liked" ? "like" : null;
-      setUserReaction(newReaction);
-      setError(null);
-      return newReaction;
-    } catch (err) {
-      console.error('Error toggling like:', err);
-      setError('Failed to update like');
-      // Return the opposite of current state as a fallback
-      const fallbackReaction = userReaction === "like" ? null : "like";
-      setUserReaction(fallbackReaction);
-      return fallbackReaction;
-    } finally {
-      setLoading(false);
-    }
-  }, [postId, userReaction]);
+    return await addReaction('like');
+  }, [addReaction]);
 
   return {
     userReaction,
     loading,
     error,
     addReaction,
-    toggleLike
+    toggleLike,
   };
 };

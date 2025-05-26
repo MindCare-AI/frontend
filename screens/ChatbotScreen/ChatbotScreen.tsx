@@ -1,276 +1,409 @@
-import React, { useState, useRef, useEffect } from 'react';
+// screens/ChatbotScreen/ChatbotScreen.tsx
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
+  FlatList,
   TextInput,
   TouchableOpacity,
-  FlatList,
+  StyleSheet,
+  Alert,
+  RefreshControl,
+  ActivityIndicator,
+  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
-  StyleSheet,
-  Animated,
-  ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
-import { AnimatedBotMessage } from '../../components/ChatbotScreen/AnimatedBotMessage';
-import { TypingIndicator } from '../../components/ChatbotScreen/TypingIndicator';
+import { ChatMessage, ChatbotConversation } from '../../types/chatbot/chatbot';
+import { chatbotApi } from '../../API/chatbot/chatbot';
+
+// Import the ChatbotStackParamList
+import { ChatbotStackParamList } from '../../navigation/types';
+
+type ChatbotScreenRouteProp = RouteProp<ChatbotStackParamList, 'ChatbotConversation'>;
+type ChatbotScreenNavigationProp = StackNavigationProp<ChatbotStackParamList, 'ChatbotConversation'>;
 
 const ChatbotScreen: React.FC = () => {
+  const route = useRoute<ChatbotScreenRouteProp>();
+  const navigation = useNavigation<ChatbotScreenNavigationProp>();
+  const { conversationId, autoCreate } = route.params || {};
+  
+  // Add navigation function to go back to conversation list
+  const goToConversationList = () => {
+    navigation.navigate('ChatbotHome');
+  };
+  
   const {
+    currentConversation,
     messages,
-    isLoading,
+    loading,
     error,
+    sendingMessage,
+    loadingMessages,
+    hasMoreMessages,
+    conversations,
+    fetchMessages,
     sendMessage,
-    clearHistory,
-    isTyping,
-    retryMessage,
+    setCurrentConversation,
+    setMessages,
+    createConversation,
+    clearError,
+    loadMoreMessages,
   } = useChatbot();
 
-  const [inputText, setInputText] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
-  const inputRef = useRef<TextInput>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const [messageText, setMessageText] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [fetchingConversation, setFetchingConversation] = useState(false);
+  const [allDataLoaded, setAllDataLoaded] = useState(false);
+  const flatListRef = React.useRef<FlatList>(null);
 
+  // Initialize conversation
   useEffect(() => {
-    if (!isLoading) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    const initializeConversation = async () => {
+      if (conversationId) {
+        // Find existing conversation
+        const existingConversation = conversations.find(conv => conv.id === conversationId);
+        if (existingConversation && 'user' in existingConversation) {
+          setCurrentConversation(existingConversation as ChatbotConversation);
+          fetchMessages(conversationId);
+        } else {
+          // If conversation not in list, fetch it directly from API
+          try {
+            console.log('[ChatbotScreen] Fetching conversation from API:', conversationId);
+            const conversation = await chatbotApi.getConversation(conversationId);
+            setCurrentConversation(conversation);
+            // Set messages from the conversation response
+            if (conversation.messages) {
+              console.log('[ChatbotScreen] Setting messages from conversation:', conversation.messages.length, 'messages');
+              setMessages(conversation.messages);
+            }
+          } catch (error) {
+            console.error('[ChatbotScreen] Failed to fetch conversation:', error);
+          }
+        }
+      } else if (autoCreate) {
+        // Create new conversation
+        const newConversation = await createConversation({
+          title: `Chat ${new Date().toLocaleDateString()}`,
+        });
+        if (newConversation) {
+          fetchMessages(newConversation.id);
+        }
+      } else if (conversations.length > 0) {
+        // Use first conversation if no specific one provided
+        const firstConv = conversations[0];
+        if ('user' in firstConv) {
+          setCurrentConversation(firstConv as ChatbotConversation);
+          fetchMessages(firstConv.id);
+        }
+      } else {
+        // No conversations exist, create one
+        console.log('[ChatbotScreen] No conversations exist, creating first one');
+        const newConversation = await createConversation({
+          title: `Chat ${new Date().toLocaleDateString()}`,
+        });
+        if (newConversation) {
+          console.log('[ChatbotScreen] Auto-created conversation:', newConversation.id);
+          // The conversation will be set as current in the createConversation hook
+        }
+      }
+    };
+
+    if (conversations.length > 0 || autoCreate || (!conversationId && conversations.length === 0)) {
+      initializeConversation();
     }
-  }, [isLoading, fadeAnim, slideAnim]);
+  }, [conversationId, autoCreate, conversations, setCurrentConversation, fetchMessages, createConversation]);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messages.length > 0 && flatListRef.current) {
-      // Use a slight delay to ensure the FlatList has rendered the new message
-      const timer = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+  // Enhanced loading check function
+  const checkIfAllDataLoaded = useCallback(() => {
+    // Only set allDataLoaded to true when both conversation and messages are fully loaded
+    const conversationLoaded = !fetchingConversation && currentConversation !== null;
+    const messagesLoaded = !loadingMessages && messages.length >= 0; // Allow for empty conversations
+    
+    if (conversationLoaded && messagesLoaded && !allDataLoaded) {
+      // Add a small delay to ensure UI is ready
+      setTimeout(() => {
+        setAllDataLoaded(true);
       }, 100);
-      
-      return () => clearTimeout(timer);
     }
-  }, [messages.length]);
+  }, [fetchingConversation, currentConversation, loadingMessages, messages.length, allDataLoaded]);
 
-  // Auto-scroll when typing indicator appears
   useEffect(() => {
-    if (isTyping && flatListRef.current) {
-      const timer = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
-      return () => clearTimeout(timer);
+    checkIfAllDataLoaded();
+  }, [checkIfAllDataLoaded]);
+
+  // Handle send message
+  const handleSendMessage = async () => {
+    console.log('[ChatbotScreen] handleSendMessage called');
+    console.log('[ChatbotScreen] messageText:', messageText);
+    console.log('[ChatbotScreen] currentConversation:', currentConversation?.id);
+    console.log('[ChatbotScreen] sendingMessage:', sendingMessage);
+    
+    if (!messageText.trim() || sendingMessage) {
+      console.log('[ChatbotScreen] Early return - no message text or already sending');
+      return;
     }
-  }, [isTyping]);
 
-  const handleSend = async () => {
-    if (!inputText.trim() || isSending) return;
+    // If no current conversation, create one automatically
+    if (!currentConversation) {
+      console.log('[ChatbotScreen] No current conversation');
+      
+      // For testing - try to use conversation ID 2 if it exists
+      try {
+        console.log('[ChatbotScreen] Attempting to use conversation ID 2...');
+        setFetchingConversation(true); // Add loading state
+        const conversation = await chatbotApi.getConversation(2);
+        console.log('[ChatbotScreen] Found conversation 2:', conversation);
+        setCurrentConversation(conversation);
+        if (conversation.messages && conversation.messages.length > 0) {
+          setMessages(conversation.messages);
+        }
+        setFetchingConversation(false); // Stop loading
+        // Send the message to conversation 2
+        const message = messageText.trim();
+        setMessageText('');
+        await sendMessage(2, message);
+        return;
+      } catch (error) {
+        console.log('[ChatbotScreen] Conversation 2 not found or error:', error);
+        setFetchingConversation(false); // Stop loading on error
+      }
+      
+      // First, try to use an existing conversation if available
+      if (conversations.length > 0) {
+        const firstConv = conversations[0];
+        if ('user' in firstConv) {
+          console.log('[ChatbotScreen] Using first available conversation:', firstConv.id);
+          setCurrentConversation(firstConv as ChatbotConversation);
+          // Send message after setting conversation
+          const message = messageText.trim();
+          setMessageText('');
+          await sendMessage(firstConv.id, message);
+          return;
+        }
+      }
+      
+      // If no conversations available, create one
+      console.log('[ChatbotScreen] Creating new conversation for message...');
+      const newConversation = await createConversation({
+        title: `Chat ${new Date().toLocaleDateString()}`,
+      });
+      
+      if (!newConversation) {
+        console.log('[ChatbotScreen] Failed to create conversation');
+        return;
+      }
+      
+      console.log('[ChatbotScreen] Created new conversation:', newConversation.id);
+      // Continue with sending the message using the new conversation
+      const message = messageText.trim();
+      setMessageText('');
+      await sendMessage(newConversation.id, message);
+      return;
+    }
 
-    setIsSending(true);
-    const messageText = inputText.trim();
-    setInputText('');
+    const message = messageText.trim();
+    setMessageText('');
     
     try {
-      await sendMessage(messageText);
-    } catch (err) {
-      console.error('Error sending message:', err);
+      console.log('[ChatbotScreen] About to call sendMessage with:', { conversationId: currentConversation.id, message });
+      await sendMessage(currentConversation.id, message);
+      console.log('[ChatbotScreen] sendMessage completed successfully');
+    } catch (error) {
+      console.log('[ChatbotScreen] sendMessage error:', error);
+      // Error is handled by the hook
+      setMessageText(message); // Restore message on error
+    }
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    if (!currentConversation) return;
+    
+    setRefreshing(true);
+    try {
+      await fetchMessages(currentConversation.id);
     } finally {
-      setIsSending(false);
+      setRefreshing(false);
     }
   };
 
-  const handleRetry = async (messageId: string) => {
-    try {
-      await retryMessage(messageId);
-    } catch (err) {
-      console.error('Error retrying message:', err);
+  // Handle load more messages
+  const handleLoadMore = () => {
+    if (currentConversation && hasMoreMessages && !loadingMessages) {
+      loadMoreMessages(currentConversation.id);
     }
   };
 
-  // Sort messages by timestamp and remove duplicates
-  const sortedMessages = React.useMemo(() => {
-    if (!Array.isArray(messages)) return [];
-    
-    // Remove duplicates based on ID
-    const uniqueMessages = messages.filter((message, index, self) => 
-      index === self.findIndex(m => m.id === message.id)
-    );
-    
-    // Sort by timestamp (oldest first for correct chronological order)
-    return uniqueMessages.sort((a, b) => {
-      const timeA = new Date(a.timestamp).getTime();
-      const timeB = new Date(b.timestamp).getTime();
-      return timeA - timeB;
-    });
-  }, [messages]);
-
-  const renderMessage = ({ item, index }: { item: any; index: number }) => (
-    <AnimatedBotMessage
-      message={item}
-      index={index}
-    />
-  );
-
-  const renderTypingIndicator = () => {
-    if (!isTyping) return null;
-    return <TypingIndicator visible={isTyping} />;
-  };
-
-  const renderLoadingScreen = () => (
-    <View style={styles.loadingContainer}>
-      <Animated.View style={[
-        styles.loadingContent,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }],
-        },
+  // Render message item
+  const renderMessage = ({ item }: { item: ChatMessage }) => (
+    <View style={[
+      styles.messageContainer,
+      item.is_bot ? styles.botMessage : styles.userMessage
+    ]}>
+      <View style={[
+        styles.messageBubble,
+        item.is_bot ? styles.botBubble : styles.userBubble
       ]}>
-        <View style={styles.loadingBotContainer}>
-          <View style={styles.loadingBot}>
-            <Text style={styles.loadingBotEmoji}>🤖</Text>
-          </View>
-        </View>
-        
-        <Text style={styles.loadingTitle}>MindCare AI</Text>
-        <Text style={styles.loadingSubtitle}>Your AI companion is ready to help</Text>
-        
-        <View style={styles.loadingDotsContainer}>
-          <ActivityIndicator size="small" color="#4A90E2" />
-        </View>
-      </Animated.View>
+        <Text style={[
+          styles.messageText,
+          item.is_bot ? styles.botText : styles.userText
+        ]}>
+          {item.content}
+        </Text>
+        {item.is_bot && item.chatbot_method && (
+          <Text style={styles.methodText}>Method: {item.chatbot_method}</Text>
+        )}
+        <Text style={[
+          styles.timestamp,
+          item.is_bot ? styles.botTimestamp : styles.userTimestamp
+        ]}>
+          {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+        </Text>
+      </View>
     </View>
   );
 
-  if (isLoading) {
-    return renderLoadingScreen();
+  // Render header
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity onPress={goToConversationList} style={styles.backButton}>
+        <Icon name="arrow-back" size={24} color="#007AFF" />
+      </TouchableOpacity>
+      <View style={styles.headerContent}>
+        <Text style={styles.headerTitle}>
+          {currentConversation?.title || 'Chatbot'}
+        </Text>
+        <Text style={styles.headerSubtitle}>
+          {currentConversation ? `${messages.length} messages` : 'No conversation'}
+        </Text>
+      </View>
+      {currentConversation && (
+        <TouchableOpacity 
+          style={styles.menuButton}
+          onPress={() => {
+            if (currentConversation) {
+              navigation.navigate('ConversationSettings', {
+                conversationId: currentConversation.id
+              });
+            }
+          }}
+        >
+          <Icon name="settings" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // Show error alert
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error, [
+        { text: 'OK', onPress: clearError }
+      ]);
+    }
+  }, [error, clearError]);
+  
+  // Scroll to end when new messages arrive
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length]);
+
+  // Show loading screen during initial load or when fetching conversation
+  if ((loading && !currentConversation) || (loadingMessages && messages.length === 0) || fetchingConversation || !allDataLoaded) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {renderHeader()}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>
+            {fetchingConversation ? 'Loading conversation...' : 
+             loading ? 'Initializing chat...' : 
+             loadingMessages ? 'Loading messages...' : 'Setting up...'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+      {renderHeader()}
+      
+      <KeyboardAvoidingView 
+        style={styles.chatContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Modern Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <View style={styles.headerAvatar}>
-                <Text style={styles.headerAvatarText}>🤖</Text>
+        {/* Messages List */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id.toString()}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.1}
+          ListFooterComponent={
+            loadingMessages && messages.length > 0 ? (
+              <View style={styles.loadingMore}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.loadingText}>Loading more messages...</Text>
               </View>
-              <View style={styles.headerInfo}>
-                <Text style={styles.headerTitle}>MindCare AI</Text>
-                <View style={styles.statusContainer}>
-                  <View style={styles.onlineIndicator} />
-                  <Text style={styles.headerSubtitle}>Online</Text>
-                </View>
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.headerButton}
-              onPress={clearHistory}
-            >
-              <Ionicons name="refresh-outline" size={20} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Messages Container */}
-        <KeyboardAvoidingView
-          style={styles.messagesContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-          <FlatList
-            ref={flatListRef}
-            data={sortedMessages}
-            renderItem={renderMessage}
-            keyExtractor={(item, index) => `${item.id}-${index}`}
-            style={styles.messagesList}
-            contentContainerStyle={[
-              styles.messagesContent,
-              sortedMessages.length === 0 && styles.emptyMessagesContent
-            ]}
-            showsVerticalScrollIndicator={false}
-            removeClippedSubviews={false}
-            initialNumToRender={20}
-            maxToRenderPerBatch={10}
-            windowSize={10}
-            getItemLayout={undefined} // Let FlatList calculate item heights dynamically
-            ListFooterComponent={renderTypingIndicator}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyStateContainer}>
-                <View style={styles.emptyStateBot}>
-                  <Text style={styles.emptyStateBotEmoji}>🤖</Text>
-                </View>
-                <Text style={styles.emptyStateTitle}>Hello! I'm MindCare AI</Text>
-                <Text style={styles.emptyStateSubtitle}>
-                  I'm here to help you with mental health support and guidance. 
-                  Feel free to ask me anything!
-                </Text>
-              </View>
-            )}
-            onContentSizeChange={() => {
-              // Only auto-scroll if we have messages
-              if (sortedMessages.length > 0) {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }
-            }}
+            ) : null
+          }
+          // Add better performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={15}
+          getItemLayout={(data, index) => ({
+            length: 80,
+            offset: 80 * index,
+            index,
+          })}
+        />
+        
+        {/* Enhanced Input Component */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            value={messageText}
+            onChangeText={setMessageText}
+            placeholder="Type your message..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            maxLength={1000}
+            editable={!sendingMessage}
           />
-
-          {/* Modern Input Area */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                ref={inputRef}
-                style={styles.textInput}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Message MindCare AI..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                maxLength={1000}
-                onSubmitEditing={Platform.OS === 'ios' ? undefined : handleSend}
-                blurOnSubmit={false}
-                returnKeyType="send"
-              />
-              
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  (!inputText.trim() || isSending) && styles.sendButtonDisabled,
-                ]}
-                onPress={handleSend}
-                disabled={!inputText.trim() || isSending}
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Animated.View>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!messageText.trim() || sendingMessage) && styles.sendButtonDisabled
+            ]}
+            onPress={handleSendMessage}
+            disabled={!messageText.trim() || sendingMessage}
+          >
+            {sendingMessage ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Icon name="send" size={20} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -278,197 +411,142 @@ const ChatbotScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
   },
-  content: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  headerContent: {
     flex: 1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
-  loadingContent: {
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  loadingBotContainer: {
-    marginBottom: 30,
-  },
-  loadingBot: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingBotEmoji: {
-    fontSize: 30,
-  },
-  loadingTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  loadingSubtitle: {
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
-    marginBottom: 30,
-    textAlign: 'center',
   },
-  loadingDotsContainer: {
-    marginTop: 20,
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerAvatarText: {
-    fontSize: 20,
-  },
-  headerInfo: {
+  chatContainer: {
     flex: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  headerButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messagesContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   messagesList: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   messagesContent: {
     paddingVertical: 16,
-    flexGrow: 1,
   },
-  emptyMessagesContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    flex: 1,
+  messageContainer: {
+    marginVertical: 4,
+    maxWidth: '80%',
   },
-  inputContainer: {
-    backgroundColor: '#FFFFFF',
+  userMessage: {
+    alignSelf: 'flex-end',
+  },
+  botMessage: {
+    alignSelf: 'flex-start',
+  },
+  messageBubble: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 20,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
+  userBubble: {
+    backgroundColor: '#007AFF',
+  },
+  botBubble: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  userText: {
+    color: '#FFFFFF',
+  },
+  botText: {
+    color: '#1F2937',
+  },
+  methodText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  timestamp: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  userTimestamp: {
+    color: '#E5E7EB',
+  },
+  botTimestamp: {
+    color: '#9CA3AF',
+  },
+  loadingMore: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 48,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   textInput: {
     flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginRight: 12,
+    maxHeight: 100,
     fontSize: 16,
-    color: '#111827',
-    maxHeight: 120,
-    paddingVertical: 8,
-    paddingRight: 12,
-    lineHeight: 20,
+    color: '#1F2937',
   },
   sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4A90E2',
+    backgroundColor: '#007AFF',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 60,
-  },
-  emptyStateBot: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  emptyStateBotEmoji: {
-    fontSize: 40,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  emptyStateSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
+    backgroundColor: '#9CA3AF',
   },
 });
 

@@ -16,6 +16,7 @@ export type RootStackParamList = {
   PatientDashboard: undefined; // Added
   TherapistDashboard: undefined; // Added
   Mood: undefined; // Add the Mood screen route
+  CreatePost: undefined; // Add CreatePost route
 };
 
 export type AppTabParamList = {
@@ -24,6 +25,12 @@ export type AppTabParamList = {
   Notifications: undefined;
   Settings: { userId?: string };
   Messaging: undefined; // Keep this if used in a different navigator
+};
+
+// Add FeedsStackParamList for the nested navigation
+export type FeedsStackParamList = {
+  FeedsList: undefined;
+  CreatePost: undefined;
 };
 
 export type AuthStackParamList = {

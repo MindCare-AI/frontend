@@ -1,222 +1,283 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  ChatbotConversation, 
-  ChatbotMessage, 
-  CreateChatbotConversationResponse 
-} from '../types/chatbot';
-import { 
-  getChatbotConversations, 
-  createChatbotConversation, 
-  sendChatbotMessage, 
-  getChatbotHistory,
-  getChatbotConversation
-} from '../hooks/ChatbotScreen/useChatbotApi';
-
-// Get auth headers for API requests
-const getAuthHeaders = async () => {
-  try {
-    // Use consistent token key
-    const token = await AsyncStorage.getItem('accessToken');
-    if (!token) {
-      throw new Error('No access token found');
-    }
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  } catch (error) {
-    console.error('Error getting auth headers:', error);
-    throw error;
-  }
-};
+// services/chatbotService.ts
+import { chatbotApi } from '../API/chatbot/chatbot';
+import {
+  ChatbotConversation,
+  ChatbotConversationListItem,
+  ChatMessage,
+  ConversationListParams,
+  MessagesParams,
+  CreateConversationRequest,
+  UpdateConversationRequest,
+  SystemInfo,
+} from '../types/chatbot/chatbot';
 
 class ChatbotService {
-  private currentConversation: ChatbotConversation | null = null;
-  private conversations: ChatbotConversation[] = [];
+  private static instance: ChatbotService;
 
-  constructor() {
-    this.loadConversationFromStorage();
+  public static getInstance(): ChatbotService {
+    if (!ChatbotService.instance) {
+      ChatbotService.instance = new ChatbotService();
+    }
+    return ChatbotService.instance;
   }
 
-  // Create a new chatbot conversation
-  async createConversation(title: string = 'New Conversation'): Promise<CreateChatbotConversationResponse> {
+  // Conversation management
+  async getConversations(params?: ConversationListParams) {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
-      // Get user ID from storage or another source
-      const userDataStr = await AsyncStorage.getItem('user');
-      const userData = userDataStr ? JSON.parse(userDataStr) : null;
-      
-      if (!userData?.id) {
-        throw new Error('User ID not found');
-      }
-
-      const conversation = await createChatbotConversation(userData.id, title, token);
-      
-      // Convert to our ChatbotConversation type
-      const chatbotConversation: ChatbotConversation = {
-        id: conversation.id,
-        user: conversation.user,
-        title: conversation.title,
-        created_at: conversation.created_at,
-        last_activity: conversation.last_activity,
-        is_active: conversation.is_active,
-        last_message: conversation.last_message,
-        message_count: conversation.message_count,
-        latest_summary: conversation.latest_summary,
-        last_message_at: conversation.last_message_at,
-        participants: conversation.participants,
-        recent_messages: conversation.recent_messages
-      };
-
-      this.currentConversation = chatbotConversation;
-      await this.saveConversationToStorage();
-      
-      return conversation;
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      throw error;
-    }
-  }
-
-  // Get all chatbot conversations for the current user
-  async getAllConversations(): Promise<ChatbotConversation[]> {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
-      const response = await getChatbotConversations(token);
-      this.conversations = response.results;
-      return this.conversations;
-    } catch (error) {
-      console.error('Error getting conversations:', error);
-      throw error;
-    }
-  }
-
-  // Send a message to the current conversation
-  async sendMessage(content: string): Promise<any> {
-    if (!this.currentConversation) {
-      throw new Error('No active conversation');
-    }
-
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
-      const response = await sendChatbotMessage(
-        Number(this.currentConversation.id), 
-        content, 
-        token
-      );
-      
-      return response;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
-  }
-
-  // Get chat history for a conversation
-  async getChatHistory(conversationId: string): Promise<ChatbotMessage[]> {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
-      const messages = await getChatbotHistory(Number(conversationId), token);
-      return messages;
-    } catch (error) {
-      console.error('Error getting chat history:', error);
-      throw error;
-    }
-  }
-
-  // Get a specific conversation
-  async getConversation(conversationId: string): Promise<ChatbotConversation> {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (!token) {
-        throw new Error('No access token found');
-      }
-
-      const conversation = await getChatbotConversation(Number(conversationId), token);
-      
+      const response = await chatbotApi.getConversations(params);
       return {
-        id: conversation.id,
-        user: conversation.user,
-        title: conversation.title,
-        created_at: conversation.created_at,
-        last_activity: conversation.last_activity,
-        is_active: conversation.is_active,
-        last_message: conversation.last_message,
-        message_count: conversation.message_count,
-        latest_summary: conversation.latest_summary,
-        last_message_at: conversation.last_message_at,
-        participants: conversation.participants,
-        recent_messages: conversation.recent_messages
+        success: true,
+        data: response,
       };
-    } catch (error) {
-      console.error('Error getting conversation:', error);
-      throw error;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch conversations',
+      };
     }
   }
 
-  // Clear conversation history (you might need to implement this in the backend)
-  async clearHistory(conversationId: string): Promise<void> {
-    // For now, just clear local storage
-    this.currentConversation = null;
-    await AsyncStorage.removeItem('currentChatbotConversation');
-  }
-
-  // Get current conversation
-  getCurrentConversation(): ChatbotConversation | null {
-    return this.currentConversation;
-  }
-
-  // Set current conversation
-  setCurrentConversation(conversation: ChatbotConversation | null): void {
-    this.currentConversation = conversation;
-    this.saveConversationToStorage();
-  }
-
-  // Load conversation from local storage
-  private async loadConversationFromStorage(): Promise<void> {
+  async getConversation(id: number) {
     try {
-      const conversationStr = await AsyncStorage.getItem('currentChatbotConversation');
-      if (conversationStr) {
-        this.currentConversation = JSON.parse(conversationStr);
-      }
-    } catch (error) {
-      console.error('Error loading conversation from storage:', error);
+      const conversation = await chatbotApi.getConversation(id);
+      return {
+        success: true,
+        data: conversation,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch conversation',
+      };
     }
   }
 
-  // Save conversation to local storage
-  private async saveConversationToStorage(): Promise<void> {
+  async createConversation(data?: CreateConversationRequest) {
     try {
-      if (this.currentConversation) {
-        await AsyncStorage.setItem(
-          'currentChatbotConversation',
-          JSON.stringify(this.currentConversation)
-        );
+      const conversation = await chatbotApi.createConversation(data);
+      return {
+        success: true,
+        data: conversation,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to create conversation',
+      };
+    }
+  }
+
+  async updateConversation(id: number, data: UpdateConversationRequest) {
+    try {
+      const conversation = await chatbotApi.updateConversation(id, data);
+      return {
+        success: true,
+        data: conversation,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to update conversation',
+      };
+    }
+  }
+
+  async deleteConversation(id: number) {
+    try {
+      await chatbotApi.deleteConversation(id);
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to delete conversation',
+      };
+    }
+  }
+
+  async toggleConversationActive(id: number, isActive?: boolean) {
+    try {
+      const response = await chatbotApi.toggleConversationActive(id, isActive);
+      return {
+        success: true,
+        data: response,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to toggle conversation status',
+      };
+    }
+  }
+
+  async clearConversation(id: number) {
+    try {
+      const response = await chatbotApi.clearConversation(id);
+      return {
+        success: true,
+        data: response,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to clear conversation',
+      };
+    }
+  }
+
+  // Message management
+  async getMessages(conversationId: number, params?: MessagesParams) {
+    try {
+      const response = await chatbotApi.getMessages(conversationId, params);
+      return {
+        success: true,
+        data: response,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch messages',
+      };
+    }
+  }
+
+  async sendMessage(conversationId: number, content: string) {
+    try {
+      const response = await chatbotApi.sendMessage(conversationId, content);
+      return {
+        success: true,
+        data: response,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to send message',
+      };
+    }
+  }
+
+  // System information
+  async getSystemInfo() {
+    try {
+      const systemInfo = await chatbotApi.getSystemInfo();
+      return {
+        success: true,
+        data: systemInfo,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to fetch system info',
+      };
+    }
+  }
+
+  // Utility methods
+  formatMessage(message: ChatMessage): string {
+    const timestamp = new Date(message.timestamp).toLocaleString();
+    const sender = message.is_bot ? 'Bot' : message.sender_name;
+    return `[${timestamp}] ${sender}: ${message.content}`;
+  }
+
+  formatConversationTitle(conversation: ChatbotConversation | ChatbotConversationListItem): string {
+    const messageCount = conversation.message_count;
+    const status = conversation.is_active ? 'Active' : 'Archived';
+    return `${conversation.title} (${messageCount} messages, ${status})`;
+  }
+
+  isConversationEmpty(conversation: ChatbotConversation | ChatbotConversationListItem): boolean {
+    return conversation.message_count === 0;
+  }
+
+  getConversationLastActivity(conversation: ChatbotConversation | ChatbotConversationListItem): Date {
+    return new Date(conversation.last_activity);
+  }
+
+  // Search and filter utilities
+  filterConversationsByTitle(
+    conversations: (ChatbotConversation | ChatbotConversationListItem)[],
+    searchTerm: string
+  ): (ChatbotConversation | ChatbotConversationListItem)[] {
+    if (!searchTerm.trim()) return conversations;
+    
+    const term = searchTerm.toLowerCase();
+    return conversations.filter(conv =>
+      conv.title.toLowerCase().includes(term)
+    );
+  }
+
+  sortConversationsByActivity(
+    conversations: (ChatbotConversation | ChatbotConversationListItem)[],
+    ascending: boolean = false
+  ): (ChatbotConversation | ChatbotConversationListItem)[] {
+    return [...conversations].sort((a, b) => {
+      const dateA = new Date(a.last_activity).getTime();
+      const dateB = new Date(b.last_activity).getTime();
+      return ascending ? dateA - dateB : dateB - dateA;
+    });
+  }
+
+  groupConversationsByDate(
+    conversations: (ChatbotConversation | ChatbotConversationListItem)[]
+  ): { [key: string]: (ChatbotConversation | ChatbotConversationListItem)[] } {
+    const groups: { [key: string]: (ChatbotConversation | ChatbotConversationListItem)[] } = {};
+    
+    conversations.forEach(conv => {
+      const date = new Date(conv.last_activity);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      
+      let groupKey: string;
+      if (date.toDateString() === today.toDateString()) {
+        groupKey = 'Today';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        groupKey = 'Yesterday';
       } else {
-        await AsyncStorage.removeItem('currentChatbotConversation');
+        groupKey = date.toLocaleDateString();
       }
-    } catch (error) {
-      console.error('Error saving conversation to storage:', error);
-    }
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = [];
+      }
+      groups[groupKey].push(conv);
+    });
+    
+    return groups;
+  }
+
+  // Message utilities
+  getMessagesBySender(messages: ChatMessage[], isBot: boolean): ChatMessage[] {
+    return messages.filter(msg => msg.is_bot === isBot);
+  }
+
+  getMessagesInTimeRange(
+    messages: ChatMessage[],
+    startTime: Date,
+    endTime: Date
+  ): ChatMessage[] {
+    return messages.filter(msg => {
+      const msgTime = new Date(msg.timestamp);
+      return msgTime >= startTime && msgTime <= endTime;
+    });
+  }
+
+  getConversationStats(conversation: ChatbotConversation) {
+    const messages = conversation.recent_messages || [];
+    const userMessages = this.getMessagesBySender(messages, false);
+    const botMessages = this.getMessagesBySender(messages, true);
+    
+    return {
+      totalMessages: conversation.message_count,
+      userMessages: userMessages.length,
+      botMessages: botMessages.length,
+      lastActivity: this.getConversationLastActivity(conversation),
+      isActive: conversation.is_active,
+    };
   }
 }
 
 // Export singleton instance
-export const chatService = new ChatbotService();
-export default chatService;
+export const chatbotService = ChatbotService.getInstance();
+export default chatbotService;
