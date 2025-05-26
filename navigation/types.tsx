@@ -38,6 +38,18 @@ export type AppStackParamList = {
   Messaging: undefined;
 };
 
+// Chatbot navigation types
+export type ChatbotStackParamList = {
+  ChatbotHome: undefined;
+  ChatbotConversation: { 
+    conversationId?: number; 
+    autoCreate?: boolean;
+  };
+  ConversationSettings: { 
+    conversationId: number;
+  };
+};
+
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;

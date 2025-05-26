@@ -11,6 +11,7 @@ import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import MoodNavigator from './mood/MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
+import ChatbotNavigator from './ChatbotNavigator';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import DashboardScreen from '../screens/Appointments/patient/DashboardScreen';
 import JournalNavigator from './Journal';
@@ -142,8 +143,11 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Chatbot" 
-        component={ChatbotScreen} 
-        options={{ tabBarLabel: 'Chatbot' }}
+        component={ChatbotNavigator} 
+        options={{ 
+          tabBarLabel: 'Chatbot',
+          headerShown: false 
+        }}
       />
       <Tab.Screen
         name="MoodTracker"

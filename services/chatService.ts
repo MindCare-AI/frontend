@@ -4,7 +4,7 @@ import {
   CreateChatbotConversationResponse, 
   SendChatbotMessageResponse,
   ChatbotConversation 
-} from '../types/chatbot';
+} from '../types/chatbot/chatbot';
 
 // Get auth headers for API requests
 const getAuthHeaders = async () => {
