@@ -133,7 +133,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={DashboardScreen}
+        component={DashboardScreenT}
         options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
