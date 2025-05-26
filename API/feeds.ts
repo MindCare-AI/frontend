@@ -34,13 +34,73 @@ export const fetchPostDetail = async (postId: number) => {
   return response.data;
 };
 
-export const createPost = async (postData: FormData) => {
-  const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-  return response.data;
+export const createPost = async (postData: any) => {
+  try {
+    console.log("DEBUG: Creating post with data:", postData);
+    
+    // Create the appropriate structure for FormData
+    const formData = new FormData();
+    
+    // Check if postData is already FormData
+    if (postData instanceof FormData) {
+      console.log("DEBUG: postData is FormData, using directly");
+      
+      // If tags is an array, convert to a single string value expected by backend
+      const tagsEntry = Array.from(postData.entries()).find(entry => entry[0] === 'tags');
+      if (tagsEntry && Array.isArray(tagsEntry[1])) {
+        console.log("DEBUG: Converting tags array to string");
+        postData.delete('tags');
+        postData.append('tags', tagsEntry[1][0]);
+      }
+      
+      const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log("DEBUG: Post created successfully:", response.data);
+      return response.data;
+    } else {
+      console.log("DEBUG: postData is not FormData, creating new FormData");
+      
+      // Convert object to FormData
+      Object.keys(postData).forEach(key => {
+        // Handle special case for tags
+        if (key === 'tags') {
+          // If it's an array, use the first item
+          if (Array.isArray(postData[key])) {
+            formData.append(key, postData[key][0]);
+          } else {
+            formData.append(key, postData[key]);
+          }
+        } 
+        // Handle file upload case
+        else if (key === 'media' && postData[key]) {
+          formData.append('file', postData[key]);
+        } 
+        // Handle standard cases
+        else {
+          formData.append(key, postData[key]);
+        }
+      });
+      
+      const response = await axios.post(`${FEEDS_URL}/posts/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log("DEBUG: Post created successfully:", response.data);
+      return response.data;
+    }
+  } catch (error) {
+    console.error("DEBUG: Error creating post:", error);
+    if (error && typeof error === 'object' && 'isAxiosError' in error && error.isAxiosError && 'response' in error && error.response) {
+      console.error("DEBUG: Server response:", (error as any).response.data);
+      console.error("DEBUG: Response status:", (error as any).response.status);
+      console.error("DEBUG: Response headers:", (error as any).response.headers);
+    }
+    throw error;
+  }
 };
 
 export const updatePost = async (postId: number, postData: FormData) => {

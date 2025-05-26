@@ -3,11 +3,19 @@
 import type React from "react"
 import { View, Text, StyleSheet } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useTheme } from "../../contexts/feeds/ThemeContext"
 import CreatePostButton from "./CreatePostButton"
 
 const EmptyFeed: React.FC = () => {
-  const { colors } = useTheme()
+  // Use HomeSettingsScreen color scheme
+  const homeScreenColors = {
+    primary: '#002D62',
+    lightBlue: '#E4F0F6',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#444',
+    borderColor: '#F0F0F0',
+    background: '#FFFFFF',
+  };
 
   return (
     <View style={styles.container}>
@@ -15,14 +23,14 @@ const EmptyFeed: React.FC = () => {
         style={[
           styles.iconContainer,
           {
-            backgroundColor: colors.highlight,
+            backgroundColor: homeScreenColors.lightBlue,
           },
         ]}
       >
-        <Ionicons name="chatbubble-ellipses" size={40} color={colors.muted} />
+        <Ionicons name="chatbubble-ellipses" size={40} color={homeScreenColors.primary} />
       </View>
-      <Text style={[styles.title, { color: colors.text }]}>No posts yet</Text>
-      <Text style={[styles.description, { color: colors.muted }]}>
+      <Text style={[styles.title, { color: homeScreenColors.textDark }]}>No posts yet</Text>
+      <Text style={[styles.description, { color: homeScreenColors.textMedium }]}>
         Be the first to create a post or follow other users to see their posts in your feed.
       </Text>
       <View style={styles.actions}>

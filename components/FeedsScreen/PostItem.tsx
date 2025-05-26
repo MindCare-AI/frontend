@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Dimensions, FlatList, TextInput, ActivityIndicator } from "react-native"
-import { Video, ResizeMode } from "expo-av" // Import ResizeMode type
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Dimensions, FlatList, TextInput, ActivityIndicator, Alert } from "react-native"
+import { VideoView, useVideoPlayer } from "expo-video"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { Post } from "../../types/feeds"
@@ -10,20 +10,30 @@ import { format } from "date-fns"
 import { usePostReactions } from "../../hooks/feeds/usePostReactions"
 import { useComments } from "../../hooks/feeds/useComments"
 import { useToast } from "../../contexts/feeds/ToastContext"
+import MediaViewerModal from "./MediaViewerModal"
+import * as FeedsApi from "../../API/feeds"
 
 interface PostItemProps {
   post: Post
-  onUpdatePost: (updates: Partial<Post>) => void
+  onUpdatePost?: (updates: Partial<Post>) => void
+  onDeletePost?: (postId: number) => void
+  colors?: any
 }
 
-const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
+const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost, onDeletePost, colors: customColors }) => {
   const { colors, isDark } = useTheme()
+  const displayColors = customColors || colors
   const [expanded, setExpanded] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const fadeAnim = React.useRef(new Animated.Value(0)).current
   const scaleAnim = React.useRef(new Animated.Value(0.95)).current
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState("")
+  const [showMediaViewer, setShowMediaViewer] = useState(false)
+  const [showDropdownMenu, setShowDropdownMenu] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(post.content || "")
+  const [isDeleting, setIsDeleting] = useState(false)
   const toast = useToast()
 
   const { 
@@ -40,6 +50,39 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
   } = useComments(post.id)
 
   const windowWidth = Dimensions.get("window").width
+
+  // Check if post has media
+  const hasMedia = post.media_files && post.media_files.length > 0
+  const firstMedia = post.media_files?.[0] || null
+  const isVideo = firstMedia && firstMedia.media_type.includes("video")
+  
+  // Video player for expo-video with auto-play and muted default
+  const [isMuted, setIsMuted] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(true) // Default to playing
+  const videoPlayer = useVideoPlayer(isVideo ? firstMedia.file : "", (player) => {
+    player.loop = true
+    player.muted = isMuted
+    // Auto-play the video without requiring user interaction
+    if (isVideo) {
+      player.play()
+      setIsPlaying(true)
+    }
+  })
+
+  // Handle mute toggle
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+    if (videoPlayer) {
+      videoPlayer.muted = !isMuted
+    }
+  }
+
+  // Update video player when muted state changes
+  React.useEffect(() => {
+    if (videoPlayer && isVideo) {
+      videoPlayer.muted = isMuted
+    }
+  }, [isMuted, videoPlayer, isVideo])
 
   // Animate when the component mounts
   React.useEffect(() => {
@@ -76,24 +119,19 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
     0
   )
 
-  // Check if post has media
-  const hasMedia = post.media_files && post.media_files.length > 0
-  // Fix the TypeScript error by using optional chaining and providing a fallback
-  const firstMedia = post.media_files?.[0] || null
-  const isVideo = firstMedia && firstMedia.media_type.includes("video")
-
   // Handle like button press
   const handleLikePress = async () => {
     try {
       const newReaction = await toggleLike()
-      // Update the post with the new reaction
-      onUpdatePost({
-        current_user_reaction: newReaction,
-        reactions_summary: {
-          ...post.reactions_summary,
-          like: (post.reactions_summary.like || 0) + (newReaction ? 1 : -1)
-        }
-      })
+      if (onUpdatePost) {
+        onUpdatePost({
+          current_user_reaction: newReaction,
+          reactions_summary: {
+            ...post.reactions_summary,
+            like: (post.reactions_summary.like || 0) + (newReaction ? 1 : -1)
+          }
+        })
+      }
     } catch (err) {
       toast.toast({
         title: "Error",
@@ -133,10 +171,11 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
         type: "success"
       })
       
-      // Update the comment count on the post
-      onUpdatePost({
-        comments_count: post.comments_count + 1
-      })
+      if (onUpdatePost) {
+        onUpdatePost({
+          comments_count: post.comments_count + 1
+        })
+      }
     } catch (err) {
       toast.toast({
         title: "Error",
@@ -144,6 +183,100 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
         type: "error"
       })
     }
+  }
+
+  // Handle edit post
+  const handleEditPost = () => {
+    setShowDropdownMenu(false)
+    setIsEditing(true)
+    setEditContent(post.content || "")
+  }
+
+  // Handle save edit
+  const handleSaveEdit = async () => {
+    if (!editContent.trim()) {
+      toast.toast({
+        title: "Error",
+        description: "Post content cannot be empty",
+        type: "error"
+      })
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('content', editContent.trim())
+      
+      const updatedPost = await FeedsApi.updatePost(post.id, formData)
+      
+      if (onUpdatePost) {
+        onUpdatePost({ content: editContent.trim() })
+      }
+      
+      setIsEditing(false)
+      toast.toast({
+        title: "Success",
+        description: "Post updated successfully!",
+        type: "success"
+      })
+    } catch (err) {
+      console.error("Error updating post:", err)
+      toast.toast({
+        title: "Error",
+        description: "Failed to update post. Please try again.",
+        type: "error"
+      })
+    }
+  }
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditContent(post.content || "")
+  }
+
+  // Handle delete post
+  const handleDeletePost = () => {
+    setShowDropdownMenu(false)
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true)
+            try {
+              await FeedsApi.deletePost(post.id)
+              
+              if (onDeletePost) {
+                onDeletePost(post.id)
+              }
+              
+              toast.toast({
+                title: "Success",
+                description: "Post deleted successfully!",
+                type: "success"
+              })
+            } catch (err) {
+              console.error("Error deleting post:", err)
+              toast.toast({
+                title: "Error",
+                description: "Failed to delete post. Please try again.",
+                type: "error"
+              })
+            } finally {
+              setIsDeleting(false)
+            }
+          }
+        }
+      ]
+    )
   }
 
   return (
@@ -161,52 +294,127 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
       {/* Author section */}
       <View style={styles.header}>
         <View style={styles.authorContainer}>
-          <Image
-            source={
-              post.author_profile_pic
-                ? { uri: post.author_profile_pic }
-                : require("../../assets/default-avatar.png")
-            }
-            style={styles.avatar}
-          />
+          <View style={[styles.avatar, { backgroundColor: colors.highlight }]}>
+            {post.author_profile_pic ? (
+              <Image
+                source={{ uri: post.author_profile_pic }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Ionicons name="person" size={20} color={colors.muted} />
+            )}
+          </View>
           <View>
-            <Text style={[styles.authorName, { color: colors.text }]}>
-              {post.author_name}
-            </Text>
+            <View style={styles.authorNameContainer}>
+              <Text style={[styles.authorName, { color: colors.text }]}>
+                {post.author_name}
+              </Text>
+              {post.author_user_type && (
+                <View style={[styles.authorTypeBadge, { backgroundColor: post.author_user_type === 'therapist' ? '#4CAF50' : '#2196F3' }]}>
+                  <Text style={styles.authorTypeBadgeText}>
+                    {post.author_user_type.charAt(0).toUpperCase() + post.author_user_type.slice(1)}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={[styles.date, { color: colors.muted }]}>
               {formattedDate}
             </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
-        </TouchableOpacity>
+        <View style={styles.menuContainer}>
+          <TouchableOpacity 
+            style={styles.moreButton}
+            onPress={() => setShowDropdownMenu(!showDropdownMenu)}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={colors.muted} />
+          </TouchableOpacity>
+          {showDropdownMenu && (
+            <View style={[styles.dropdownMenu, { 
+              backgroundColor: colors.card, 
+              borderColor: colors.border,
+              shadowColor: colors.text 
+            }]}>
+              <TouchableOpacity 
+                style={styles.dropdownItem}
+                onPress={handleEditPost}
+              >
+                <Ionicons name="create-outline" size={16} color={colors.text} />
+                <Text style={[styles.dropdownText, { color: colors.text }]}>Edit Post</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.dropdownItem}
+                onPress={handleDeletePost}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={colors.danger} />
+                ) : (
+                  <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                )}
+                <Text style={[styles.dropdownText, { color: colors.danger }]}>
+                  {isDeleting ? "Deleting..." : "Delete Post"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Post content */}
-      <TouchableOpacity activeOpacity={0.9} onPress={() => setExpanded(!expanded)}>
-        <Text
-          style={[styles.content, { color: colors.text }]}
-          numberOfLines={expanded ? undefined : 4}
-        >
-          {post.content}
-        </Text>
-        {!expanded && post.content.length > 300 && (
-          <Text style={[styles.readMore, { color: colors.primary }]}>
-            Read more
+      {isEditing ? (
+        <View style={styles.editContainer}>
+          <TextInput
+            style={[styles.editInput, { 
+              color: colors.text, 
+              borderColor: colors.border,
+              backgroundColor: colors.background 
+            }]}
+            value={editContent}
+            onChangeText={setEditContent}
+            multiline
+            placeholder="What's on your mind?"
+            placeholderTextColor={colors.muted}
+            maxLength={1000}
+          />
+          <View style={styles.editActions}>
+            <TouchableOpacity 
+              style={[styles.editButton, { backgroundColor: colors.muted }]}
+              onPress={handleCancelEdit}
+            >
+              <Text style={[styles.editButtonText, { color: colors.background }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.editButton, { backgroundColor: colors.primary }]}
+              onPress={handleSaveEdit}
+            >
+              <Text style={[styles.editButtonText, { color: colors.background }]}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity activeOpacity={0.9} onPress={() => setExpanded(!expanded)}>
+          <Text
+            style={[styles.content, { color: colors.text }]}
+            numberOfLines={expanded ? undefined : 4}
+          >
+            {post.content}
           </Text>
-        )}
-      </TouchableOpacity>
+          {!expanded && post.content && post.content.length > 300 && (
+            <Text style={[styles.readMore, { color: colors.primary }]}>
+              Read more
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
 
-      {/* Media display */}
+      {/* Enhanced Media display with better video support */}
       {hasMedia && firstMedia && (
         <View style={styles.mediaContainer}>
           {!isVideo ? (
             <TouchableOpacity
               activeOpacity={0.95}
-              onPress={() => {
-                // TODO: Open image viewer
-              }}
+              onPress={() => setShowMediaViewer(true)}
             >
               <Animated.Image
                 source={{ uri: firstMedia.file }}
@@ -219,30 +427,57 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
               />
               {!imageLoaded && (
                 <View style={[styles.loader, { backgroundColor: colors.highlight }]}>
-                  <Text style={{ color: colors.muted }}>Loading...</Text>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={{ color: colors.muted, marginTop: 8 }}>Loading image...</Text>
                 </View>
               )}
             </TouchableOpacity>
           ) : (
-            <Video
-              source={{ uri: firstMedia.file }}
-              style={[styles.media, { height: windowWidth * 0.6 }]}
-              useNativeControls
-              resizeMode={ResizeMode.CONTAIN} // Use the enum value instead of string
-              isLooping={false}
-              posterSource={{ uri: firstMedia.file + "?thumb=1" }}
-              posterStyle={styles.media}
-              usePoster
-            />
+            <View
+              style={styles.videoContainer}
+            >
+              <VideoView
+                player={videoPlayer}
+                style={[styles.media, { height: windowWidth * 0.6 }]}
+                allowsFullscreen
+                nativeControls={false}
+              />
+              <View style={styles.videoControls}>
+                <TouchableOpacity
+                  style={styles.muteButton}
+                  onPress={toggleMute}
+                >
+                  <Ionicons 
+                    name={isMuted ? "volume-mute" : "volume-high"} 
+                    size={20} 
+                    color="white" 
+                  />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.fullScreenButton}
+                  onPress={() => setShowMediaViewer(true)}
+                >
+                  <Ionicons name="expand-outline" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Invisible overlay for opening media viewer but preserving autoplay */}
+              <TouchableOpacity
+                style={styles.videoOverlay}
+                activeOpacity={0.95}
+                onPress={() => setShowMediaViewer(true)}
+              />
+            </View>
           )}
         </View>
       )}
 
-      {/* Post metrics with working reactions */}
-      <View style={styles.metrics}>
+      {/* Enhanced Post metrics */}
+      <View style={[styles.metrics, { borderTopColor: colors.border }]}>
         <View style={styles.metric}>
           <TouchableOpacity 
-            style={styles.metricButton}
+            style={[styles.metricButton, { backgroundColor: userReaction ? `${colors.danger}15` : 'transparent' }]}
             onPress={handleLikePress}
             disabled={reactionLoading}
           >
@@ -259,7 +494,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
 
         <View style={styles.metric}>
           <TouchableOpacity 
-            style={styles.metricButton}
+            style={[styles.metricButton, { backgroundColor: showComments ? `${colors.primary}15` : 'transparent' }]}
             onPress={handleCommentPress}
           >
             <Ionicons 
@@ -289,7 +524,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
         </View>
       </View>
       
-      {/* Comments section */}
+      {/* Enhanced Comments section */}
       {showComments && (
         <View style={[styles.commentsSection, { borderTopColor: colors.border, borderTopWidth: 1 }]}>
           {commentsLoading ? (
@@ -303,14 +538,16 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
               keyExtractor={(item) => item.id.toString()}
               renderItem={({ item }) => (
                 <View style={styles.commentItem}>
-                  <Image
-                    source={
-                      item.author_profile_pic
-                        ? { uri: item.author_profile_pic }
-                        : require("../../assets/default-avatar.png")
-                    }
-                    style={styles.commentAvatar}
-                  />
+                  <View style={[styles.commentAvatar, { backgroundColor: colors.highlight }]}>
+                    {item.author_profile_pic ? (
+                      <Image
+                        source={{ uri: item.author_profile_pic }}
+                        style={styles.commentAvatarImage}
+                      />
+                    ) : (
+                      <Ionicons name="person" size={12} color={colors.muted} />
+                    )}
+                  </View>
                   <View style={styles.commentContent}>
                     <Text style={[styles.commentAuthor, { color: colors.text }]}>
                       {item.author_name}
@@ -332,10 +569,10 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
             </Text>
           )}
           
-          {/* Add new comment */}
+          {/* Enhanced Add new comment */}
           <View style={[styles.addCommentContainer, { borderTopColor: colors.border }]}>
             <TextInput
-              style={[styles.commentInput, { color: colors.text, backgroundColor: colors.highlight }]}
+              style={[styles.commentInput, { color: colors.text, backgroundColor: colors.highlight, borderColor: colors.border }]}
               placeholder="Add a comment..."
               placeholderTextColor={colors.muted}
               value={commentText}
@@ -345,15 +582,30 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost }) => {
             <TouchableOpacity
               style={[
                 styles.postCommentButton,
-                { backgroundColor: colors.primary, opacity: commentText.trim() ? 1 : 0.5 }
+                { 
+                  backgroundColor: colors.primary, 
+                  opacity: commentText.trim() ? 1 : 0.5,
+                  ...styles.buttonShadow
+                }
               ]}
               onPress={handlePostComment}
               disabled={!commentText.trim()}
             >
-              <Text style={styles.postCommentText}>Post</Text>
+              <Ionicons name="send" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {/* Media Viewer Modal */}
+      {hasMedia && firstMedia && (
+        <MediaViewerModal
+          visible={showMediaViewer}
+          onClose={() => setShowMediaViewer(false)}
+          mediaUrl={firstMedia.file}
+          mediaType={isVideo ? "video" : "image"}
+          title={post.author_name}
+        />
       )}
     </Animated.View>
   )
@@ -363,15 +615,20 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 10,
     marginVertical: 8,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 14,
+    padding: 16,
   },
   authorContainer: {
     flexDirection: "row",
@@ -381,34 +638,121 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 10,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   authorName: {
     fontWeight: "600",
     fontSize: 15,
+  },
+  authorNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  authorTypeBadge: {
+    borderRadius: 12,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authorTypeBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
   },
   date: {
     fontSize: 12,
     marginTop: 2,
   },
   moreButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 16,
+  },
+  menuContainer: {
+    position: 'relative',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownText: {
+    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  videoControls: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  muteButton: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 8,
+    marginRight: 8,
+  },
+  fullScreenButton: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 20,
+    padding: 8,
   },
   content: {
-    paddingHorizontal: 14,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     fontSize: 15,
     lineHeight: 22,
   },
   readMore: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingBottom: 10,
     fontSize: 14,
     fontWeight: "500",
   },
   mediaContainer: {
     width: "100%",
-    backgroundColor: "#f0f0f0",
+    position: 'relative',
+  },
+  videoContainer: {
+    position: 'relative',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   media: {
     width: "100%",
@@ -426,23 +770,24 @@ const styles = StyleSheet.create({
   metrics: {
     flexDirection: "row",
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    padding: 10,
+    padding: 12,
   },
   metric: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 20,
+    marginRight: 24,
   },
   metricButton: {
-    padding: 6,
+    padding: 8,
+    borderRadius: 20,
   },
   metricText: {
-    marginLeft: 4,
+    marginLeft: 6,
     fontSize: 14,
+    fontWeight: '500',
   },
   commentsSection: {
-    padding: 10,
+    padding: 12,
   },
   loadingComments: {
     flexDirection: 'row',
@@ -462,6 +807,14 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  commentAvatarImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
   },
   commentContent: {
     flex: 1,
@@ -488,27 +841,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: 1,
-    paddingTop: 10,
-    marginTop: 5,
+    paddingTop: 12,
+    marginTop: 8,
   },
   commentInput: {
     flex: 1,
     minHeight: 40,
     borderRadius: 20,
-    paddingHorizontal: 15,
+    borderWidth: 1,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
+    marginRight: 8,
   },
   postCommentButton: {
-    marginLeft: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  postCommentText: {
-    color: 'white',
+  buttonShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  editContainer: {
+    marginVertical: 8,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  editButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 14,
     fontWeight: '600',
   },
 })
 
-export default PostItem
+export default PostItem;

@@ -19,6 +19,7 @@ interface FeedHeaderProps {
   onTabChange: (tab: string) => void
   onRefresh: () => void
   showFollowingTab?: boolean // Add this prop
+  isSearching?: boolean
 }
 
 const FeedHeader: React.FC<FeedHeaderProps> = ({ 
@@ -27,7 +28,8 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
   onSearchChange, 
   onTabChange, 
   onRefresh,
-  showFollowingTab = true // Default to showing it
+  showFollowingTab = true, // Default to showing it
+  isSearching: externalIsSearching = false
 }) => {
   const { colors, isDark } = useTheme()
   const [searchQuery, setSearchQuery] = useState("")
@@ -37,14 +39,14 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
     tags: [],
     users: [],
   })
-  const [activeSort, setActiveSort] = useState<SortOption>("newest") // Added SortOption type here
+  const [activeSort, setActiveSort] = useState<SortOption>("most-viewed") // Changed default from "newest" to "most-viewed"
   const [filterModalVisible, setFilterModalVisible] = useState(false)
   const [sortModalVisible, setSortModalVisible] = useState(false)
   const [searchModalVisible, setSearchModalVisible] = useState(false)
   const [activeTab, setActiveTab] = useState("for-you")
+  const [isSearching, setIsSearching] = useState(false)
 
   const SORT_OPTIONS = [
-    { value: "newest", label: "Newest" },
     { value: "most-viewed", label: "Most Viewed" },
     { value: "most-reactions", label: "Most Reactions" },
   ]
@@ -107,14 +109,19 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
     activeFilters.topics.length + activeFilters.types.length + activeFilters.tags.length + activeFilters.users.length
 
   const handleSearch = (query: string) => {
+    setIsSearching(true)
     setSearchQuery(query)
+    
+    // The search loading state will be managed by the usePosts hook
+    // when searchQuery changes, it will trigger a new API call
+    setIsSearching(false)
     setSearchModalVisible(false)
   }
 
   // Add this handler function to handle sort changes from SortModal
   const handleSortChange = (sort: string) => {
     // Ensure the string is a valid SortOption
-    if (sort === "newest" || sort === "most-viewed" || sort === "most-reactions") {
+    if (sort === "most-viewed" || sort === "most-reactions") {
       setActiveSort(sort as SortOption)
     }
   }
@@ -142,11 +149,13 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
           <Ionicons name="search" size={20} color={colors.muted} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search posts, tags, or users..."
+            placeholder="Search"
             placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             onFocus={() => setSearchModalVisible(true)}
+            returnKeyType="search"
+            autoCorrect={false}
           />
         </View>
         <View style={styles.actionButtons}>
@@ -216,6 +225,7 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
           tabs={[
             { key: "for-you", title: "For You" },
             ...(showFollowingTab ? [{ key: "following", title: "Following" }] : [])
+            // Removed "newest" tab as requested
           ]}
           activeTab={activeTab}
           onTabChange={setActiveTab}
@@ -244,7 +254,13 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
         sortOptions={SORT_OPTIONS}
       />
 
-      <SearchModal visible={searchModalVisible} onClose={() => setSearchModalVisible(false)} onSearch={handleSearch} />
+      <SearchModal 
+        visible={searchModalVisible} 
+        onClose={() => setSearchModalVisible(false)} 
+        onSearch={handleSearch}
+        isSearching={externalIsSearching || isSearching}
+        searchResults={[]}
+      />
     </View>
   )
 }
@@ -265,17 +281,19 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    height: 40,
+    height: 44,
+    paddingHorizontal: 4,
   },
   searchIcon: {
-    marginHorizontal: 8,
+    marginHorizontal: 12,
   },
   searchInput: {
     flex: 1,
     height: "100%",
-    fontSize: 14,
+    fontSize: 16,
+    paddingRight: 12,
   },
   actionButtons: {
     flexDirection: "row",

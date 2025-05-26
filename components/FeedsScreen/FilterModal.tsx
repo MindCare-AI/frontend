@@ -31,7 +31,18 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
   const TOPIC_CHOICES = ["Technology", "Business", "Health", "Science", "Entertainment", "Sports"]
   const POST_TYPES = ["Text", "Image", "Video", "Poll"]
-  const TAG_CHOICES = ["Trending", "Popular", "New", "Programming", "Design", "Marketing"]
+  const TAG_CHOICES = [
+    "personal_growth 🌱",
+    "anxiety 😰",
+    "depression 😔",
+    "relationships 💝",
+    "self_care 🧘",
+    "mindfulness 🧠",
+    "stress_management 😌",
+    "therapy_tips 💭",
+    "wellness 🌿",
+    "support 🤝",
+  ]
   const USER_CHOICES = ["Jane Cooper", "Alex Morgan", "Taylor Swift", "Robert Johnson", "Emily Johnson", "David Wilson"] // Add this line
 
   const totalActiveFilters =

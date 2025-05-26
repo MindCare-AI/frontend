@@ -30,6 +30,17 @@ const PostActions: React.FC<PostActionsProps> = ({
   isSaved,
   onSaveToggle,
 }) => {
+  // Use colors matching HomeSettingsScreen
+  const homeScreenColors = {
+    primary: '#002D62', // Deep blue from HomeSettingsScreen
+    lightBlue: '#E4F0F6',
+    white: '#FFFFFF',
+    textDark: '#333',
+    textMedium: '#444',
+    borderColor: '#F0F0F0',
+    background: '#FFFFFF',
+  };
+
   const { colors, isDark } = useTheme()
   const {toast} = useToast()
   const [showReactions, setShowReactions] = useState(false)
@@ -120,16 +131,20 @@ const PostActions: React.FC<PostActionsProps> = ({
     )
   }
 
+  // Add action button styles with HomeScreen colors
+  const actionButtonStyle = {
+    backgroundColor: homeScreenColors.lightBlue,
+    borderColor: homeScreenColors.primary,
+    color: homeScreenColors.primary,
+  };
+
+  const primaryButtonStyle = {
+    backgroundColor: homeScreenColors.primary,
+    color: homeScreenColors.white,
+  };
+
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          borderTopColor: colors.border,
-          borderBottomColor: colors.border,
-        },
-      ]}
-    >
+    <View style={[styles.container, { backgroundColor: homeScreenColors.white }]}>
       {renderReactionsPopup()}
 
       <View style={styles.actionsContainer}>
@@ -247,8 +262,10 @@ const PostActions: React.FC<PostActionsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderBottomWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   reactionsPopup: {
     flexDirection: "row",

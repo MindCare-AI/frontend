@@ -40,10 +40,10 @@ export const useComments = (postId: number) => {
   const addComment = useCallback(async (content: string) => {
     try {
       setLoading(true);
-      const newComment = await FeedsApi.createComment(postId, { content });
+      const newComment = await FeedsApi.createComment(postId, { content }) as Comment;
       
       // If the API call succeeds but doesn't return the expected data, create a mock comment
-      if (!newComment) {
+      if (!newComment || typeof newComment !== 'object' || !newComment.id) {
         const mockComment: Comment = {
           id: Date.now(), // Use timestamp as temp ID
           post: postId,
@@ -62,8 +62,10 @@ export const useComments = (postId: number) => {
         return mockComment;
       }
       
-      setComments(prev => [newComment as Comment, ...prev]);
-      return newComment as Comment;
+      // If API returns data, use it (ensure it's properly typed)
+      const typedComment: Comment = newComment;
+      setComments(prev => [typedComment, ...prev]);
+      return typedComment;
     } catch (err) {
       console.error('Error adding comment:', err);
       setError('Failed to add comment');
