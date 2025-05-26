@@ -1,5 +1,5 @@
 // screens/ChatbotScreen/ChatbotScreen.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,9 +22,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
 import { ChatMessage, ChatbotConversation } from '../../types/chatbot/chatbot';
 import { chatbotApi } from '../../API/chatbot/chatbot';
-
-// Import the ChatbotStackParamList
+import { globalStyles } from '../../styles/global';
 import { ChatbotStackParamList } from '../../navigation/types';
+import TypingAnimation from '../../components/ChatbotScreen/TypingAnimation';
+import LoadingMessageIndicator from '../../components/ChatbotScreen/LoadingMessageIndicator';
 
 type ChatbotScreenRouteProp = RouteProp<ChatbotStackParamList, 'ChatbotConversation'>;
 type ChatbotScreenNavigationProp = StackNavigationProp<ChatbotStackParamList, 'ChatbotConversation'>;
@@ -59,6 +62,8 @@ const ChatbotScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchingConversation, setFetchingConversation] = useState(false);
   const [allDataLoaded, setAllDataLoaded] = useState(false);
+  const [typingMessages, setTypingMessages] = useState<{[key: string]: boolean}>({});
+  const messageAnimations = React.useRef<{[key: string]: Animated.Value}>({});
   const flatListRef = React.useRef<FlatList>(null);
 
   // Initialize conversation
@@ -240,33 +245,78 @@ const ChatbotScreen: React.FC = () => {
   };
 
   // Render message item
-  const renderMessage = ({ item }: { item: ChatMessage }) => (
-    <View style={[
-      styles.messageContainer,
-      item.is_bot ? styles.botMessage : styles.userMessage
-    ]}>
-      <View style={[
-        styles.messageBubble,
-        item.is_bot ? styles.botBubble : styles.userBubble
+  const renderMessage = ({ item }: { item: ChatMessage }) => {
+    // Initialize animation value for this message if not already done
+    if (!messageAnimations.current[item.id]) {
+      messageAnimations.current[item.id] = new Animated.Value(0);
+      
+      // Start animation when message is rendered
+      Animated.timing(messageAnimations.current[item.id], {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }).start();
+    }
+    
+    // Calculate animation styles
+    const animatedStyle = {
+      opacity: messageAnimations.current[item.id],
+      transform: [
+        {
+          translateY: messageAnimations.current[item.id].interpolate({
+            inputRange: [0, 1],
+            outputRange: [10, 0],
+          }),
+        },
+      ],
+    };
+
+    return (
+      <Animated.View style={[
+        styles.messageContainer,
+        item.is_bot ? styles.botMessage : styles.userMessage,
+        animatedStyle
       ]}>
-        <Text style={[
-          styles.messageText,
-          item.is_bot ? styles.botText : styles.userText
+        <View style={[
+          styles.messageBubble,
+          item.is_bot ? styles.botBubble : styles.userBubble
         ]}>
-          {item.content}
-        </Text>
-        {item.is_bot && item.chatbot_method && (
-          <Text style={styles.methodText}>Method: {item.chatbot_method}</Text>
-        )}
-        <Text style={[
-          styles.timestamp,
-          item.is_bot ? styles.botTimestamp : styles.userTimestamp
-        ]}>
-          {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-        </Text>
-      </View>
-    </View>
-  );
+          {item.is_bot && typingMessages[item.id] ? (
+            <TypingAnimation 
+              text={item.content}
+              speed={40}
+              onComplete={() => {
+                setTypingMessages(prev => ({...prev, [item.id]: false}));
+              }}
+              textStyle={[
+                styles.messageText,
+                item.is_bot ? styles.botText : styles.userText
+              ]}
+            />
+          ) : (
+            <Text style={[
+              styles.messageText,
+              item.is_bot ? styles.botText : styles.userText
+            ]}>
+              {item.content}
+            </Text>
+          )}
+          
+          {item.is_bot && item.chatbot_method && (
+            <Text style={styles.methodText}>Method: {item.chatbot_method}</Text>
+          )}
+          
+          <Text style={[
+            styles.timestamp,
+            item.is_bot ? styles.botTimestamp : styles.userTimestamp
+          ]}>
+            {new Date(item.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          </Text>
+        </View>
+      </Animated.View>
+    );
+  };
 
   // Render header
   const renderHeader = () => (
@@ -464,50 +514,62 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   messageContainer: {
-    marginVertical: 4,
-    maxWidth: '80%',
+    marginVertical: 6,
+    maxWidth: '85%',
   },
   userMessage: {
     alignSelf: 'flex-end',
+    marginLeft: 50,
   },
   botMessage: {
     alignSelf: 'flex-start',
+    marginRight: 50,
   },
   messageBubble: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   userBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: globalStyles.colors.primary,
+    borderBottomRightRadius: 4,
+    shadowColor: globalStyles.colors.primary,
   },
   botBubble: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   userText: {
     color: '#FFFFFF',
   },
   botText: {
-    color: '#1F2937',
+    color: globalStyles.colors.text,
   },
   methodText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
     fontStyle: 'italic',
-    marginTop: 4,
+    marginTop: 6,
+    opacity: 0.8,
   },
   timestamp: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '500',
   },
   userTimestamp: {
-    color: '#E5E7EB',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   botTimestamp: {
     color: '#9CA3AF',

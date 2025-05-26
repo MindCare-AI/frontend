@@ -170,22 +170,44 @@ export const useChatbot = () => {
   const fetchMessages = useCallback(async (conversationId: number, params?: MessagesParams) => {
     try {
       updateState({ loadingMessages: true, error: null });
+      
+      // First, check if the conversation exists and fetch it if needed
+      let currentConv = state.currentConversation;
+      if (!currentConv || currentConv.id !== conversationId) {
+        try {
+          console.log('[useChatbot] Fetching conversation:', conversationId);
+          const conversationResponse = await chatbotApi.getConversation(conversationId);
+          currentConv = conversationResponse;
+          updateState({ currentConversation: conversationResponse });
+        } catch (error) {
+          console.error('[useChatbot] Failed to fetch conversation:', error);
+          handleError(error, 'fetch conversation');
+          return;
+        }
+      }
+      
+      console.log('[useChatbot] Fetching messages for conversation:', conversationId);
       const response = await chatbotApi.getMessages(conversationId, params);
       
-      // Sort messages by timestamp (oldest first) for proper display
-      const sortedMessages = response.messages.sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-      
-      updateState({
-        messages: sortedMessages,
-        hasMoreMessages: response.has_more,
-        loadingMessages: false,
-      });
+      // Add a delay to ensure UI updates properly
+      setTimeout(() => {
+        // Sort messages by timestamp (oldest first) for proper display
+        const sortedMessages = response.messages.sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+        
+        updateState({
+          messages: sortedMessages,
+          hasMoreMessages: response.has_more,
+          loadingMessages: false,
+        });
+        
+        console.log('[useChatbot] Fetched', sortedMessages.length, 'messages');
+      }, 300);
     } catch (error) {
       handleError(error, 'fetch messages');
     }
-  }, [updateState, handleError]);
+  }, [state.currentConversation, updateState, handleError]);
 
   // Load more messages (for pagination)
   const loadMoreMessages = useCallback(async (conversationId: number) => {
@@ -223,20 +245,36 @@ export const useChatbot = () => {
       console.log('[useChatbot] sendMessage response:', response);
       
       // Add both user message and bot response to messages
-      setState(prevState => ({
-        ...prevState,
-        messages: [...prevState.messages, response.user_message, response.bot_response],
-        sendingMessage: false,
-        conversations: prevState.conversations.map((conv: ChatbotConversation | ChatbotConversationListItem) => 
-          conv.id === conversationId 
-            ? { 
-                ...conv, 
-                last_activity: response.bot_response.timestamp,
-                message_count: ('message_count' in conv ? conv.message_count : 0) + 2 
-              }
-            : conv
-        ),
-      }));
+      setState(prevState => {
+        // Extract previous messages
+        const prevMessages = [...prevState.messages];
+        
+        // Add user message immediately
+        prevMessages.push(response.user_message);
+        
+        // Add bot response with typing property
+        const botResponse = {
+          ...response.bot_response,
+          typing: true // Now properly typed in the interface
+        };
+        
+        prevMessages.push(botResponse);
+        
+        return {
+          ...prevState,
+          messages: prevMessages,
+          sendingMessage: false,
+          conversations: prevState.conversations.map((conv: ChatbotConversation | ChatbotConversationListItem) => 
+            conv.id === conversationId 
+              ? { 
+                  ...conv, 
+                  last_activity: response.bot_response.timestamp,
+                  message_count: ('message_count' in conv ? conv.message_count : 0) + 2 
+                }
+              : conv
+          ),
+        };
+      });
     } catch (error) {
       console.log('[useChatbot] sendMessage error:', error);
       handleError(error, 'send message');

@@ -70,21 +70,8 @@ const ChatbotNavigator: React.FC = () => {
               }}>
                 <TouchableOpacity
                   onPress={() => {
-                    // Add conversation list functionality
-                    console.log('Show conversation list');
-                  }}
-                  style={{ padding: 8 }}
-                >
-                  <Ionicons 
-                    name="list" 
-                    size={24} 
-                    color={globalStyles.colors.white} 
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
                     // Add new conversation functionality
-                    console.log('Start new conversation');
+                    navigation.navigate('ChatbotConversation', { autoCreate: true });
                   }}
                   style={{ padding: 8 }}
                 >
@@ -104,6 +91,7 @@ const ChatbotNavigator: React.FC = () => {
           component={ChatbotScreen}
           options={({ route, navigation }) => ({
             title: 'Conversation',
+            headerRight: () => null, // Remove settings icon
           })}
         />
         
