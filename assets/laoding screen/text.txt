@@ -1,0 +1,9 @@
+const App = () => {
+  return (
+    <DotLottieReact
+      src="https://lottie.host/f9fa0587-8f5c-40e2-98a0-95f8e0912adc/7pAXupINJT.lottie"
+      loop
+      autoplay
+    />
+  );
+};

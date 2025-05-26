@@ -107,3 +107,36 @@ export const formatDuration = (minutes: number): string => {
   
   return `${hours} hour${hours !== 1 ? 's' : ''} ${remainingMinutes} min${remainingMinutes !== 1 ? 's' : ''}`;
 };
+
+/**
+ * Format a date string to a relative format (e.g., "2 hours ago", "yesterday", etc.)
+ * @param dateString ISO date string
+ * @returns Relative date string
+ */
+import { formatDistanceToNow, isToday, isYesterday } from 'date-fns';
+
+export const formatRelativeDate = (dateString: string): string => {
+  try {
+    const date = parseISO(dateString);
+    
+    if (isToday(date)) {
+      return `Today, ${format(date, 'h:mm a')}`;
+    }
+    
+    if (isYesterday(date)) {
+      return `Yesterday, ${format(date, 'h:mm a')}`;
+    }
+    
+    // If within the last 7 days, show relative time
+    const diffInDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffInDays < 7) {
+      return formatDistanceToNow(date, { addSuffix: true });
+    }
+    
+    // Otherwise, show the date
+    return format(date, 'MMM d, yyyy');
+  } catch (error) {
+    console.error('Error formatting relative date:', error);
+    return dateString;
+  }
+};

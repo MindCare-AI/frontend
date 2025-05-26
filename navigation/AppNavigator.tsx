@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import MoodNavigator from './mood/MoodNavigator';
 import { SettingsStack } from './SettingsStack';
 import { globalStyles } from '../styles/global';
+import ChatbotNavigator from './ChatbotNavigator';
 import ChatbotScreen from '../screens/ChatbotScreen/ChatbotScreen';
 import DashboardScreen from '../screens/Appointments/patient/DashboardScreen';
 import JournalNavigator from './Journal';
@@ -25,12 +26,18 @@ import ConversationsScreen from '../screens/Conversations/ConversationsScreen';
 // Import ChatScreen
 import ChatScreen from '../screens/Conversations/ChatScreen';
 import MessagingNavigator from './MessagingNavigator';
+import CreatePostScreen from '../screens/CreatePostScreen/CreatePostScreen';
 
 // Import types or define them
 import { AppStackParamList } from './types';
 import FeedScreen from '../screens/FeedsScreen/FeedScreen';
 
-// You'll need to update your types.ts file to include these
+// Stack navigator types
+type FeedsStackParamList = {
+  FeedsList: undefined;
+  CreatePost: undefined;
+};
+
 type DrawerParamList = {
   Home: undefined;
   Profile: undefined;
@@ -42,6 +49,8 @@ type RootStackParamList = {
   Main: undefined;
   ChatScreen: { conversationId: string | number };
   ConversationDetails: { conversationId: string | number };
+  FeedsList: undefined;
+  CreatePost: undefined;
 };
 
 type MessagingStackParamList = {
@@ -53,6 +62,7 @@ const Tab = createBottomTabNavigator<AppStackParamList>();
 const Drawer = createDrawerNavigator<DrawerParamList>();
 const Stack = createStackNavigator<RootStackParamList>();
 const MessagingStackNavigator = createStackNavigator<MessagingStackParamList>();
+const FeedsStack = createStackNavigator<FeedsStackParamList>();
 
 
 // Your existing Tab Navigator
@@ -99,8 +109,11 @@ const TabNavigator = () => {
     >
       <Tab.Screen 
         name="Feeds" 
-        component={FeedScreen} 
-        options={{ tabBarLabel: 'Home' }}
+        component={FeedsStackNavigator} 
+        options={{ 
+          tabBarLabel: 'Home',
+          headerShown: false 
+        }}
       />
       <Tab.Screen 
         name="Appointments" 
@@ -115,8 +128,11 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Chatbot" 
-        component={ChatbotScreen} 
-        options={{ tabBarLabel: 'Chatbot' }}
+        component={ChatbotNavigator} 
+        options={{ 
+          tabBarLabel: 'Chatbot',
+          headerShown: false 
+        }}
       />
       <Tab.Screen
         name="MoodTracker"
@@ -201,6 +217,23 @@ const DrawerNavigator = () => {
     </Drawer.Navigator>
   );
 };
+
+// Create a stack navigator for the feeds to include CreatePost
+function FeedsStackNavigator() {
+  return (
+    <FeedsStack.Navigator screenOptions={{ headerShown: false }}>
+      <FeedsStack.Screen name="FeedsList" component={FeedScreen} />
+      <FeedsStack.Screen 
+        name="CreatePost" 
+        component={CreatePostScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Create Post'
+        }}
+      />
+    </FeedsStack.Navigator>
+  );
+}
 
 // Main stack navigator
 const AppNavigator = () => {

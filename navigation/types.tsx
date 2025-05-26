@@ -1,6 +1,12 @@
 import type { RouteProp } from "@react-navigation/native";
 import type { StackNavigationProp } from "@react-navigation/stack";
 
+// Stack navigator types
+export type FeedsStackParamList = {
+  FeedsList: undefined;
+  CreatePost: undefined;
+};
+
 //navigation/types.tsx
 export type RootStackParamList = {
   Splash: undefined;
@@ -19,7 +25,10 @@ export type RootStackParamList = {
 };
 
 export type AppStackParamList = {
-  Feeds: undefined;
+  Feeds: {
+    screen?: keyof FeedsStackParamList;
+    params?: object;
+  };
   Chatbot: undefined;
   Notifications: undefined;
   Settings: undefined;
@@ -27,6 +36,18 @@ export type AppStackParamList = {
   Appointments: undefined;
   Journal: undefined;
   Messaging: undefined;
+};
+
+// Chatbot navigation types
+export type ChatbotStackParamList = {
+  ChatbotHome: undefined;
+  ChatbotConversation: { 
+    conversationId?: number; 
+    autoCreate?: boolean;
+  };
+  ConversationSettings: { 
+    conversationId: number;
+  };
 };
 
 export type AuthStackParamList = {

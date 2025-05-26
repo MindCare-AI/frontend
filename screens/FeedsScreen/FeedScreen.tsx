@@ -1,46 +1,60 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { StyleSheet, TouchableOpacity, Animated } from "react-native"
+import { StyleSheet, TouchableOpacity, Animated, View, Text, ActivityIndicator, Platform } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import FeedHeader from "../../components/FeedsScreen/FeedHeader"
 import FeedContainer from "../../components/FeedsScreen/FeedContainer"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
-import { useToast } from "../../contexts/feeds/ToastContext" // Import toast context
+import { useToast } from "../../contexts/feeds/ToastContext"
 import type { FilterState, SortOption } from "../../types/feeds"
 
 const FeedScreen = () => {
   const { colors } = useTheme()
-  const navigation = useNavigation<any>() // Use any type to bypass type checking temporarily
-  const toast = useToast() // Get the toast function
+  const navigation = useNavigation()
+  const toast = useToast()
   const [filters, setFilters] = useState<FilterState>({
     topics: [],
     types: [],
     tags: [],
     users: [],
   })
-  const [sortBy, setSortBy] = useState<SortOption>("newest")
+  const [sortBy, setSortBy] = useState<SortOption>("most-viewed")
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeTab, setActiveTab] = useState("for-you") // Only using for-you since we're removing the following tab
+  const [activeTab, setActiveTab] = useState("for-you")
+  const [isSearching, setIsSearching] = useState(false)
   
-  // Reference to the FeedContainer to access its refresh method
   const feedContainerRef = useRef<any>(null)
-  
-  // Animation value for the add button
   const scaleAnim = useRef(new Animated.Value(1)).current
   
-  // Handler for refresh button click
   const handleRefresh = () => {
+    console.log('FeedScreen: Refresh triggered')
     if (feedContainerRef.current) {
       feedContainerRef.current.refresh()
     }
+    
+    // Show user feedback
+    toast.toast({
+      title: "Refreshing",
+      description: "Fetching latest posts...",
+      type: "info",
+      duration: 2000,
+    });
+  }
+
+  const handleLoadingChange = (loading: boolean) => {
+    setIsSearching(loading)
+    
+    // Optional: Show loading feedback in UI
+    if (loading) {
+      console.log('FeedScreen: Posts are loading...')
+    }
   }
   
-  // Handler for add button press - navigate to create post screen
   const handleAddPost = () => {
-    // Animation for button press
+    // Enhanced animation for button press
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 0.9,
@@ -54,12 +68,11 @@ const FeedScreen = () => {
       })
     ]).start(() => {
       try {
-        // Try to navigate to the CreatePostScreen
+        // Navigate to CreatePost screen
         navigation.navigate("CreatePost");
         console.log("Navigating to create post screen");
       } catch (err) {
         console.error("Navigation error:", err);
-        // Show toast message as fallback
         toast.toast({
           title: "Create Post",
           description: "This feature is coming soon!",
@@ -72,13 +85,24 @@ const FeedScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Show loading overlay for initial load */}
+      {isSearching && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading posts...
+          </Text>
+        </View>
+      )}
+      
       <FeedHeader
         onFiltersChange={setFilters}
         onSortChange={setSortBy}
         onSearchChange={setSearchQuery}
         onTabChange={setActiveTab}
         onRefresh={handleRefresh}
-        showFollowingTab={false} // Add this prop to control visibility of following tab
+        showFollowingTab={false}
+        isSearching={isSearching}
       />
       
       <FeedContainer 
@@ -86,18 +110,23 @@ const FeedScreen = () => {
         filters={filters} 
         sortBy={sortBy} 
         searchQuery={searchQuery} 
-        activeTab={activeTab} 
+        activeTab={activeTab}
+        onLoadingChange={handleLoadingChange}
       />
       
-      {/* Add Post Button (FAB) */}
+      {/* Enhanced FAB with better design */}
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-          onPress={handleAddPost}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        style={[styles.addButton, { backgroundColor: colors.primary, ...styles.fabShadow }]}
+        onPress={() => {
+          console.log('Button pressed');
+          handleAddPost();
+        }}
+        activeOpacity={0.8}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Ionicons name="add" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
   )
@@ -116,13 +145,31 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     zIndex: 999,
+  },
+  fabShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '500',
   },
 })
 
-export default FeedScreen
+export default FeedScreen;

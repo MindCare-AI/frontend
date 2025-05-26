@@ -78,7 +78,7 @@ const SortModal: React.FC<SortModalProps> = ({ visible, onClose, activeSort, onS
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.modalOverlay}>
         <View
           style={[
@@ -124,6 +124,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 1000, // Add high z-index
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalContent: {
     borderTopLeftRadius: 20,
