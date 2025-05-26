@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet, Animated, Text } from 'react-native';
 import { useTheme } from '../../contexts/feeds/ThemeContext';
 
-const LoadingIndicator = () => {
+const LoadingIndicator = ({ size = 'large' as 'large' | 'small' | number, color = "#002D62", text = "Loading..." }) => {
   const { colors } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -54,9 +54,9 @@ const LoadingIndicator = () => {
         }
       ]}
     >
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size={size} color={color} />
       <Text style={[styles.loadingText, { color: colors.text }]}>
-        Loading feeds...
+        {text}
       </Text>
     </Animated.View>
   );

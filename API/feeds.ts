@@ -45,14 +45,8 @@ export const createPost = async (postData: any) => {
     if (postData instanceof FormData) {
       console.log("DEBUG: postData is FormData, using directly");
       
-      // If tags is an array, convert to a single string value expected by backend
-      const tagsEntry = Array.from(postData.entries()).find(entry => entry[0] === 'tags');
-      if (tagsEntry && Array.isArray(tagsEntry[1])) {
-        console.log("DEBUG: Converting tags array to string");
-        postData.delete('tags');
-        postData.append('tags', tagsEntry[1][0]);
-      }
-      
+      // FormData entries are always [string, FormDataEntryValue] where FormDataEntryValue is string | File
+      // No need to handle arrays since FormData doesn't store arrays directly
       const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -67,12 +61,7 @@ export const createPost = async (postData: any) => {
       Object.keys(postData).forEach(key => {
         // Handle special case for tags
         if (key === 'tags') {
-          // If it's an array, use the first item
-          if (Array.isArray(postData[key])) {
-            formData.append(key, postData[key][0]);
-          } else {
-            formData.append(key, postData[key]);
-          }
+          formData.append(key, postData[key]);
         } 
         // Handle file upload case
         else if (key === 'media' && postData[key]) {

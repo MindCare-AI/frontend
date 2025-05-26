@@ -126,8 +126,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose} statusBarTranslucent>
+      <View style={[styles.modalOverlay, { zIndex: 9999 }]}>
         <View
           style={[
             styles.modalContent,
@@ -243,6 +243,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 1000, // Add high z-index
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalContent: {
     borderTopLeftRadius: 20,
@@ -250,6 +256,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingBottom: Platform.OS === "ios" ? 40 : 20,
     maxHeight: "80%",
+    zIndex: 1001, // Ensure content is above overlay
+    elevation: 10, // For Android
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   webOverlay: {
     position: "absolute",

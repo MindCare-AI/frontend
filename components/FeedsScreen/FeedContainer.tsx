@@ -1,7 +1,7 @@
 "use client"
 
 import { forwardRef, useImperativeHandle, useState, useEffect } from "react"
-import { View, FlatList, Text, StyleSheet, RefreshControl } from "react-native"
+import { View, FlatList, Text, StyleSheet, RefreshControl, ActivityIndicator } from "react-native"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import type { FilterState, SortOption } from "../../types/feeds"
 import PostItem from "./PostItem"
@@ -65,6 +65,7 @@ const FeedContainer = forwardRef(({
     loading,
     refreshing,
     error,
+    isLoadingMore,
     handleRefresh,
     handleLoadMore,
     updatePost,
@@ -113,9 +114,11 @@ const FeedContainer = forwardRef(({
     return () => clearTimeout(timer)
   }
   
+  // Show skeleton loading for initial load
   if (loading && !refreshing && posts.length === 0) {
     return (
       <View style={{ backgroundColor: homeScreenColors.background, flex: 1 }}>
+        <LoadingIndicator />
         <PostSkeleton colors={homeScreenColors} />
         <PostSkeleton colors={homeScreenColors} />
         <PostSkeleton colors={homeScreenColors} />
@@ -123,11 +126,11 @@ const FeedContainer = forwardRef(({
     )
   }
   
-  if (error) {
+  if (error && posts.length === 0) {
     return <ErrorMessage message={error} onRetry={handleRefresh} />
   }
   
-  if (posts.length === 0) {
+  if (!loading && posts.length === 0) {
     return (
       <View style={[styles.emptyContainer, { backgroundColor: homeScreenColors.lightBlue }]}>
         <EmptyFeed />
@@ -157,14 +160,15 @@ const FeedContainer = forwardRef(({
         />
       }
       style={{ backgroundColor: homeScreenColors.background }}
-      ListHeaderComponent={() => (
-        loading && (
-          <View>
-            <PostSkeleton colors={homeScreenColors} />
-            <PostSkeleton colors={homeScreenColors} />
-            <PostSkeleton colors={homeScreenColors} />
+      ListFooterComponent={() => (
+        isLoadingMore ? (
+          <View style={{ padding: 16, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={homeScreenColors.primary} />
+            <Text style={{ marginTop: 8, color: homeScreenColors.textMedium }}>
+              Loading more posts...
+            </Text>
           </View>
-        )
+        ) : null
       )}
     />
   )

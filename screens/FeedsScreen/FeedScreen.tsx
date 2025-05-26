@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { StyleSheet, TouchableOpacity, Animated } from "react-native"
+import { StyleSheet, TouchableOpacity, Animated, View, Text, ActivityIndicator, Platform } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
@@ -30,13 +30,27 @@ const FeedScreen = () => {
   const scaleAnim = useRef(new Animated.Value(1)).current
   
   const handleRefresh = () => {
+    console.log('FeedScreen: Refresh triggered')
     if (feedContainerRef.current) {
       feedContainerRef.current.refresh()
     }
+    
+    // Show user feedback
+    toast.toast({
+      title: "Refreshing",
+      description: "Fetching latest posts...",
+      type: "info",
+      duration: 2000,
+    });
   }
 
   const handleLoadingChange = (loading: boolean) => {
     setIsSearching(loading)
+    
+    // Optional: Show loading feedback in UI
+    if (loading) {
+      console.log('FeedScreen: Posts are loading...')
+    }
   }
   
   const handleAddPost = () => {
@@ -71,6 +85,16 @@ const FeedScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Show loading overlay for initial load */}
+      {isSearching && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading posts...
+          </Text>
+        </View>
+      )}
+      
       <FeedHeader
         onFiltersChange={setFilters}
         onSortChange={setSortBy}
@@ -129,6 +153,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '500',
   },
 })
 
