@@ -1,50 +1,59 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface OnboardingProgressProps {
-  steps: number;
   currentStep: number;
+  totalSteps: number;
 }
 
 const OnboardingProgress: React.FC<OnboardingProgressProps> = ({
-  steps,
   currentStep,
+  totalSteps,
 }) => {
+  const progress = (currentStep / totalSteps) * 100;
+
   return (
     <View style={styles.container}>
-      {Array.from({ length: steps }).map((_, index) => (
-        <View
-          key={index}
-          style={[
-            styles.dot,
-            currentStep === index && styles.activeDot,
-            currentStep > index && styles.completedDot,
-          ]}
-        />
-      ))}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressBar, { width: `${progress}%` }]} />
+        </View>
+        <Text style={styles.progressText}>
+          {currentStep + 1} of {totalSteps}
+        </Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    paddingHorizontal: 30,
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: '#E4F0F6',
+  },
+  progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  dot: {
-    width: 16,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ddd',
+  progressTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#D1E7DD',
+    borderRadius: 2,
+    overflow: 'hidden',
   },
-  activeDot: {
-    width: 32,
-    backgroundColor: '#000',
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#002D62',
+    borderRadius: 2,
   },
-  completedDot: {
-    width: 32,
-    backgroundColor: '#666',
+  progressText: {
+    fontSize: 12,
+    color: '#002D62',
+    fontWeight: '500',
   },
 });
 
