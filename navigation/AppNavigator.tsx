@@ -6,6 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useWindowDimensions } from 'react-native';
 import { Appbar } from 'react-native-paper';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
 
 // Existing imports
 import MoodNavigator from './mood/MoodNavigator';
@@ -53,29 +54,12 @@ const Drawer = createDrawerNavigator<DrawerParamList>();
 const Stack = createStackNavigator<RootStackParamList>();
 const MessagingStackNavigator = createStackNavigator<MessagingStackParamList>();
 
-// Custom header for the stack navigator
-const CustomNavigationBar = ({ navigation, back }: any) => {
-  // Check if openDrawer is available
-  const canOpenDrawer = navigation.openDrawer !== undefined;
-  
-  return (
-    <Appbar.Header>
-      {back ? (
-        <Appbar.BackAction onPress={navigation.goBack} color="white" />
-      ) : canOpenDrawer ? (
-        <Appbar.Action
-          icon="menu"
-          color="white"
-          onPress={() => navigation.openDrawer()}
-        />
-      ) : null}
-      <Appbar.Content title="TherapistConnect" color="white" />
-    </Appbar.Header>
-  );
-};
 
 // Your existing Tab Navigator
 const TabNavigator = () => {
+  const { user } = useAuth(); // Add this line to access the auth context
+  const userType = user?.user_type || 'patient'; // Default to patient if not set
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -120,7 +104,8 @@ const TabNavigator = () => {
       />
       <Tab.Screen 
         name="Appointments" 
-        component={DashboardScreenT}
+        // Dynamically select the dashboard component based on user type
+        component={userType === 'therapist' ? DashboardScreenT : DashboardScreen}
         options={{ tabBarLabel: 'Appointments' }}
       />
       <Tab.Screen 
@@ -223,16 +208,12 @@ const AppNavigator = () => {
   const isLargeScreen = dimensions.width >= 768;
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        header: (props) => <CustomNavigationBar {...props} />,
-      }}
-    >
+    <Stack.Navigator>
       <Stack.Screen
         name="Main"
         component={DrawerNavigator}
         options={{
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen 
