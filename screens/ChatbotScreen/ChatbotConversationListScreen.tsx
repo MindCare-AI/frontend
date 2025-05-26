@@ -245,6 +245,33 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
+    transform: [{ scale: 1 }],  // For animations
+    // Add animation properties
+    zIndex: 10,
+  },
+  // Add animation related styles
+  fabPressed: {
+    transform: [{ scale: 0.95 }],
+    shadowOpacity: 0.2,
+  },
+  conversationItem: {
+    marginVertical: 6,
+    marginHorizontal: 12,
+    backgroundColor: globalStyles.colors.white,
+    borderRadius: 10,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    transform: [{ scale: 1 }], // For animations
+  },
+  conversationItemPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
 });
 

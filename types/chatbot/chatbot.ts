@@ -19,6 +19,7 @@ export interface ChatMessage {
   metadata?: Record<string, any>;
   parent_message?: number | null;
   chatbot_method?: string | null;
+  typing?: boolean; // Added for typing animation
 }
 
 export interface LastMessage {
