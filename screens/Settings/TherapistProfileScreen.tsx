@@ -147,8 +147,10 @@ const TherapistProfileScreen = () => {
           verification_status: verification_status || 'pending'
         });
         
+        // Set the profile picture URL (now it should be a full URL)
         if (profile_picture) {
           setProfilePictureUrl(profile_picture);
+          console.log('Set profile picture URL:', profile_picture);
         }
         
         setLoading(false);
@@ -191,16 +193,32 @@ const TherapistProfileScreen = () => {
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Fix: Use MediaTypeOptions
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        // Include extra info about the selected image
+        exif: true,
+      });
 
-    if (!result.canceled) {
-      setProfilePicture(result.assets[0]);
-      setProfilePictureUrl(result.assets[0].uri);
+      if (!result.canceled) {
+        // Enhance the image object with additional metadata needed for upload
+        const selectedImage = {
+          ...result.assets[0],
+          fileName: `profile_${Date.now()}.jpg`,
+          mimeType: 'image/jpeg'
+        };
+        
+        console.log('Selected image:', selectedImage);
+        
+        setProfilePicture(selectedImage);
+        setProfilePictureUrl(selectedImage.uri);
+      }
+    } catch (err) {
+      console.error('Error picking image:', err);
+      setError('Failed to select image. Please try again.');
     }
   };
 
@@ -210,12 +228,29 @@ const TherapistProfileScreen = () => {
       setError(null);
       setFieldErrors({});
       
-      // Update profile data
+      // Update profile data first
       await updateTherapistProfile(profile);
       
       // If there's a new profile picture, upload it separately
       if (profilePicture) {
-        await uploadProfilePicture(profilePicture);
+        try {
+          const uploadResult = await uploadProfilePicture(profilePicture) as { profile_picture: string };
+          console.log('Profile picture uploaded successfully:', uploadResult);
+          
+          // Update the profile picture URL with the new one
+          if (uploadResult.profile_picture) {
+            setProfilePictureUrl(uploadResult.profile_picture);
+          }
+        } catch (uploadError) {
+          console.error('Profile picture upload failed:', uploadError);
+          // Don't fail the entire operation if just the picture upload fails
+          Alert.alert(
+            'Partial Success', 
+            'Profile updated successfully, but profile picture upload failed. Please try uploading the picture again.'
+          );
+          setSaving(false);
+          return;
+        }
       }
       
       setSaving(false);
@@ -421,7 +456,7 @@ const TherapistProfileScreen = () => {
           <Text style={styles.label}>License Number</Text>
           <TextInput
             style={styles.input}
-            value={profile.license_number}
+            value={profile.license_number || ''}
             onChangeText={(text) => handleChange('license_number', text)}
           />
           {fieldErrors.license_number && (
@@ -466,7 +501,7 @@ const TherapistProfileScreen = () => {
           <Text style={styles.label}>Hourly Rate ($)</Text>
           <TextInput
             style={styles.input}
-            value={String(profile.hourly_rate)}
+            value={profile.hourly_rate ? String(profile.hourly_rate) : ''}
             onChangeText={(text) => handleChange('hourly_rate', text)}
             keyboardType="decimal-pad"
             placeholder="Enter your hourly rate"
