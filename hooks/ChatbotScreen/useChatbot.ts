@@ -1,4 +1,3 @@
-// hooks/ChatbotScreen/useChatbot.ts
 import { useState, useEffect, useCallback } from 'react';
 import { chatbotApi } from '../../API/chatbot/chatbot';
 import {
