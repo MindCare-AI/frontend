@@ -38,15 +38,10 @@ export const createPost = async (postData: any) => {
   try {
     console.log("DEBUG: Creating post with data:", postData);
     
-    // Create the appropriate structure for FormData
-    const formData = new FormData();
-    
     // Check if postData is already FormData
     if (postData instanceof FormData) {
       console.log("DEBUG: postData is FormData, using directly");
       
-      // FormData entries are always [string, FormDataEntryValue] where FormDataEntryValue is string | File
-      // No need to handle arrays since FormData doesn't store arrays directly
       const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -57,21 +52,47 @@ export const createPost = async (postData: any) => {
     } else {
       console.log("DEBUG: postData is not FormData, creating new FormData");
       
-      // Convert object to FormData
-      Object.keys(postData).forEach(key => {
-        // Handle special case for tags
-        if (key === 'tags') {
-          formData.append(key, postData[key]);
-        } 
-        // Handle file upload case
-        else if (key === 'media' && postData[key]) {
-          formData.append('file', postData[key]);
-        } 
-        // Handle standard cases
-        else {
-          formData.append(key, postData[key]);
-        }
-      });
+      // Create a fresh FormData object
+      const formData = new FormData();
+      
+      // Add each field explicitly
+      if (postData.content) {
+        formData.append('content', postData.content);
+      }
+      
+      // Handle post_type with support for both naming conventions
+      const postType = postData.post_type || postData.postType;
+      if (postType) {
+        formData.append('post_type', postType);
+      }
+      
+      if (postData.tags) {
+        formData.append('tags', postData.tags);
+      }
+      
+      if (postData.topics) {
+        formData.append('topics', postData.topics);
+      }
+      
+      // Handle link_url with support for both naming conventions
+      const linkUrl = postData.link_url || postData.linkUrl;
+      if (linkUrl) {
+        formData.append('link_url', linkUrl);
+      }
+      
+      // Handle file upload
+      if (postData.file) {
+        formData.append('file', postData.file);
+      } else if (postData.media) {
+        formData.append('file', postData.media);
+      }
+      
+      // Log form data keys for debugging
+      // const formDataKeys = [];
+      // formData.forEach((value, key) => {
+      //   formDataKeys.push(key);
+      // });
+      // console.log("DEBUG: Sending FormData with keys:", formDataKeys);
       
       const response = await axios.post(`${FEEDS_URL}/posts/`, formData, {
         headers: {
