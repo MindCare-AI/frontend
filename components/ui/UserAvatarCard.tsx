@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { globalStyles } from '../../styles/global';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -48,36 +47,44 @@ const UserAvatarCard: React.FC<UserAvatarCardProps> = ({
   const defaultAvatar = require('../../assets/default-avatar.png');
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.avatarContainer}
-        onPress={onAvatarChange ? handleAvatarPress : undefined}
-        disabled={!onAvatarChange}
-      >
-        <Image
-          source={avatar ? { uri: avatar } : defaultAvatar}
-          style={styles.avatar}
-        />
-        {onAvatarChange && (
-          <View style={styles.editIconContainer}>
-            <Ionicons name="camera" size={16} color="#FFFFFF" />
-          </View>
-        )}
-      </TouchableOpacity>
-      <View style={styles.infoContainer}>
-        <Text style={styles.name}>{name}</Text>
-        {role && (
-          <Text style={styles.role}>
-            {role.charAt(0).toUpperCase() + role.slice(1)}
-          </Text>
-        )}
+    <View style={styles.profileSection}>
+      <View style={styles.profilePictureSection}>
+        <View style={styles.profilePicture}>
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.placeholder}>
+              <Text style={styles.placeholderText}>No image</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.uploadControls}>
+          <Text style={styles.label}>Profile Picture</Text>
+          <TouchableOpacity 
+            style={styles.uploadButton} 
+            onPress={onAvatarChange ? handleAvatarPress : undefined}
+            disabled={!onAvatarChange}
+          >
+            <Text style={styles.uploadButtonText}>
+              {onAvatarChange ? 'Choose Image' : 'No Access'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
+      
+      <Text style={styles.nameText}>{name}</Text>
+      {role && (
+        <Text style={styles.roleText}>
+          {role.charAt(0).toUpperCase() + role.slice(1)}
+        </Text>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  profileSection: {
     backgroundColor: globalStyles.colors.white,
     borderRadius: 12,
     padding: 16,
@@ -85,40 +92,67 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     ...globalStyles.shadow,
   },
-  avatarContainer: {
+  profilePictureSection: {
     position: 'relative',
     marginBottom: 12,
+    alignItems: 'center',
   },
-  avatar: {
+  profilePicture: {
     width: 100,
     height: 100,
     borderRadius: 50,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: globalStyles.colors.primary,
   },
-  editIconContainer: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    backgroundColor: globalStyles.colors.primary,
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  placeholder: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: globalStyles.colors.white,
+    width: '100%',
+    height: '100%',
+    backgroundColor: globalStyles.colors.neutralLight, // Replace lightGray with neutralLight
   },
-  infoContainer: {
+  placeholderText: {
+    color: globalStyles.colors.neutralMedium, // Replace gray with neutralMedium
+  },
+  uploadControls: {
+    marginTop: 8,
     alignItems: 'center',
   },
-  name: {
+  label: {
+    fontSize: 14,
+    color: globalStyles.colors.text,
+    marginBottom: 4,
+  },
+  uploadButton: {
+    backgroundColor: globalStyles.colors.primary,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 120,
+  },
+  uploadButtonText: {
+    color: globalStyles.colors.white,
+    fontWeight: '500',
+  },
+  nameText: {
     fontSize: 20,
     fontWeight: '600',
     color: globalStyles.colors.text,
     marginBottom: 4,
+    textAlign: 'center',
   },
-  role: {
+  roleText: {
     fontSize: 14,
     color: globalStyles.colors.secondary,
+    textAlign: 'center',
   },
 });
 

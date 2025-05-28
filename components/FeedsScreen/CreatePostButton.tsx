@@ -12,13 +12,22 @@ import {
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useToast } from "../../contexts/feeds/ToastContext"
+import * as ImagePicker from 'expo-image-picker';
 
 interface CreatePostButtonProps {
   position?: "bottom-right" | "center"
+}
+
+// Define a proper type for the media file
+interface MediaFile {
+  uri: string;
+  name?: string;
+  type: string;
 }
 
 const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-right" }) => {
@@ -42,9 +51,35 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
   const [tagInput, setTagInput] = useState("")
   const [postType, setPostType] = useState<"text" | "image" | "video" | "poll">("text")
   const [isCreatingPost, setIsCreatingPost] = useState(false)
+  
+  // Fix state type declarations
+  const [mediaFile, setMediaFile] = useState<any>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
-  const TOPIC_CHOICES = ["Technology", "Business", "Health", "Science", "Entertainment", "Sports"]
-  const TAG_CHOICES = ["Trending", "Popular", "New", "Programming", "Design", "Marketing"]
+  const TOPIC_CHOICES = [
+    "Mental Health",
+    "Therapy", 
+    "Self Care", 
+    "Mindfulness", 
+    "Stress Management", 
+    "Relationships", 
+    "Personal Growth", 
+    "Anxiety", 
+    "Depression", 
+    "Wellness"
+  ]
+  const TAG_CHOICES = [
+    "Mental Health",
+    "Therapy", 
+    "Self Care", 
+    "Mindfulness", 
+    "Stress Management", 
+    "Relationships", 
+    "Personal Growth", 
+    "Anxiety", 
+    "Depression", 
+    "Wellness"
+  ]
 
   const handleAddTag = () => {
     if (tagInput && !selectedTags.includes(tagInput)) {
@@ -57,6 +92,61 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
     setSelectedTags(selectedTags.filter((t) => t !== tag))
   }
 
+  const handleSelectMedia = async () => {
+    try {
+      // Request permissions first
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        toast({
+          title: "Permission denied",
+          description: "We need access to your media to upload files",
+          type: "error",
+          duration: 4000,
+        });
+        return;
+      }
+      
+      const options = {
+        mediaTypes: postType === "image" 
+          ? ImagePicker.MediaTypeOptions.Images 
+          : ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        quality: 0.8,
+      };
+      
+      const result = await ImagePicker.launchImageLibraryAsync(options);
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedAsset = result.assets[0];
+        
+        // Create file object
+        const fileUri = selectedAsset.uri;
+        const fileName = fileUri.split('/').pop();
+        const fileType = selectedAsset.mimeType || 
+                         (postType === "image" ? "image/jpeg" : "video/mp4");
+        
+        // Create a file object for the API
+        const file = {
+          uri: fileUri,
+          name: fileName,
+          type: fileType,
+        };
+        
+        setMediaFile(file);
+        setMediaPreview(fileUri);
+      }
+    } catch (error) {
+      console.error('Error selecting media:', error);
+      toast({
+        title: "Error",
+        description: "Failed to select media. Please try again.",
+        type: "error",
+        duration: 4000,
+      });
+    }
+  };
+
   const handleCreatePost = async () => {
     setIsCreatingPost(true)
     
@@ -64,18 +154,44 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
       // Import the API function
       const { createPost } = await import('../../API/feeds');
       
-      // Prepare the post data in the correct format
-      const postData = {
-        content: postContent,
-        type: postType,
-        topic: selectedTopic,
-        tags: selectedTags,
-      };
-
-      console.log('Creating post with data:', postData);
+      // Create a FormData instance for multipart/form-data
+      const formData = new FormData();
       
-      // Call the API
-      const result = await createPost(postData);
+      // Add content
+      formData.append("content", postContent);
+      
+      // Map our UI post types to backend post types
+      const apiPostType = postType === "poll" ? "text" : postType;
+      formData.append("post_type", apiPostType);
+      
+      // Add topic if selected
+      if (selectedTopic) {
+        formData.append("topics", selectedTopic.toLowerCase().replace(" ", "_"));
+      }
+      
+      // Add tags (backend expects a string, not an array)
+      if (selectedTags.length > 0) {
+        formData.append("tags", selectedTags.join(',').toLowerCase().replace(/ /g, "_"));
+      } else {
+        // Default tag if none selected
+        formData.append("tags", "mental_health");
+      }
+      
+      // Add media file if present
+      if (mediaFile && (postType === "image" || postType === "video")) {
+        formData.append("file", mediaFile);
+      }
+      
+      console.log('Creating post with data:', {
+        content: postContent,
+        post_type: apiPostType,
+        topics: selectedTopic, 
+        tags: selectedTags,
+        hasMedia: !!mediaFile
+      });
+      
+      // Call the API with FormData
+      const result = await createPost(formData);
       console.log('Post created successfully:', result);
 
       // Reset form and close modal
@@ -83,6 +199,8 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
       setSelectedTopic("")
       setSelectedTags([])
       setPostType("text")
+      setMediaFile(null)
+      setMediaPreview(null)
       setIsModalVisible(false)
 
       toast({
@@ -348,26 +466,39 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
                       borderColor: colors.border,
                     },
                   ]}
+                  onPress={postType !== "poll" ? handleSelectMedia : undefined}
                 >
-                  {postType === "image" && <Ionicons name="image" size={32} color={colors.muted} />}
-                  {postType === "video" && <Ionicons name="videocam" size={32} color={colors.muted} />}
-                  {postType === "poll" && <Ionicons name="stats-chart" size={32} color={colors.muted} />}
-                  <Text style={[styles.mediaUploadText, { color: colors.muted }]}>
-                    {postType === "image" && "Click to upload an image"}
-                    {postType === "video" && "Click to upload a video"}
-                    {postType === "poll" && "Add poll options (coming soon)"}
-                  </Text>
-                  {(postType === "image" || postType === "video") && (
-                    <TouchableOpacity
-                      style={[
-                        styles.uploadButton,
-                        {
-                          borderColor: colors.border,
-                        },
-                      ]}
-                    >
-                      <Text style={{ color: colors.text }}>Upload</Text>
-                    </TouchableOpacity>
+                  {mediaPreview ? (
+                    <View style={styles.mediaPreviewContainer}>
+                      {postType === "image" && (
+                        <Image source={{ uri: mediaPreview }} style={styles.mediaPreviewImage} />
+                      )}
+                      {postType === "video" && (
+                        <View style={styles.videoPreviewPlaceholder}>
+                          <Ionicons name="play-circle" size={48} color={colors.primary} />
+                        </View>
+                      )}
+                      <TouchableOpacity 
+                        style={styles.clearMediaButton}
+                        onPress={() => {
+                          setMediaFile(null);
+                          setMediaPreview(null);
+                        }}
+                      >
+                        <Ionicons name="close-circle" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <>
+                      {postType === "image" && <Ionicons name="image" size={32} color={colors.muted} />}
+                      {postType === "video" && <Ionicons name="videocam" size={32} color={colors.muted} />}
+                      {postType === "poll" && <Ionicons name="stats-chart" size={32} color={colors.muted} />}
+                      <Text style={[styles.mediaUploadText, { color: colors.muted }]}>
+                        {postType === "image" && "Click to upload an image"}
+                        {postType === "video" && "Click to upload a video"}
+                        {postType === "poll" && "Add poll options (coming soon)"}
+                      </Text>
+                    </>
                   )}
                 </TouchableOpacity>
               )}
@@ -605,6 +736,31 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginLeft: 8,
     borderWidth: 1,
+  },
+  mediaPreviewContainer: {
+    width: '100%',
+    height: 200,
+    position: 'relative',
+  },
+  mediaPreviewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  videoPreviewPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e1e1e1',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  clearMediaButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 12,
   },
 })
 
