@@ -7,14 +7,14 @@
       "dom",
       "es2017"
     ],
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "strict": true,
     "esModuleInterop": true,
     "target": "es2017",
-    "module": "esnext",
+    "module": "Node16",
     "allowJs": true,
     "isolatedModules": true
   },

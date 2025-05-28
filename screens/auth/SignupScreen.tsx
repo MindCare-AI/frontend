@@ -9,13 +9,14 @@ import {
   ScrollView,
   Animated,
 } from "react-native";
-import { NavigationProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import Logo from "../../assets/images/logo_mindcare.svg";
 import { gsap } from 'gsap';
 
 type SignupScreenProps = {
-  navigation: NavigationProp<any>;
+  navigation: {
+    navigate: (screen: string) => void;
+  };
 };
 
 const SignupScreen = ({ navigation }: SignupScreenProps) => {
@@ -24,8 +25,6 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     email: "",
     password1: "",
     password2: "",
-    first_name: "",
-    last_name: "",
   });
   const [showPassword1, setShowPassword1] = useState(false);
   const [showPassword2, setShowPassword2] = useState(false);
@@ -57,21 +56,6 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
-  };
-
-  const validatePassword = (password: string) => {
-    // At least 8 characters
-    const minLength = password.length >= 8;
-    // At least one uppercase letter
-    const hasUpperCase = /[A-Z]/.test(password);
-    // At least one lowercase letter
-    const hasLowerCase = /[a-z]/.test(password);
-    // At least one number
-    const hasNumber = /\d/.test(password);
-    // At least one special character
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-    return minLength && hasUpperCase && hasLowerCase && hasNumber && hasSpecial;
   };
 
   const handleChange = (field: string, value: string) => {
@@ -111,9 +95,7 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
       !formData.username ||
       !formData.email ||
       !formData.password1 ||
-      !formData.password2 ||
-      !formData.first_name ||
-      !formData.last_name
+      !formData.password2
     ) {
       setSignupError("Please fill in all fields");
       shakeError();
@@ -123,15 +105,6 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     // Email validation
     if (!validateEmail(formData.email)) {
       setSignupError("Please enter a valid email address");
-      shakeError();
-      return;
-    }
-
-    // Add password validation check
-    if (!validatePassword(formData.password1)) {
-      setSignupError(
-        "Password must be at least 8 characters and contain uppercase, lowercase, number and special characters"
-      );
       shakeError();
       return;
     }
@@ -147,8 +120,6 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
     const payload = {
       username: formData.username,
       email: formData.email,
-      first_name: formData.first_name,
-      last_name: formData.last_name,
       password1: formData.password1,
       password2: formData.password2,
     };
@@ -240,26 +211,6 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
                 style={styles.inputIcon}
               />
             )}
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="First Name"
-              placeholderTextColor="#888888"
-              value={formData.first_name}
-              onChangeText={(value) => handleChange("first_name", value)}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Last Name"
-              placeholderTextColor="#888888"
-              value={formData.last_name}
-              onChangeText={(value) => handleChange("last_name", value)}
-            />
           </View>
 
           <View style={styles.inputContainer}>

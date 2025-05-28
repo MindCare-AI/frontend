@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, Animated } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CommonActions } from '@react-navigation/native';
 
 // Import onboarding components
 import UserTypeSelection from '../../components/Onboarding/UserTypeSelection';
@@ -25,14 +28,14 @@ type OnboardingStep =
 
 interface EnhancedOnboardingScreenProps {
   onNext: () => void;
-  onBack: () => void;
+  onBack?: () => void; // Make onBack optional since we won't use it after welcome
 }
 
 const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({ 
   onNext, 
   onBack 
 }) => {
-  const navigation = useNavigation();
+  const { accessToken, updateUserRole } = useAuth();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('userType');
   const [userType, setUserTypeState] = useState<'patient' | 'therapist' | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -73,7 +76,13 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
   const handleUserTypeSelect = async (selectedUserType: 'patient' | 'therapist') => {
     try {
       console.log('Setting user type:', selectedUserType);
-      await setUserType(selectedUserType);
+      console.log('Current access token:', accessToken ? 'Available' : 'Not available');
+      
+      // Use the updateUserRole from AuthContext which already handles the API call
+      await updateUserRole(selectedUserType);
+      
+      console.log('User role updated successfully');
+      
       setUserTypeState(selectedUserType);
       
       // Reload user data to get profile_id
@@ -86,11 +95,14 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
       }
     } catch (error) {
       console.error('Error setting user type:', error);
+      // Handle error appropriately - maybe show an alert
     }
   };
 
   const handleBackNavigation = () => {
     switch (currentStep) {
+      case 'userType':
+        return;
       case 'patientPersonalInfo':
       case 'therapistBasicInfo':
         setCurrentStep('userType');
@@ -108,8 +120,23 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
         setCurrentStep('therapistBasicInfo');
         break;
       default:
-        onBack();
-        break;
+        return;
+    }
+  };
+
+  const handleComplete = async () => {
+    try {
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'App' as never }],
+        })
+      );
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Fallback to onNext
+      onNext();
     }
   };
 
@@ -119,7 +146,7 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
         return (
           <UserTypeSelection
             onSelect={handleUserTypeSelect}
-            onBack={onBack}
+            onBack={() => {}} // Provide empty function to disable back
           />
         );
 
@@ -127,7 +154,7 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
         return (
           <PatientPersonalInfo
             onNext={() => setCurrentStep('patientProfilePicture')}
-            onBack={handleBackNavigation}
+            onBack={() => {}} // Or remove this line entirely
             currentUser={currentUser}
           />
         );
@@ -153,7 +180,7 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
       case 'patientGoals':
         return (
           <PatientWellnessGoals
-            onNext={onNext}
+            onNext={handleComplete} // Change this to handleComplete
             onBack={handleBackNavigation}
           />
         );

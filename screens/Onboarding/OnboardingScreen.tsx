@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef  } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Import all onboarding components
 import WelcomeSlideScreen from './WelcomeSlideScreen';
@@ -18,6 +19,7 @@ import PatientBasicInfo from '../../components/Onboarding/PatientBasicInfo';
 import PatientWellnessGoals from '../../components/Onboarding/PatientWellnessGoals';
 import TherapistVerificationIntro from '../../components/Onboarding/TherapistVerificationIntro';
 import OnboardingProgress from '../../components/Onboarding/OnboardingProgress';
+import PatientProfilePicture from '../../components/Onboarding/PatientProfilePicture';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +28,7 @@ type OnboardingStep =
   | 'enhanced'
   | 'userType'
   | 'patientBasic'
+  | 'patientProfilePicture'
   | 'patientGoals'
   | 'therapistVerification'
   | 'complete';
@@ -47,13 +50,14 @@ const markOnboardingComplete = async (): Promise<void> => {
 
 const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { updateUserRole } = useAuth();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const getStepsForUserType = (userType: 'patient' | 'therapist'): OnboardingStep[] => {
     if (userType === 'patient') {
-      return ['welcome', 'userType', 'patientBasic', 'patientGoals', 'complete'];
+      return ['welcome', 'userType', 'patientBasic', 'patientProfilePicture', 'patientGoals', 'complete'];
     } else {
       return ['welcome', 'userType', 'therapistVerification', 'complete'];
     }
@@ -93,6 +97,31 @@ const OnboardingScreen: React.FC = () => {
     });
   };
 
+  const handleUserTypeSelect = async (selectedUserType: 'patient' | 'therapist') => {
+    try {
+      console.log('Setting user type:', selectedUserType);
+      
+      // Uncommented the API call
+      await updateUserRole(selectedUserType);
+      
+      console.log('User role updated successfully');
+      
+      // Update local state
+      setOnboardingData(prev => ({ ...prev, userType: selectedUserType }));
+      
+      // Navigate to next step
+      animateToNext();
+      if (selectedUserType === 'patient') {
+        setCurrentStep('patientBasic');
+      } else {
+        setCurrentStep('therapistVerification');
+      }
+    } catch (error) {
+      console.error('Error setting user type:', error);
+      // Handle error appropriately - maybe show an alert
+    }
+  };
+
   const handleNext = async (stepData?: any) => {
     animateToNext();
 
@@ -101,13 +130,9 @@ const OnboardingScreen: React.FC = () => {
         setCurrentStep('userType');
         break;
       case 'userType':
+        // This case is now handled by handleUserTypeSelect
         if (stepData?.userType) {
-          setOnboardingData(prev => ({ ...prev, userType: stepData.userType }));
-          if (stepData.userType === 'patient') {
-            setCurrentStep('patientBasic');
-          } else {
-            setCurrentStep('therapistVerification');
-          }
+          await handleUserTypeSelect(stepData.userType);
         }
         break;
       case 'patientBasic':
@@ -115,6 +140,9 @@ const OnboardingScreen: React.FC = () => {
           ...prev, 
           patientData: { ...prev.patientData, ...stepData }
         }));
+        setCurrentStep('patientProfilePicture');
+        break;
+      case 'patientProfilePicture':
         setCurrentStep('patientGoals');
         break;
       case 'patientGoals':
@@ -142,8 +170,11 @@ const OnboardingScreen: React.FC = () => {
       case 'patientBasic':
         setCurrentStep('userType');
         break;
-      case 'patientGoals':
+      case 'patientProfilePicture':
         setCurrentStep('patientBasic');
+        break;
+      case 'patientGoals':
+        setCurrentStep('patientProfilePicture');
         break;
       case 'therapistVerification':
         setCurrentStep('userType');
@@ -159,7 +190,7 @@ const OnboardingScreen: React.FC = () => {
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
-          routes: [{ name: 'MainApp' as never }],
+          routes: [{ name: 'App' as never }], // Changed from 'MainApp' to 'App'
         })
       );
     } catch (error) {
@@ -191,7 +222,7 @@ const OnboardingScreen: React.FC = () => {
         return (
           <Animated.View style={[styles.stepContainer, animatedStyle]}>
             <UserTypeSelection 
-              onSelect={(userType) => handleNext({ userType })}
+              onSelect={handleUserTypeSelect}
               onBack={handleBack}
             />
           </Animated.View>
@@ -201,6 +232,15 @@ const OnboardingScreen: React.FC = () => {
         return (
           <Animated.View style={[styles.stepContainer, animatedStyle]}>
             <PatientBasicInfo 
+              onNext={handleNext}
+            />
+          </Animated.View>
+        );
+
+      case 'patientProfilePicture':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <PatientProfilePicture 
               onNext={handleNext}
               onBack={handleBack}
             />

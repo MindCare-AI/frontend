@@ -11,7 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../contexts/AuthContext';
 import { TextInput, Button, HelperText, RadioButton, IconButton } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -29,8 +30,10 @@ import { globalStyles } from '../../styles/global';
 import { SettingsStackParamList } from '../../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 
+type NavigationProp = NativeStackNavigationProp<SettingsStackParamList>;
+
 const PatientProfileScreen = () => {
-  const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
+  const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

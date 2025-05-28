@@ -393,26 +393,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserRole = async (role: 'patient' | 'therapist') => {
     try {
-      setUser(prev => {
-        if (!prev) return null;
+      if (!authState.accessToken) {
+        throw new Error('No access token available');
+      }
 
-        return {
-          ...prev,
-          user_type: role
-        };
-      });
-
-      await axios.post(
+      // Make the API call to set user type
+      const response = await axios.post(
         `${API_URL}/users/set-user-type/`,
         { user_type: role },
         {
           headers: {
-            Authorization: `Bearer ${authState.accessToken}`
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authState.accessToken}`
           }
         }
       );
 
+      console.log('User role updated successfully:', response.data);
+
+      // Update local user state
+      setUser(prev => {
+        if (!prev) return null;
+        const updatedUser = {
+          ...prev,
+          user_type: role
+        };
+        // Store updated user data
+        AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+        return updatedUser;
+      });
+
+      // Fetch fresh user data to ensure consistency
       await fetchUserData();
+
     } catch (error) {
       console.error('Error updating user role:', error);
       throw error;
