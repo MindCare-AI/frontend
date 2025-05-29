@@ -18,6 +18,7 @@ import UserTypeSelection from '../../components/Onboarding/UserTypeSelection';
 import PatientBasicInfo from '../../components/Onboarding/PatientBasicInfo';
 import PatientWellnessGoals from '../../components/Onboarding/PatientWellnessGoals';
 import TherapistVerificationIntro from '../../components/Onboarding/TherapistVerificationIntro';
+import TherapistBasicInfo from '../../components/Onboarding/TherapistBasicInfo';
 import OnboardingProgress from '../../components/Onboarding/OnboardingProgress';
 import PatientProfilePicture from '../../components/Onboarding/PatientProfilePicture';
 
@@ -31,6 +32,7 @@ type OnboardingStep =
   | 'patientProfilePicture'
   | 'patientGoals'
   | 'therapistVerification'
+  | 'therapistBasic'
   | 'complete';
 
 interface OnboardingData {
@@ -59,7 +61,7 @@ const OnboardingScreen: React.FC = () => {
     if (userType === 'patient') {
       return ['welcome', 'userType', 'patientBasic', 'patientProfilePicture', 'patientGoals', 'complete'];
     } else {
-      return ['welcome', 'userType', 'therapistVerification', 'complete'];
+      return ['welcome', 'userType', 'therapistVerification', 'therapistBasic', 'complete'];
     }
   };
 
@@ -101,10 +103,9 @@ const OnboardingScreen: React.FC = () => {
     try {
       console.log('Setting user type:', selectedUserType);
       
-      // Uncommented the API call
+      // Update user role for both patient and therapist users
       await updateUserRole(selectedUserType);
-      
-      console.log('User role updated successfully');
+      console.log(`User role updated successfully to: ${selectedUserType}`);
       
       // Update local state
       setOnboardingData(prev => ({ ...prev, userType: selectedUserType }));
@@ -153,6 +154,13 @@ const OnboardingScreen: React.FC = () => {
         await handleComplete();
         break;
       case 'therapistVerification':
+        setCurrentStep('therapistBasic');
+        break;
+      case 'therapistBasic':
+        setOnboardingData(prev => ({ 
+          ...prev, 
+          therapistData: { ...prev.therapistData, ...stepData }
+        }));
         await handleComplete();
         break;
       default:
@@ -179,9 +187,18 @@ const OnboardingScreen: React.FC = () => {
       case 'therapistVerification':
         setCurrentStep('userType');
         break;
+      case 'therapistBasic':
+        setCurrentStep('therapistVerification');
+        break;
       default:
         break;
     }
+  };
+
+  // Add skip handler for therapist verification
+  const handleSkipVerification = () => {
+    animateToNext();
+    setCurrentStep('therapistBasic');
   };
 
   const handleComplete = async () => {
@@ -211,13 +228,6 @@ const OnboardingScreen: React.FC = () => {
           </Animated.View>
         );
 
-      case 'enhanced':
-        return (
-          <Animated.View style={[styles.stepContainer, animatedStyle]}>
-            <EnhancedOnboardingScreen onNext={handleNext} onBack={handleBack} />
-          </Animated.View>
-        );
-
       case 'userType':
         return (
           <Animated.View style={[styles.stepContainer, animatedStyle]}>
@@ -233,6 +243,7 @@ const OnboardingScreen: React.FC = () => {
           <Animated.View style={[styles.stepContainer, animatedStyle]}>
             <PatientBasicInfo 
               onNext={handleNext}
+              onBack={handleBack}
             />
           </Animated.View>
         );
@@ -261,10 +272,21 @@ const OnboardingScreen: React.FC = () => {
         return (
           <Animated.View style={[styles.stepContainer, animatedStyle]}>
             <TherapistVerificationIntro 
-              onNext={handleComplete}
+              onNext={handleNext}
               onBack={handleBack}
+              onSkip={handleSkipVerification}
             />
           </Animated.View>
+        );
+
+      // For the therapistBasic case, make it a direct ScrollView without the animation wrapper
+      case 'therapistBasic':
+        return (
+          <TherapistBasicInfo 
+            onNext={handleNext}
+            onBack={handleBack}
+            currentUser={onboardingData?.therapistData}
+          />
         );
 
       default:
@@ -285,6 +307,7 @@ const OnboardingScreen: React.FC = () => {
   );
 };
 
+// Update the styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -292,10 +315,13 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+    overflow: 'visible',
   },
   stepContainer: {
     flex: 1,
+    width: width,
+    overflow: 'visible',
   },
-});
 
+});
 export default OnboardingScreen;

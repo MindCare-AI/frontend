@@ -5,9 +5,10 @@ import { Shield, FileText, User } from 'lucide-react-native';
 interface TherapistVerificationIntroProps {
   onNext: () => void;
   onBack: () => void;
+  onSkip: () => void;
 }
 
-const TherapistVerificationIntro: React.FC<TherapistVerificationIntroProps> = ({ onNext, onBack }) => {
+const TherapistVerificationIntro: React.FC<TherapistVerificationIntroProps> = ({ onNext, onBack, onSkip }) => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
@@ -47,6 +48,9 @@ const TherapistVerificationIntro: React.FC<TherapistVerificationIntroProps> = ({
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
           <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+          <Text style={styles.skipButtonText}>Skip for Now</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.nextButton} onPress={onNext}>
           <Text style={styles.nextButtonText}>Start Verification</Text>
@@ -116,7 +120,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: 15,
+    gap: 10,
   },
   backButton: {
     flex: 1,
@@ -129,7 +133,19 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#002D62',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
+  },
+  skipButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#E0E0E0',
+  },
+  skipButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   nextButton: {
     flex: 1,
@@ -141,7 +157,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
   },
 });
 
