@@ -173,7 +173,7 @@ interface UserData {
  * Fetches the current user's data from the API
  * @returns Promise with user data including therapist profile if available
  */
-const getCurrentUserData = async (): Promise<UserData> => {
+export const getCurrentUserData = async (): Promise<UserData> => {
   const token = await AsyncStorage.getItem('accessToken');
   if (!token) {
     throw new Error('Authentication token not found');
@@ -301,6 +301,46 @@ export const updateTherapistProfile = async (profileData: Partial<TherapistProfi
     return mapBackendToFrontend(response.data) as TherapistProfile;
   } catch (error) {
     console.error('Error updating therapist profile:', error);
+    handleApiError(error);
+    throw error;
+  }
+};
+
+/**
+ * Update specific fields of therapist profile for the current user using PATCH
+ * This allows for partial updates without affecting other fields
+ */
+export const updateTherapistProfilePartial = async (profileData: Partial<TherapistProfile>): Promise<TherapistProfile> => {
+  try {
+    const token = await AsyncStorage.getItem('accessToken');
+    const userData = await getCurrentUserData();
+    
+    if (!userData.therapist_profile?.id) {
+      throw new Error('No therapist profile ID found for current user');
+    }
+    
+    const profileId = userData.therapist_profile.id;
+    
+    // Map frontend fields to backend fields
+    const mappedData = mapFrontendToBackend(profileData);
+    
+    console.log('Sending partial profile update with data:', JSON.stringify(mappedData, null, 2));
+    
+    const response = await axios.patch<TherapistProfile>(
+      `${API_URL}/therapist/profiles/${profileId}/`, 
+      mappedData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    // Map the response back to frontend fields
+    return mapBackendToFrontend(response.data) as TherapistProfile;
+  } catch (error) {
+    console.error('Error updating therapist profile partially:', error);
     handleApiError(error);
     throw error;
   }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { User, Phone } from 'lucide-react-native';
-import { updatePatientProfile } from '../../utils/onboardingAPI';
+import { updatePatientProfile, PatientProfile } from '../../API/settings/patient_profile';
 
 interface PatientPersonalData {
   first_name: string;
@@ -18,9 +18,9 @@ interface PatientPersonalInfoProps {
 
 const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBack, currentUser }) => {
   const [formData, setFormData] = useState<PatientPersonalData>({
-    first_name: currentUser?.first_name || '',
-    last_name: currentUser?.last_name || '',
-    phone_number: currentUser?.phone_number || '',
+    first_name: '',
+    last_name: '',
+    phone_number: '',
     gender: 'N',
   });
 
@@ -31,11 +31,19 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
     }
 
     try {
-      if (currentUser?.profile_id) {
-        console.log('Saving patient personal info:', formData);
-        await updatePatientProfile(currentUser.profile_id, formData);
-        console.log('Patient personal info saved successfully');
-      }
+      console.log('Updating patient profile with:', formData);
+      
+      // Create update payload with only the fields we're updating
+      const updateData: Partial<PatientProfile> = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone_number: formData.phone_number,
+        gender: formData.gender,
+      };
+      
+      const updatedProfile = await updatePatientProfile(updateData);
+      console.log('Patient profile updated successfully:', updatedProfile);
+      
       onNext(formData);
     } catch (error) {
       console.error('Error updating patient profile:', error);
@@ -113,9 +121,6 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
             <Text style={styles.nextButtonText}>Continue</Text>
           </TouchableOpacity>
@@ -203,19 +208,6 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     gap: 15,
-  },
-  backButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#002D62',
-  },
-  backButtonText: {
-    color: '#002D62',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   nextButton: {
     flex: 1,

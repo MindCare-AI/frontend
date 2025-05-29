@@ -47,7 +47,12 @@ const getCurrentUserId = async (): Promise<string> => {
     }
   });
   
+  console.log('getCurrentUserId response:', JSON.stringify(response.data, null, 2));
+  console.log('Response status:', response.status);
+  console.log('Response headers:', response.headers);
+  
   if (!response.data.profile_id) {
+    console.error('profile_id not found in response. Available fields:', Object.keys(response.data));
     throw new Error('User ID not found in response');
   }
   

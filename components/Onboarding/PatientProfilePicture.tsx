@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from 'react-native';
 import { Camera, Upload, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadPatientProfilePicture } from '../../utils/onboardingAPI';
+import { uploadPatientProfilePicture } from '../../API/settings/patient_profile';
 
 interface PatientProfilePictureProps {
   onNext: () => void;
@@ -14,7 +14,141 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Web-specific file input handler
+  const handleWebFileInput = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.capture = 'environment'; // This enables camera on mobile web
+      
+      input.onchange = (event: any) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            setProfileImage(e.target?.result as string);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      
+      input.click();
+    }
+  };
+
+  // Web camera capture (using getUserMedia)
+  const handleWebCamera = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        // Check if getUserMedia is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          Alert.alert('Not Supported', 'Camera is not supported on this browser');
+          return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } // Front camera
+        });
+        
+        // Create video element
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+        
+        // Create canvas for capture
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Create a modal or overlay for camera preview
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.8);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+        `;
+        
+        video.style.cssText = `
+          width: 300px;
+          height: 300px;
+          object-fit: cover;
+          border-radius: 50%;
+          border: 3px solid white;
+        `;
+        
+        const captureBtn = document.createElement('button');
+        captureBtn.textContent = 'Capture';
+        captureBtn.style.cssText = `
+          margin-top: 20px;
+          padding: 10px 20px;
+          background: #002D62;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        `;
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.cssText = `
+          margin-top: 10px;
+          padding: 10px 20px;
+          background: #ccc;
+          color: black;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        `;
+        
+        overlay.appendChild(video);
+        overlay.appendChild(captureBtn);
+        overlay.appendChild(cancelBtn);
+        document.body.appendChild(overlay);
+        
+        captureBtn.onclick = () => {
+          canvas.width = 300;
+          canvas.height = 300;
+          ctx?.drawImage(video, 0, 0, 300, 300);
+          
+          const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+          setProfileImage(dataURL);
+          
+          // Cleanup
+          stream.getTracks().forEach(track => track.stop());
+          document.body.removeChild(overlay);
+        };
+        
+        cancelBtn.onclick = () => {
+          stream.getTracks().forEach(track => track.stop());
+          document.body.removeChild(overlay);
+        };
+        
+      } catch (error) {
+        console.error('Camera error:', error);
+        Alert.alert('Camera Error', 'Unable to access camera. Please try uploading a file instead.');
+      }
+    }
+  };
+
   const pickImage = async (useCamera: boolean = false) => {
+    if (Platform.OS === 'web') {
+      if (useCamera) {
+        await handleWebCamera();
+      } else {
+        handleWebFileInput();
+      }
+      return;
+    }
+
+    // Mobile implementation (existing code)
     try {
       let result;
       if (useCamera) {
@@ -46,10 +180,33 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
   };
 
   const handleNext = async () => {
-    if (profileImage && currentUser?.profile_id) {
+    if (profileImage) {
       try {
         setUploading(true);
-        await uploadPatientProfilePicture(currentUser.profile_id, profileImage);
+        
+        let imageData;
+        
+        if (Platform.OS === 'web') {
+          // For web, convert data URL to blob
+          const response = await fetch(profileImage);
+          const blob = await response.blob();
+          
+          imageData = {
+            uri: profileImage,
+            fileName: 'profile.jpg',
+            mimeType: 'image/jpeg',
+            blob: blob // Include blob for web
+          };
+        } else {
+          // Mobile implementation
+          imageData = {
+            uri: profileImage,
+            fileName: 'profile.jpg',
+            mimeType: 'image/jpeg'
+          };
+        }
+        
+        await uploadPatientProfilePicture(imageData);
         console.log('Profile picture uploaded successfully');
       } catch (error) {
         console.error('Error uploading profile picture:', error);
@@ -88,12 +245,16 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
         <View style={styles.buttonGroup}>
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(true)}>
             <Camera size={20} color="#002D62" />
-            <Text style={styles.actionButtonText}>Take Photo</Text>
+            <Text style={styles.actionButtonText}>
+              {Platform.OS === 'web' ? 'Use Camera' : 'Take Photo'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(false)}>
             <Upload size={20} color="#002D62" />
-            <Text style={styles.actionButtonText}>Choose from Gallery</Text>
+            <Text style={styles.actionButtonText}>
+              {Platform.OS === 'web' ? 'Upload File' : 'Choose from Gallery'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

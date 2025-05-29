@@ -7,36 +7,35 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { Calendar, User, Phone, Mail } from 'lucide-react-native';
-import { updatePatientProfile } from '../../utils/onboardingAPI';
+import { User, Phone } from 'lucide-react-native';
+import { updatePatientProfile } from '../../API/settings/patient_profile';
 
 interface PatientBasicData {
   first_name: string;
   last_name: string;
-  email: string;
   phone_number: string;
-  date_of_birth: string;
+  gender: 'M' | 'F' | 'O' | 'N';
 }
 
 interface PatientBasicInfoProps {
   onNext: (data: PatientBasicData) => void;
-  onBack: () => void;
+  onBack?: () => void; // Make onBack optional
   currentUser?: any;
 }
 
 const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({ 
-  onNext, 
-  onBack, 
-  currentUser 
+  onNext,
+  onBack 
 }) => {
   const [formData, setFormData] = useState<PatientBasicData>({
-    first_name: currentUser?.first_name || '',
-    last_name: currentUser?.last_name || '',
-    email: currentUser?.email || '',
-    phone_number: currentUser?.phone_number || '',
-    date_of_birth: '',
+    first_name: '',
+    last_name: '',
+    phone_number: '',
+    gender: 'N',
   });
+  const [loading, setLoading] = useState(false);
 
   const handleNext = async () => {
     // Basic validation
@@ -46,15 +45,17 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
     }
 
     try {
-      if (currentUser?.profile_id) {
-        console.log('Saving patient data:', formData);
-        await updatePatientProfile(currentUser.profile_id, formData);
-        console.log('Patient data saved successfully');
-      }
+      setLoading(true);
+      
+      // Update patient profile with form data
+      await updatePatientProfile(formData);
+      
+      setLoading(false);
       onNext(formData);
     } catch (error) {
       console.error('Error updating patient profile:', error);
       Alert.alert('Error', 'Failed to save your information. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -90,17 +91,6 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
           </View>
 
           <View style={styles.inputGroup}>
-            <Mail size={20} color="#002D62" />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={formData.email}
-              onChangeText={(text) => updateField('email', text)}
-              keyboardType="email-address"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
             <Phone size={20} color="#002D62" />
             <TextInput
               style={styles.input}
@@ -111,23 +101,47 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Calendar size={20} color="#002D62" />
-            <TextInput
-              style={styles.input}
-              placeholder="Date of Birth (YYYY-MM-DD)"
-              value={formData.date_of_birth}
-              onChangeText={(text) => updateField('date_of_birth', text)}
-            />
+          <Text style={styles.genderLabel}>Gender *</Text>
+          <View style={styles.genderOptions}>
+            {[
+              { key: 'M', label: 'Male' },
+              { key: 'F', label: 'Female' },
+              { key: 'O', label: 'Other' },
+              { key: 'N', label: 'Prefer not to say' }
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.genderOption,
+                  formData.gender === option.key && styles.selectedGender
+                ]}
+                onPress={() => updateField('gender', option.key as 'M' | 'F' | 'O' | 'N')}
+              >
+                <Text style={[
+                  styles.genderText,
+                  formData.gender === option.key && styles.selectedGenderText
+                ]}>{option.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Continue</Text>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={[styles.nextButton, loading && styles.disabledButton]} 
+            onPress={handleNext}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.nextButtonText}>Continue</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -139,9 +153,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#E4F0F6',
-  },
-  scrollView: {
-    flex: 1,
   },
   content: {
     padding: 30,
@@ -181,19 +192,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 15,
   },
-  backButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#002D62',
-  },
-  backButtonText: {
-    color: '#002D62',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
   nextButton: {
     flex: 1,
     paddingVertical: 16,
@@ -201,10 +199,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#002D62',
   },
+  backButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#002D62',
+  },
+  disabledButton: {
+    backgroundColor: '#9FB1C7',
+  },
   nextButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  backButtonText: {
+    color: '#002D62',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  genderLabel: {
+    fontSize: 16,
+    color: '#002D62',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  genderOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  genderOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f8f8f8',
+  },
+  selectedGender: {
+    backgroundColor: '#002D62',
+    borderColor: '#002D62',
+  },
+  genderText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedGenderText: {
+    color: '#fff',
   },
 });
 

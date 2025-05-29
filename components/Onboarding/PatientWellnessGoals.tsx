@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Heart, Brain, Users, Target } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
 
 interface WellnessGoal {
   id: string;
@@ -43,6 +46,8 @@ const wellnessGoals: WellnessGoal[] = [
 
 const PatientWellnessGoals: React.FC<PatientWellnessGoalsProps> = ({ onNext, onBack }) => {
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigation = useNavigation();
 
   const toggleGoal = (goalId: string) => {
     setSelectedGoals(prev => 
@@ -52,9 +57,40 @@ const PatientWellnessGoals: React.FC<PatientWellnessGoalsProps> = ({ onNext, onB
     );
   };
 
-  const handleNext = () => {
-    // This is just a fake screen for user experience - no data saving
-    onNext();
+  const markOnboardingComplete = async (): Promise<void> => {
+    try {
+      await AsyncStorage.setItem('onboarding_completed', 'true');
+    } catch (error) {
+      console.error('Error marking onboarding complete:', error);
+      throw error;
+    }
+  };
+
+  const handleNext = async () => {
+    setIsLoading(true);
+    try {
+      // Save selected goals to storage or send to API
+      if (selectedGoals.length > 0) {
+        await AsyncStorage.setItem('wellness_goals', JSON.stringify(selectedGoals));
+      }
+
+      // Mark onboarding as complete
+      await markOnboardingComplete();
+
+      // Navigate to the main app
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'App' as never }],
+        })
+      );
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Fallback to onNext if navigation fails
+      onNext();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -95,8 +131,14 @@ const PatientWellnessGoals: React.FC<PatientWellnessGoalsProps> = ({ onNext, onB
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>Continue</Text>
+          <TouchableOpacity 
+            style={[styles.nextButton, isLoading && styles.disabledButton]} 
+            onPress={handleNext}
+            disabled={isLoading}
+          >
+            <Text style={styles.nextButtonText}>
+              {isLoading ? 'Completing...' : 'Continue'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -196,6 +238,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  disabledButton: {
+    backgroundColor: '#999',
   },
 });
 

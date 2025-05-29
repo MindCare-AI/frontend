@@ -71,12 +71,6 @@ const UserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect, onBack 
           ))}
         </View>
       </View>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -151,22 +145,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
-  },
-  buttonContainer: {
-    paddingHorizontal: 30,
-    paddingVertical: 20,
-  },
-  backButton: {
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#002D62',
-  },
-  backButtonText: {
-    color: '#002D62',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
 });
 
