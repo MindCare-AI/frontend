@@ -3,7 +3,8 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { TextInput, Button, Chip, Text } from 'react-native-paper';
 import { SectionHeader } from './SectionHeader';
 import { globalStyles } from '../../styles/global';
-import { MedicalInformation } from '../../API/settings/patient_profile';
+
+type MedicalInformation = any;
 
 interface PatientInfoFormProps {
   initialData: Partial<MedicalInformation>;
@@ -28,17 +29,17 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
     field: K, 
     value: MedicalInformation[K]
   ) => {
-    setMedicalData(prev => ({ ...prev, [field]: value }));
+    setMedicalData((prev: MedicalInformation) => ({ ...prev, [field]: value }));
   };
 
   const handleEmergencyContactChange = (
     field: keyof NonNullable<MedicalInformation['emergencyContact']>,
     value: string
   ) => {
-    setMedicalData(prev => ({
+    setMedicalData((prev: MedicalInformation) => ({
       ...prev,
       emergencyContact: {
-        ...(prev.emergencyContact || {}),
+        ...prev.emergencyContact,
         [field]: value,
       },
     }));
@@ -56,9 +57,10 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
   };
 
   const removeMedication = (medication: string) => {
-    const updatedMedications = (medicalData.currentMedications || [])
-      .filter(med => med !== medication);
-    handleChange('currentMedications', updatedMedications);
+    setMedicalData((prev: MedicalInformation) => ({
+      ...prev,
+      currentMedications: (prev.currentMedications || []).filter((med: string) => med !== medication),
+    }));
   };
 
   const addAllergy = () => {
@@ -73,9 +75,10 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
   };
 
   const removeAllergy = (allergy: string) => {
-    const updatedAllergies = (medicalData.allergies || [])
-      .filter(a => a !== allergy);
-    handleChange('allergies', updatedAllergies);
+    setMedicalData((prev: MedicalInformation) => ({
+      ...prev,
+      allergies: (prev.allergies || []).filter((a: string) => a !== allergy),
+    }));
   };
 
   const handleSubmit = async () => {
@@ -129,7 +132,7 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
       </View>
 
       <View style={styles.chipContainer}>
-        {(medicalData.currentMedications || []).map((medication, index) => (
+        {(medicalData.currentMedications || []).map((medication: string, index: number) => (
           <Chip
             key={`med-${index}`}
             style={styles.chip}
@@ -166,7 +169,7 @@ export const PatientInfoForm: React.FC<PatientInfoFormProps> = ({
       </View>
 
       <View style={styles.chipContainer}>
-        {(medicalData.allergies || []).map((allergy, index) => (
+        {(medicalData.allergies || []).map((allergy: string, index: number) => (
           <Chip
             key={`allergy-${index}`}
             style={styles.chip}

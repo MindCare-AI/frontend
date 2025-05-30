@@ -7,16 +7,17 @@
       "dom",
       "es2017"
     ],
-    "moduleResolution": "node16",
+    "moduleResolution": "bundler",
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "strict": true,
     "esModuleInterop": true,
     "target": "es2017",
-    "module": "Node16",
+    "module": "esnext",
     "allowJs": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "customConditions": ["react-native"]
   },
   "include": [
     "**/*.ts",

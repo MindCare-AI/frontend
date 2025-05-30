@@ -1,0 +1,235 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import {
+  fetchJournalEntries,
+  fetchJournalEntry,
+  createJournalEntry,
+  updateJournalEntry,
+  deleteJournalEntry,
+  shareJournalEntry,
+  fetchJournalStatistics
+} from '../API/journal';
+import { JournalFilterParams, JournalStatistics, ShareResponse } from '../types/journal';
+import type { JournalEntry } from '../types/Journal';
+
+interface JournalContextType {
+  entries: JournalEntry[];
+  currentEntry: JournalEntry | null;
+  statistics: JournalStatistics | null;
+  loading: boolean;
+  error: string | null;
+  filterParams: JournalFilterParams;
+  
+  // Actions
+  fetchEntries: (filters?: JournalFilterParams) => Promise<void>;
+  fetchEntry: (id: number) => Promise<JournalEntry>;
+  addEntry: (entry: Partial<JournalEntry>) => Promise<JournalEntry>;
+  editEntry: (id: number, entry: Partial<JournalEntry>) => Promise<JournalEntry>;
+  removeEntry: (id: number) => Promise<void>;
+  shareEntry: (id: number) => Promise<ShareResponse>;
+  fetchStats: () => Promise<void>;
+  setFilters: (filters: JournalFilterParams) => void;
+}
+
+const JournalContext = createContext<JournalContextType | undefined>(undefined);
+
+export const useJournal = () => {
+  const context = useContext(JournalContext);
+  if (!context) {
+    throw new Error('useJournal must be used within a JournalProvider');
+  }
+  return context;
+};
+
+interface JournalProviderProps {
+  children: ReactNode;
+}
+
+export const JournalProvider: React.FC<JournalProviderProps> = ({ children }) => {
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
+  const [statistics, setStatistics] = useState<JournalStatistics | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filterParams, setFilterParams] = useState<JournalFilterParams>({});
+
+  // Fetch all journal entries with optional filters
+  const fetchEntries = useCallback(async (filters?: JournalFilterParams) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const newFilters = filters || filterParams;
+      setFilterParams(newFilters);
+      const data = await fetchJournalEntries(newFilters);
+      setEntries(data);
+    } catch (err: any) {
+      console.error('Error fetching journal entries:', err);
+      setError(err.message || 'Failed to fetch journal entries');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [filterParams]);
+
+  // Fetch a specific journal entry by ID
+  const fetchEntry = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchJournalEntry(id);
+      setCurrentEntry(data);
+      return data;
+    } catch (err: any) {
+      console.error(`Error fetching journal entry ${id}:`, err);
+      setError(err.message || 'Failed to fetch journal entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Create a new journal entry
+  const addEntry = useCallback(async (entry: Partial<JournalEntry>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const newEntry = await createJournalEntry(entry);
+      setEntries((prev) => [newEntry, ...prev]);
+      return newEntry;
+    } catch (err: any) {
+      console.error('Error creating journal entry:', err);
+      setError(err.message || 'Failed to create journal entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Update an existing journal entry
+  const editEntry = useCallback(async (id: number, entry: Partial<JournalEntry>) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const updatedEntry = await updateJournalEntry(id, entry);
+      
+      setEntries(prev => 
+        prev.map(item => item.id === id ? updatedEntry : item)
+      );
+      
+      if (currentEntry && currentEntry.id === id) {
+        setCurrentEntry(updatedEntry);
+      }
+      
+      return updatedEntry;
+    } catch (err: any) {
+      console.error(`Error updating journal entry ${id}:`, err);
+      setError(err.message || 'Failed to update journal entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [currentEntry]);
+
+  // Delete a journal entry
+  const removeEntry = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await deleteJournalEntry(id);
+      
+      setEntries(prev => prev.filter(entry => entry.id !== id));
+      
+      if (currentEntry && currentEntry.id === id) {
+        setCurrentEntry(null);
+      }
+    } catch (err: any) {
+      console.error(`Error deleting journal entry ${id}:`, err);
+      setError(err.message || 'Failed to delete journal entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [currentEntry]);
+
+  // Share a journal entry with therapist
+  const shareEntry = useCallback(async (id: number): Promise<ShareResponse> => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await shareJournalEntry(id);
+      
+      // Update the entry in our state to reflect shared status
+      setEntries(prev => 
+        prev.map(entry => entry.id === id ? { 
+          ...entry, 
+          shared_with_therapist: true 
+        } : entry)
+      );
+      
+      if (currentEntry && currentEntry.id === id) {
+        setCurrentEntry({
+          ...currentEntry,
+          shared_with_therapist: true
+        });
+      }
+      
+      return response;
+    } catch (err: any) {
+      console.error(`Error sharing journal entry ${id}:`, err);
+      setError(err.message || 'Failed to share journal entry');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [currentEntry]);
+
+  // Fetch journal statistics
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const stats = await fetchJournalStatistics();
+      setStatistics(stats);
+    } catch (err: any) {
+      console.error('Error fetching journal statistics:', err);
+      setError(err.message || 'Failed to fetch journal statistics');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Set filter parameters
+  const setFilters = useCallback((filters: JournalFilterParams) => {
+    setFilterParams(filters);
+  }, []);
+
+  // Fetch entries on mount and when filters change
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
+
+  const value = {
+    entries,
+    currentEntry,
+    statistics,
+    loading,
+    error,
+    filterParams,
+    fetchEntries,
+    fetchEntry,
+    addEntry,
+    editEntry,
+    removeEntry,
+    shareEntry,
+    fetchStats,
+    setFilters
+  };
+
+  return (
+    <JournalContext.Provider value={value}>
+      {children}
+    </JournalContext.Provider>
+  );
+};
+
+export default JournalProvider;

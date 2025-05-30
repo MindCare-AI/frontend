@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Platform, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useToast } from "../../contexts/feeds/ToastContext"
@@ -30,21 +30,11 @@ const PostActions: React.FC<PostActionsProps> = ({
   isSaved,
   onSaveToggle,
 }) => {
-  // Use colors matching HomeSettingsScreen
-  const homeScreenColors = {
-    primary: '#002D62', // Deep blue from HomeSettingsScreen
-    lightBlue: '#E4F0F6',
-    white: '#FFFFFF',
-    textDark: '#333',
-    textMedium: '#444',
-    borderColor: '#F0F0F0',
-    background: '#FFFFFF',
-  };
-
-  const { colors, isDark } = useTheme()
+  const { colors } = useTheme();
   const {toast} = useToast()
   const [showReactions, setShowReactions] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleReport = (reason: string) => {
     setShowReportModal(false)
@@ -131,61 +121,88 @@ const PostActions: React.FC<PostActionsProps> = ({
     )
   }
 
-  // Add action button styles with HomeScreen colors
-  const actionButtonStyle = {
-    backgroundColor: homeScreenColors.lightBlue,
-    borderColor: homeScreenColors.primary,
-    color: homeScreenColors.primary,
+  // Handle reaction toggle
+  const handleReactionToggle = async () => {
+    try {
+      setIsLoading(true);
+      const newReaction = userReaction ? null : 'like';
+      
+      // Call the API through the onReactionChange prop
+      await onReactionChange(newReaction);
+    } catch (error) {
+      console.error("Error toggling reaction:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const primaryButtonStyle = {
-    backgroundColor: homeScreenColors.primary,
-    color: homeScreenColors.white,
+  // Handle save toggle
+  const handleSaveToggle = () => {
+    onSaveToggle(!isSaved);
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: homeScreenColors.white }]}>
+    <View style={styles.container}>
       {renderReactionsPopup()}
 
       <View style={styles.actionsContainer}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => setShowReactions(true)}
-          onLongPress={() => onReactionChange(userReaction ? null : "like")}
+          onPress={handleReactionToggle}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Ionicons
+              name={userReaction ? "heart" : "heart-outline"}
+              size={24}
+              color={userReaction ? colors.danger : colors.text}
+            />
+          )}
+          {totalReactions > 0 && (
+            <Text style={[styles.actionText, { color: colors.text }]}>
+              {totalReactions}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={onCommentToggle}
         >
           <Ionicons
-            name="thumbs-up"
-            size={20}
-            color={userReaction ? colors.primary : colors.muted}
-            style={styles.actionIcon}
+            name="chatbubble-outline"
+            size={22}
+            color={colors.text}
           />
-          <Text style={[styles.actionText, { color: userReaction ? colors.primary : colors.muted }]}>
-            {totalReactions > 0 ? `${totalReactions} ` : ""}Like
-          </Text>
+          {commentsCount > 0 && (
+            <Text style={[styles.actionText, { color: colors.text }]}>
+              {commentsCount}
+            </Text>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={onCommentToggle}>
-          <Ionicons name="chatbubble-outline" size={20} color={colors.muted} style={styles.actionIcon} />
-          <Text style={[styles.actionText, { color: colors.muted }]}>
-            {commentsCount > 0 ? `${commentsCount} ` : ""}Comment
-          </Text>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={onShare}
+        >
+          <Ionicons
+            name="share-social-outline"
+            size={24}
+            color={colors.text}
+          />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={onShare}>
-          <Ionicons name="share-outline" size={20} color={colors.muted} style={styles.actionIcon} />
-          <Text style={[styles.actionText, { color: colors.muted }]}>Share</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton} onPress={() => onSaveToggle(!isSaved)}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={handleSaveToggle}
+        >
           <Ionicons
             name={isSaved ? "bookmark" : "bookmark-outline"}
-            size={20}
-            color={isSaved ? colors.success : colors.muted}
-            style={styles.actionIcon}
+            size={24}
+            color={colors.text}
           />
-          <Text style={[styles.actionText, { color: isSaved ? colors.success : colors.muted }]}>
-            {isSaved ? "Saved" : "Save"}
-          </Text>
         </TouchableOpacity>
       </View>
 
@@ -291,17 +308,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  actionIcon: {
-    marginRight: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
   },
   actionText: {
+    marginLeft: 4,
     fontSize: 14,
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,

@@ -279,7 +279,10 @@ const nativeStyleSheet = StyleSheet.create({
 // Combined styles (including web-specific)
 export const globalStyles = {
   ...nativeStyleSheet,
-  colors,
+  colors: {
+    ...colors,
+    textPlaceholder: colors.neutralMedium, // Add this for placeholders
+  },
   spacing,
   borderRadius,
   fonts,
@@ -292,6 +295,15 @@ export const globalStyles = {
   subtitle: fonts.subtitle,
   caption: fonts.caption,
   captionBold: fonts.captionBold,
+  title: {
+    fontSize: 22,
+    fontWeight: '600' as const,
+    color: colors.neutralDark,
+  },
+  bodyBold: {
+    ...fonts.body,
+    fontWeight: 'bold' as const,
+  },
   // Web-specific styles (if needed, adapt for React Native Web)
   container: {
     ...nativeStyleSheet.container,

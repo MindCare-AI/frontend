@@ -89,4 +89,4 @@ export interface FilterState {
   users: string[];
 }
 
-export type SortOption = 'newest' | 'most-viewed' | 'most-reactions';
+export type SortOption = 'newest' | 'most-viewed' | 'most-reactions' | 'popular';

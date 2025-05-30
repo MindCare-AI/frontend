@@ -27,8 +27,10 @@ interface ThemeColors {
   info: string
   muted: string
   highlight: string
-  error: string // Add this
-  white: string // Add this
+  error: string
+  white: string
+  textDark: string
+  textMedium: string
 }
 
 // Updated colors to match journaling theme (blue/white)
@@ -47,6 +49,8 @@ const lightColors: ThemeColors = {
   highlight: "#EDF2FF", // Light blue highlight
   error: "#D32F2F", // Add this - a standard error red
   white: "#FFFFFF", // Add this
+  textDark: "#333333",
+  textMedium: "#666666"
 }
 
 const darkColors: ThemeColors = {
@@ -64,6 +68,8 @@ const darkColors: ThemeColors = {
   highlight: "#2D3748", // Dark blue highlight
   error: "#EF5350", // Add this - a slightly lighter red for dark mode
   white: "#FFFFFF", // Add this
+  textDark: "#E2E8F0", 
+  textMedium: "#A0AEC0"
 }
 
 const ThemeContext = createContext<ThemeContextType>({

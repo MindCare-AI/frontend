@@ -88,7 +88,7 @@ export const UserAvatarCard: React.FC<UserAvatarCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: globalStyles.colors.card,
+    backgroundColor: globalStyles.colors.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,

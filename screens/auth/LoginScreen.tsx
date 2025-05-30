@@ -456,7 +456,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
           <View style={styles.inputContainer}>
             <TextInput
-              style={[styles.input, loginError && styles.inputError]}
+              style={[styles.input, loginError ? styles.inputError : undefined]}
               placeholder="Email Address"
               placeholderTextColor="#888888"
               keyboardType="email-address"
@@ -475,7 +475,7 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
 
           <View style={styles.inputContainer}>
             <TextInput
-              style={[styles.input, loginError && styles.inputError]}
+              style={[styles.input, loginError ? styles.inputError : undefined]}
               placeholder="Password"
               placeholderTextColor="#888888"
               secureTextEntry={!showPassword}
