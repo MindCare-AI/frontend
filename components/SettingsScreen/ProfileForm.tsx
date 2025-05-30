@@ -38,11 +38,11 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({
     }
   };
 
-  const handleAddressChange = (field: keyof UserProfile['address'], value: string) => {
-    setFormData(prev => ({
+  const handleAddressChange = (field: keyof NonNullable<UserProfile['address']>, value: string) => {
+    setFormData((prev) => ({
       ...prev,
       address: {
-        ...(prev.address || {}),
+        ...prev.address,
         [field]: value,
       },
     }));

@@ -107,7 +107,7 @@ const FeedScreen = () => {
       
       <FeedContainer 
         ref={feedContainerRef}
-        filters={filters} 
+        filters={filters}
         sortBy={sortBy} 
         searchQuery={searchQuery} 
         activeTab={activeTab}

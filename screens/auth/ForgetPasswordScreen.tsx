@@ -171,7 +171,7 @@ const ForgotPasswordScreen = ({ navigation }: ForgotPasswordScreenProps) => {
 
             <View style={[styles.inputContainer, { borderColor: globalStyles.colors.border }]}>
               <TextInput
-                style={[styles.input, globalStyles.body, error && styles.inputError]}
+                style={[styles.input, globalStyles.body, error ? styles.inputError : null]}
                 placeholder="Email Address"
                 placeholderTextColor={globalStyles.colors.textPlaceholder}
                 keyboardType="email-address"

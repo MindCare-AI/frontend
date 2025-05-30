@@ -1,10 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 import { 
-  CreateChatbotConversationResponse, 
-  SendChatbotMessageResponse,
+  SendMessageResponse,
   ChatbotConversation 
 } from '../types/chatbot/chatbot';
+
+// Define the missing types
+interface CreateChatbotConversationResponse {
+  conversation: ChatbotConversation;
+  message?: string;
+}
 
 // Get auth headers for API requests
 const getAuthHeaders = async () => {
@@ -55,18 +60,7 @@ class ChatService {
       console.log('[ChatService] ✅ Conversation created:', data);
       
       return {
-        id: data.id,
-        user: data.user,
-        title: data.title,
-        created_at: data.created_at,
-        last_activity: data.last_activity,
-        is_active: data.is_active,
-        last_message: data.last_message,
-        message_count: data.message_count,
-        latest_summary: data.latest_summary,
-        last_message_at: data.last_message_at,
-        participants: data.participants,
-        recent_messages: data.recent_messages || []
+        conversation: data
       };
     } catch (error) {
       console.error('[ChatService] ❌ Error creating conversation:', error);
@@ -125,7 +119,7 @@ class ChatService {
   }
 
   // Send a message to the chatbot
-  async sendMessage(content: string): Promise<SendChatbotMessageResponse | null> {
+  async sendMessage(content: string): Promise<SendMessageResponse | null> {
     if (!this.currentConversation) {
       throw new Error('No active conversation');
     }
@@ -148,33 +142,30 @@ class ChatService {
       console.log('[ChatService] ✅ Message sent, received response:', data);
       
       return {
-        id: data.id,
-        conversation_id: data.conversation_id,
-        timestamp: data.timestamp,
-        user_message: data.user_message ? {
+        user_message: {
           id: data.user_message.id,
           content: data.user_message.content,
           timestamp: data.user_message.timestamp,
           message_type: data.user_message.message_type || 'text',
           is_bot: false,
           sender: data.user_message.sender,
-          sender_name: data.user_message.sender_name,
-          metadata: data.user_message.metadata,
+          sender_name: data.user_message.sender_name || 'You',
+          metadata: data.user_message.metadata || {},
           parent_message: data.user_message.parent_message,
           chatbot_method: data.user_message.chatbot_method,
-        } : undefined,
-        bot_response: data.bot_response ? {
+        },
+        bot_response: {
           id: data.bot_response.id,
           content: data.bot_response.content,
           timestamp: data.bot_response.timestamp,
           message_type: data.bot_response.message_type || 'text',
           is_bot: true,
           sender: data.bot_response.sender,
-          sender_name: data.bot_response.sender_name,
-          metadata: data.bot_response.metadata,
+          sender_name: data.bot_response.sender_name || 'AI Assistant',
+          metadata: data.bot_response.metadata || {},
           parent_message: data.bot_response.parent_message,
-          chatbot_method: data.bot_response.chatbot_method,
-        } : undefined
+          chatbot_method: data.bot_response.chatbot_method
+        }
       };
     } catch (error) {
       console.error('[ChatService] ❌ Error sending message:', error);

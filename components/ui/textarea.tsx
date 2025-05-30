@@ -104,93 +104,47 @@ export const Textarea = React.forwardRef<TextInput, TextareaProps>(
     const isNearLimit = maxLength && characterCount >= maxLength * 0.9;
 
     return (
-      <Animated.View
-        style={[
-          styles.container,
-          { transform: [{ translateX: errorShakeAnim }] },
-        ]}
-      >
-        {label && (
-          <Animated.Text
-            style={[
-              styles.label,
-              {
-                color: labelColor,
-                transform: [
-                  {
-                    scale: focusAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.1],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            {label}
-          </Animated.Text>
-        )}
-
-        <Animated.View
+      <View style={styles.container}>
+        {label && <Text style={styles.label}>{label}</Text>}
+        <View
           style={[
             styles.inputContainer,
-            {
-              borderColor,
-              minHeight,
-              backgroundColor: disabled ? '#F3F4F6' : '#FFFFFF',
-            },
             isFocused && styles.focused,
+            error ? styles.errorContainer : null,
+            style,
           ]}
         >
           <TextInput
             ref={ref}
-            style={[
-              styles.input,
-              { minHeight: minHeight - 24 }, // Account for padding
-              style,
-            ]}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor="#9CA3AF"
             maxLength={maxLength}
-            multiline
-            textAlignVertical="top"
             editable={!disabled}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
-            accessibilityLabel={label}
-            accessibilityHint={helperText}
-            accessibilityState={{ disabled, error: !!error }}
+            style={[styles.input, { minHeight }, disabled && { color: '#9CA3AF' }]}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            accessibilityState={{ disabled }}
             {...props}
           />
-        </Animated.View>
-
+        </View>
         <View style={styles.footer}>
-          {(error || helperText) && (
-            <Text
-              style={[
-                styles.helperText,
-                error && styles.errorText,
-              ]}
-            >
-              {error || helperText}
-            </Text>
+          {helperText && (
+            <Text style={[styles.helperText, error ? styles.errorText : undefined]}>{helperText}</Text>
           )}
-          
-          {maxLength && (
+          {maxLength !== undefined && (
             <Text
               style={[
                 styles.charCount,
-                isNearLimit && styles.nearLimit,
-                characterCount === maxLength && styles.atLimit,
-              ]}
+                value.length >= maxLength && styles.atLimit,
+                value.length >= maxLength - 10 && value.length < maxLength && styles.nearLimit,
+              ].filter(Boolean)}
             >
-              {characterCount}/{maxLength}
+              {value.length}/{maxLength}
             </Text>
           )}
         </View>
-      </Animated.View>
+      </View>
     );
   }
 );
@@ -217,6 +171,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 2,
+  },
+  errorContainer: {
+    borderColor: '#DC2626',
   },
   input: {
     fontSize: 16,

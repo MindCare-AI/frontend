@@ -58,7 +58,7 @@ const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
       {showProgress && (
         <View style={styles.footer}>
           <OnboardingProgress
-            steps={totalSteps}
+            totalSteps={totalSteps}
             currentStep={currentStep}
           />
         </View>
