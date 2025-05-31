@@ -4,7 +4,6 @@
     "slug": "mindcare",
     "scheme": "mindcareai",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/logo_mindcare.png",
@@ -21,40 +20,35 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mindcareai.app",
-      "buildNumber": "1.0.0",
-      "config": {
-        "usesNonExemptEncryption": false
-      },
-      "newArchEnabled": true
+      "bundleIdentifier": "com.mindcareai.app"
     },
     "android": {
-      
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo_mindcare.png",
         "backgroundColor": "#ffffff"
-        
       },
       "package": "com.mindcareai.app",
-      "versionCode": 1,
-      "newArchEnabled": true,
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": {
-            "scheme": "mindcareai"
-          },
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "newArchEnabled": false
     },
     "web": {
-      "favicon": "./assets/images/logo_mindcare.png",
-      "config": {
-        "oauth": {
-          "redirectUrl": "mindcareai://oauth_callback"
-        }
+      "favicon": "./assets/images/logo_mindcare.png"
+    },
+    "plugins": [
+      "expo-image-picker",
+      "expo-document-picker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "275fb931-7367-4329-a7c2-03cb67d6bd48"
       }
-    }
+    },
+    "owner": "yasserbhj"
   }
 }

@@ -8,38 +8,19 @@ module.exports = (() => {
   config.transformer = {
     ...transformer,
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
+    assetPlugins: ['expo-asset/tools/hashAssetFiles'],
   };
   
   config.resolver = {
     ...resolver,
     assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
     sourceExts: [...resolver.sourceExts, 'svg'],
-    blacklistRE: /node_modules\/react-native\/ReactCommon\/.*/,
   };
 
-  config.watcher = {
-    ...config.watcher,
-    ignore: [
-      /node_modules\/react-native\/ReactCommon\/.*/,
-      /node_modules\/@expo\/.*/,
-      /\.git\/.*/,
-      /android\/.*/,
-      /ios\/.*/,
-    ],
-    watchman: {
-      ignore_dirs: [
-        'node_modules/react-native/ReactCommon',
-        'node_modules/@expo',
-        'node_modules/@react-native-async-storage',
-        'node_modules/@react-native-community',
-        'node_modules/@shopify',
-        '.git',
-        '.expo',
-        'android',
-        'ios'
-      ]
-    }
-  };
+  config.watchFolders = [__dirname];
+  
+  // Add this for better compatibility
+  config.resolver.platforms = ['native', 'android', 'ios', 'web'];
   
   return config;
 })();

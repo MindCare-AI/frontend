@@ -1,17 +1,41 @@
+import { Platform } from 'react-native';
+
 //config.ts
-export const API_BASE_URL = __DEV__ 
-  ? 'http://127.0.0.1:8000' 
-  : 'https://api.mindcareai.com';
+const getLocalApiUrl = () => {
+  if (__DEV__) {
+    if (Platform.OS === 'web') {
+      return 'http://127.0.0.1:8000';
+    } else if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:8000';
+    } else {
+      // iOS simulator or other platforms
+      return 'http://127.0.0.1:8000';
+    }
+  }
+  return 'https://api.mindcareai.com';
+};
+
+const getLocalWsUrl = () => {
+  if (__DEV__) {
+    if (Platform.OS === 'web') {
+      return 'ws://127.0.0.1:8000';
+    } else if (Platform.OS === 'android') {
+      return 'ws://10.0.2.2:8000';
+    } else {
+      // iOS simulator or other platforms
+      return 'ws://127.0.0.1:8000';
+    }
+  }
+  return 'wss://api.mindcareai.com';
+};
+
+export const API_BASE_URL = getLocalApiUrl();
 
 // Use this for WebSocket connections - Updated to handle authentication
-export const WS_BASE_URL = __DEV__ 
-  ? 'ws://127.0.0.1:8000' 
-  : 'wss://api.mindcareai.com';
+export const WS_BASE_URL = getLocalWsUrl();
 
 // Use this for REST API calls
-export const API_URL = __DEV__ 
-  ? 'http://127.0.0.1:8000/api/v1' 
-  : 'https://api.mindcareai.com/api/v1';
+export const API_URL = `${API_BASE_URL}/api/v1`;
 
 // App Configuration
 export const APP_CONFIG = {
@@ -33,7 +57,9 @@ export const GOOGLE_CLIENT_ID = '826529019009-12eb7c55fhp7altmd1jnhgel7e92bg39.a
 export const GITHUB_CLIENT_ID = 'Ov23libU65qS0FNZsNvh';
 
 export const OAUTH_CONFIG = {
-  redirectUri: 'com.mindcareai.app:/oauth2redirect',  // Updated redirect URI
+  redirectUri: Platform.OS === 'web' 
+    ? 'http://localhost:3000/oauth2redirect'  // Web redirect
+    : 'com.mindcareai.app://oauth2redirect',  // Mobile redirect
   scopes: ['openid', 'email', 'profile'],
   responseType: 'code',
   accessType: 'offline',
