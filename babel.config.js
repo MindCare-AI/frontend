@@ -3,6 +3,14 @@ module.exports = function(api) {
   return {
     presets: [
       'babel-preset-expo',
+      '@babel/preset-flow',
+      [
+        '@babel/preset-typescript',
+        {
+          allowDeclareFields: true,
+          allowNamespaces: true,
+        }
+      ]
       [
         '@babel/preset-typescript',
         {
@@ -12,6 +20,10 @@ module.exports = function(api) {
       ]
     ],
     plugins: [
+      '@babel/plugin-syntax-flow',
+      '@babel/plugin-transform-flow-strip-types',
+      'react-native-reanimated/plugin',
+    ],
       ['react-native-reanimated/plugin', {
         relativeSourceLocation: true,
       }],

@@ -60,23 +60,28 @@ export const getConversationById = async (conversationId: ConversationId) => {
   try {
     const config = await getAuthHeaders();
     
-    // First try to get it as a one-to-one conversation
+    // Check conversation type from the group conversation endpoint first
     try {
-      const response = await axios.get(`${API_URL}/messaging/one_to_one/${conversationId}/`, config);
-      // Return properly structured data with is_group flag
-      return {
-        ...(typeof response.data === 'object' && response.data !== null ? response.data : {}),
-        is_group: false,
-      };
-    } catch (error) {
-      // If it fails, try to get it as a group conversation
       const groupResponse = await axios.get(`${API_URL}/messaging/groups/${conversationId}/`, config);
-      // Return properly structured data with is_group flag
-      return {
-        ...(typeof groupResponse.data === 'object' && groupResponse.data !== null ? groupResponse.data : {}),
-        is_group: true,
-      };
+      
+      // If this succeeds, it's a group conversation
+      if (groupResponse.status === 200) {
+        console.log(`[API] Conversation ${conversationId} is a group chat`);
+        return {
+          ...(typeof groupResponse.data === 'object' && groupResponse.data !== null ? groupResponse.data : {}),
+          is_group: true,
+        };
+      }
+    } catch (groupError) {
+      console.log(`[API] Conversation ${conversationId} is not a group chat, trying one-to-one`);
     }
+    
+    // If group fails or returns empty, try one-to-one
+    const response = await axios.get(`${API_URL}/messaging/one_to_one/${conversationId}/`, config);
+    return {
+      ...(typeof response.data === 'object' && response.data !== null ? response.data : {}),
+      is_group: false,
+    };
   } catch (error) {
     console.error('Error fetching conversation details:', error);
     throw error;
@@ -211,7 +216,17 @@ export const sendMessage = async (
     if (!isWebSocketConnected || !isCorrectConversation) {
       console.log(`[API] 🔄 Attempting WebSocket connect for conversation ${conversationId}`);
       try {
-        await websocketService.connect(conversationId.toString());
+        const userData = await AsyncStorage.getItem('user');
+        const user = userData ? JSON.parse(userData) : { id: '', username: '' };
+        // Use the isGroup parameter from the function to determine conversation type
+        const conversationType = isGroup ? 'group' : 'one-to-one';
+        
+        await websocketService.connect({
+          userId: user.id || '',
+          username: user.username || '',
+          conversationId: conversationId.toString(),
+          conversationType: conversationType
+        });
       } catch (connErr) {
         console.warn(`[API] ⚠️ WebSocket reconnection failed:`, connErr);
       }

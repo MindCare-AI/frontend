@@ -8,6 +8,10 @@ interface EmptyConversationsListProps {
   onRetry?: () => void;
   onStartConversation?: () => void;
   filterMode?: 'all' | 'direct' | 'group';
+  title?: string;
+  subtitle?: string;
+  onCreateConversation?: () => void;
+  loading?: boolean;
 }
 
 const EmptyConversationsList: React.FC<EmptyConversationsListProps> = ({
@@ -53,13 +57,8 @@ const EmptyConversationsList: React.FC<EmptyConversationsListProps> = ({
         <Ionicons name="person-outline" size={64} color="#3498db" />
         <Text style={styles.title}>No direct messages</Text>
         <Text style={styles.message}>
-          You don't have any direct messages yet. Start a conversation with a therapist.
+          You don't have any direct messages yet.
         </Text>
-        {onStartConversation && (
-          <TouchableOpacity style={styles.button} onPress={onStartConversation}>
-            <Text style={styles.buttonText}>Start a Direct Message</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   }
