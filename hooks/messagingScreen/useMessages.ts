@@ -133,22 +133,27 @@ export function useMessages(
         setError(null);
         console.log(`[useMessages] Loading messages for conversation: ${conversationId}`);
         
-        // First, determine if this is a group or one-to-one conversation
-        let isGroup = false;
+        // Determine if this is a group or one-to-one conversation
+        let determinedIsGroup = isGroup;
         let endpoint = '';
         
-        try {
-          // Try to get conversation details to determine type
-          const conversationDetails = await getConversationById(conversationId);
-          isGroup = conversationDetails.is_group || false;
-          console.log(`[useMessages] Conversation ${conversationId} is ${isGroup ? 'group' : 'one-to-one'}`);
-        } catch (error) {
-          console.warn(`[useMessages] Could not determine conversation type, defaulting to one-to-one:`, error);
-          isGroup = false;
+        // Only try to determine conversation type if not explicitly set in params
+        if (determinedIsGroup === undefined) {
+          try {
+            // Try to get conversation details to determine type
+            const conversationDetails = await getConversationById(conversationId);
+            determinedIsGroup = conversationDetails.is_group || false;
+            console.log(`[useMessages] Conversation ${conversationId} is ${determinedIsGroup ? 'group' : 'one-to-one'}`);
+          } catch (error) {
+            console.warn(`[useMessages] Could not determine conversation type, defaulting to one-to-one:`, error);
+            determinedIsGroup = false;
+          }
+        } else {
+          console.log(`[useMessages] Using provided conversation type: ${determinedIsGroup ? 'group' : 'one-to-one'}`);
         }
 
         // Use the appropriate endpoint based on conversation type
-        endpoint = isGroup 
+        endpoint = determinedIsGroup 
           ? `${API_URL}/messaging/groups/${conversationId}/`
           : `${API_URL}/messaging/one_to_one/${conversationId}/`;
 

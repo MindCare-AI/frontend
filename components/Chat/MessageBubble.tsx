@@ -32,8 +32,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRetry,
   showSenderName = false,
 }) => {
+  const senderId = message.sender_id?.toString() || '';
+  const userId = currentUserId?.toString() || '';
   // Ensure proper comparison of sender_id with currentUserId
-  const isOwnMessage = String(message.sender_id) === String(currentUserId);
+  const isOwnMessage = senderId === userId;
   const isBot = message.is_bot || false;
 
   console.log(`[MessageBubble] Rendering message ${message.id}:`, {
