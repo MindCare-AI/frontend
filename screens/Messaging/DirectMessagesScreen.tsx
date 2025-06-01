@@ -322,11 +322,6 @@ const DirectMessagesScreen: React.FC = () => {
             updateCellsBatchingPeriod={50}
             windowSize={10}
           />
-          <FloatingButton
-            onPress={handleNewConversation}
-            icon="add"
-            style={styles.fab}
-          />
         </KeyboardAvoidingView>
       )}
       <UserSelectionModal
