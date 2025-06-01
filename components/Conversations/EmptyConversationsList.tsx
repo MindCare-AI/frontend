@@ -8,6 +8,10 @@ interface EmptyConversationsListProps {
   onRetry?: () => void;
   onStartConversation?: () => void;
   filterMode?: 'all' | 'direct' | 'group';
+  title?: string;
+  subtitle?: string;
+  onCreateConversation?: () => void;
+  loading?: boolean;
 }
 
 const EmptyConversationsList: React.FC<EmptyConversationsListProps> = ({

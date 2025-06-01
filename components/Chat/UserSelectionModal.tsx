@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { getAllUsers } from '../../API/conversations';
 
-interface User {
+export interface User {
   id: string | number;
   username: string;
   email?: string;
@@ -24,13 +24,19 @@ interface User {
 interface UserSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  conversationType: 'group' | 'direct';
-  onCreateConversation: (
+  conversationType?: 'group' | 'direct';
+  onCreateConversation?: (
     selectedUsers: User[],
     groupName?: string,
     groupDescription?: string
   ) => Promise<void>;
-  currentUserId: string | number;
+  users?: any[];
+  loading?: boolean;
+  onSelectUsers?: (selectedUsers: any[]) => Promise<void>;
+  multiSelect?: boolean;
+  title?: string;
+  subtitle?: string;
+  currentUserId?: string | number;
   creating?: boolean;
 }
 
@@ -105,7 +111,9 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
     }
 
     try {
-      await onCreateConversation(selectedUsers, groupName, groupDescription);
+      if (onCreateConversation) {
+        await onCreateConversation(selectedUsers, groupName, groupDescription);
+      }
     } catch (error) {
       // Error handling is done in parent component
     }

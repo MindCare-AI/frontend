@@ -211,7 +211,17 @@ export const sendMessage = async (
     if (!isWebSocketConnected || !isCorrectConversation) {
       console.log(`[API] 🔄 Attempting WebSocket connect for conversation ${conversationId}`);
       try {
-        await websocketService.connect(conversationId.toString());
+        const userData = await AsyncStorage.getItem('user');
+        const user = userData ? JSON.parse(userData) : { id: '', username: '' };
+        // Use the isGroup parameter from the function to determine conversation type
+        const conversationType = isGroup ? 'group' : 'one-to-one';
+        
+        await websocketService.connect({
+          userId: user.id || '',
+          username: user.username || '',
+          conversationId: conversationId.toString(),
+          conversationType: conversationType
+        });
       } catch (connErr) {
         console.warn(`[API] ⚠️ WebSocket reconnection failed:`, connErr);
       }

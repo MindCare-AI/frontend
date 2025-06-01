@@ -9,6 +9,7 @@ interface FloatingButtonProps {
   onPress: () => void;
   icon?: IoniconsNames; // Now using the proper type for Ionicons
   color?: string;
+  style?: any;
 }
 
 const FloatingButton: React.FC<FloatingButtonProps> = ({

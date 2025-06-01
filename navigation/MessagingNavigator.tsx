@@ -1,8 +1,9 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MessagingStackParamList } from './types';
-import ConversationsScreen from '../screens/Conversations/ConversationsScreen';
-import ChatScreen from '../screens/Conversations/ChatScreen';
+import MessagingTabNavigator from './MessagingTabNavigator';
+import DirectChatScreen from '../screens/Messaging/DirectChatScreen';
+import GroupChatScreen from '../screens/Messaging/GroupChatScreen';
 import MessagingSettingsScreen from '../screens/Messaging/MessagingSettingsScreen';
 import { globalStyles } from '../styles/global';
 import { createBoxShadow } from '../utils/shadows';
@@ -12,7 +13,7 @@ const Stack = createStackNavigator<MessagingStackParamList>();
 const MessagingNavigator: React.FC = () => {
   return (
     <Stack.Navigator
-      initialRouteName="Home"
+      initialRouteName="MessagingTabs"
       screenOptions={{
         headerStyle: {
           backgroundColor: globalStyles.colors.primary,
@@ -26,18 +27,26 @@ const MessagingNavigator: React.FC = () => {
       }}
     >
       <Stack.Screen 
-        name="Home" 
-        component={ConversationsScreen} 
+        name="MessagingTabs" 
+        component={MessagingTabNavigator} 
         options={{ 
           title: 'Messages',
           headerShown: false
         }} 
       />
       <Stack.Screen 
-        name="Chat" 
-        component={ChatScreen} 
+        name="DirectChat" 
+        component={DirectChatScreen} 
         options={({ route }) => ({ 
-          title: 'Chat',
+          title: route.params?.conversationTitle || 'Chat',
+          headerBackTitleVisible: false
+        })} 
+      />
+      <Stack.Screen 
+        name="GroupChat" 
+        component={GroupChatScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.conversationTitle || 'Group Chat',
           headerBackTitleVisible: false
         })} 
       />

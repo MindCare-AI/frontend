@@ -1,55 +1,75 @@
 import { WS_BASE_URL } from '../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Backend-compatible WebSocket message interface
+// Updated WebSocket message interface to match new Django Channels backend
 export interface WebSocketMessage {
-  event: 'chat.message' | 'typing.indicator' | 'read.receipt' | 'message.reaction' | 'user.online' | 'user.offline' | 'heartbeat';
-  type?: 'message' | 'typing' | 'read' | 'reaction' | 'presence' | 'heartbeat'; // For backward compatibility
+  type: 'chat.message' | 'typing.indicator' | 'read.receipt' | 'message.reaction' | 'user.online' | 'user.offline' | 'heartbeat';
+  event?: string;
+  user_id?: string;
+  username?: string;
+  timestamp?: string;
   
-  // Message data for chat.message events
+  // Message content (for chat.message type)
   message?: {
     id: string | number;
     content: string;
-    message_type: 'text' | 'image' | 'file' | 'system';
-    sender_id: string | number;
+    sender: string | number;
     sender_name: string;
+    message_type: string;
     timestamp: string;
     conversation_id: string | number;
-    media?: string | null;
-    metadata?: any;
+    is_bot?: boolean;
+    metadata?: Record<string, any>;
+    attachment?: {
+      id: string;
+      url: string;
+      type: string;
+      name: string;
+      size: number;
+    };
+    reactions?: Array<{
+      id: string;
+      emoji: string;
+      user_id: string;
+      timestamp: string;
+    }>;
+    read_by?: string[];
+    edited?: boolean;
   };
   
-  // Typing indicator data
-  user_id?: string | number;
-  username?: string;
+  // Typing indicator fields (typing.indicator type)
   is_typing?: boolean;
   
-  // Read receipt data
-  message_id?: string | number;
-  read_by?: string | number;
+  // Read receipt fields (read.receipt type)
+  message_id?: string;
+  read_by_user?: string;
+  read_at?: string;
   
-  // Reaction data
+  // Reaction fields (message.reaction type)
   reaction?: string;
   action?: 'add' | 'remove';
+  emoji?: string;
   
-  // Presence data
-  user?: {
-    id: string | number;
-    username: string;
-    status: 'online' | 'offline';
+  // Presence fields (user.online/offline type)
+  presence_status?: 'online' | 'offline';
+  last_seen?: string;
+  
+  // Error handling
+  error?: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
   };
   
-  // Heartbeat data
-  timestamp?: string;
-  
-  // General fields
-  conversation_id?: string | number;
+  // Backend routing and conversation context
+  conversation_id?: string;
   conversation_type?: 'one-to-one' | 'group';
+  channel_group?: string;
 }
 
 export interface MessageData {
   content: string;
-  message_type?: 'text' | 'image' | 'file' | 'system';
+  message_type?: string;
   metadata?: any;
   media_id?: string;
 }
@@ -57,7 +77,7 @@ export interface MessageData {
 class WebSocketService {
   private ws: WebSocket | null = null;
   private conversationId: string | null = null;
-  private conversationType: 'one-to-one' | 'group' | null = null;
+  private conversationType: 'one-to-one' | 'group' = 'one-to-one';
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 1000;
@@ -71,38 +91,30 @@ class WebSocketService {
   private lastHeartbeat: number = 0;
   private heartbeatInterval: number = 30000; // 30 seconds, matching backend
   private heartbeatCheckTimer: NodeJS.Timeout | null = null;
+  private heartbeatSendTimer: NodeJS.Timeout | null = null;
   private missedHeartbeats: number = 0;
   private readonly MAX_MISSED_HEARTBEATS = 3;
 
-  // Connect to WebSocket for a specific conversation with type
-  async connect(params: {
-    userId: string | number;
-    username: string;
-    conversationId: string;
-    conversationType: 'one-to-one' | 'group';
-  }): Promise<void> {
-    const { conversationId, conversationType } = params;
-    
+  // Connect to WebSocket for a specific conversation
+  async connect(conversationId: string, isGroup: boolean = false): Promise<void> {
     // If already connected to the same conversation, don't reconnect
     if (this.isConnecting || 
        (this.ws && 
         this.ws.readyState === WebSocket.OPEN && 
-        this.conversationId === conversationId &&
-        this.conversationType === conversationType)) {
-      console.log('[WebSocket] 🔄 Already connected to conversation', conversationId, `(${conversationType})`);
+        this.conversationId === conversationId)) {
+      console.log('[WebSocket] 🔄 Already connected to conversation', conversationId);
       return Promise.resolve();
     }
 
     // If connecting to a different conversation, disconnect first
-    if (this.ws && this.conversationId && 
-       (this.conversationId !== conversationId || this.conversationType !== conversationType)) {
+    if (this.ws && this.conversationId && this.conversationId !== conversationId) {
       console.log('[WebSocket] 🔄 Switching conversations, disconnecting first');
       this.disconnect(true);
     }
 
     this.isConnecting = true;
     this.conversationId = conversationId;
-    this.conversationType = conversationType;
+    this.conversationType = isGroup ? 'group' : 'one-to-one';
     this.connectionStartTime = Date.now();
 
     try {
@@ -112,10 +124,10 @@ class WebSocketService {
         throw new Error('No access token found');
       }
 
-      // New backend URL pattern: /ws/<conversation-type>/<conversation_id>/?token=<JWT>
-      const wsUrl = `${WS_BASE_URL}/ws/${conversationType}/${conversationId}/?token=${token}`;
+      // Use the new backend URL pattern based on conversation type
+      const wsUrl = `${WS_BASE_URL}/ws/${this.conversationType}/${conversationId}/?token=${token}`;
       console.log(`[WebSocket] 🚀 Connecting to: ${wsUrl}`);
-      console.log(`[WebSocket] 📊 Connection attempt #${this.reconnectAttempts + 1}`);
+      console.log(`[WebSocket] 📊 Connection attempt #${this.reconnectAttempts + 1} for ${this.conversationType} conversation`);
 
       this.ws = new WebSocket(wsUrl);
 
@@ -130,7 +142,7 @@ class WebSocketService {
         this.ws!.onopen = () => {
           clearTimeout(connectionTimeout);
           const connectionTime = Date.now() - this.connectionStartTime;
-          console.log(`[WebSocket] ✅ Connected successfully for ${conversationType} conversation: ${conversationId}`);
+          console.log(`[WebSocket] ✅ Connected successfully for ${this.conversationType} conversation: ${conversationId}`);
           console.log(`[WebSocket] ⏱️ Connection established in ${connectionTime}ms`);
           console.log(`[WebSocket] 🔗 ReadyState: ${this.ws?.readyState} (OPEN)`);
           
@@ -139,9 +151,10 @@ class WebSocketService {
           this.lastPingTime = Date.now();
           this.notifyConnectionCallbacks(true);
           
-          // Log connection details
+          // Log connection details and start heartbeat
           this.logConnectionStatus();
           this.startHeartbeatMonitoring();
+          this.startHeartbeatSending();
           resolve();
         };
 
@@ -155,6 +168,7 @@ class WebSocketService {
           this.isConnecting = false;
           this.notifyConnectionCallbacks(false);
           this.stopHeartbeatMonitoring();
+          this.stopHeartbeatSending();
           
           // Log close reasons
           if (event.code === 1000) {
@@ -163,6 +177,8 @@ class WebSocketService {
             console.log('[WebSocket] ⚠️ Abnormal closure (connection lost)');
           } else if (event.code === 4001) {
             console.log('[WebSocket] 🔒 Authentication failed');
+          } else if (event.code === 4004) {
+            console.log('[WebSocket] 🚫 Invalid conversation access');
           } else {
             console.log(`[WebSocket] ❓ Unknown close code: ${event.code}`);
           }
@@ -209,31 +225,36 @@ class WebSocketService {
       this.ws = null;
     }
     this.conversationId = null;
-    this.conversationType = null;
     this.reconnectAttempts = 0;
     this.isConnecting = false;
     this.messagesSentCount = 0;
     this.messagesReceivedCount = 0;
+    this.stopHeartbeatMonitoring();
+    this.stopHeartbeatSending();
   }
 
-  // Send a message through WebSocket
+  // Send a message through WebSocket - Updated to match backend format
   sendMessage(messageData: MessageData): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.error('[WebSocket] ❌ Cannot send message - WebSocket not connected');
       console.log(`[WebSocket] 🔗 Current state: ${this.ws?.readyState || 'null'}`);
       throw new Error('WebSocket is not connected');
     }
+
     const payload = {
-      event: 'chat.message',
-      type: 'message', // For backward compatibility
+      type: 'chat.message',
+      event: 'send_message',
       content: messageData.content,
       message_type: messageData.message_type || 'text',
       metadata: messageData.metadata || {},
+      timestamp: new Date().toISOString(),
       ...(messageData.media_id && { media_id: messageData.media_id })
     };
+
     this.messagesSentCount++;
     console.log(`[WebSocket] 📤 Sending message (#${this.messagesSentCount}):`, payload);
     console.log(`[WebSocket] 💬 Content: "${payload.content.substring(0, 100)}${payload.content.length > 100 ? '...' : ''}"`);
+    
     try {
       this.ws.send(JSON.stringify(payload));
       console.log('[WebSocket] ✅ Message sent successfully');
@@ -243,59 +264,77 @@ class WebSocketService {
     }
   }
 
-  // Send read receipt (keep only this version)
-  sendReadReceipt(messageId: string | number): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocket] ❌ Cannot send read receipt - WebSocket not connected');
-      return;
-    }
-    const payload = {
-      event: 'read.receipt',
-      type: 'read', // For backward compatibility
-      message_id: messageId,
-      conversation_id: this.conversationId,
-      conversation_type: this.conversationType,
-    };
-    console.log(`[WebSocket] 📤 Sending read receipt for message: ${messageId}`);
-    try {
-      this.ws.send(JSON.stringify(payload));
-      console.log('[WebSocket] ✅ Read receipt sent successfully');
-    } catch (error) {
-      console.error('[WebSocket] ❌ Error sending read receipt:', error);
-    }
-  }
-
-  // Send typing indicator (keep only this version)
+  // Send typing indicator - Updated to match backend format
   sendTyping(isTyping: boolean): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.warn('[WebSocket] ⚠️ Cannot send typing indicator - WebSocket not connected');
       return;
     }
+
     const payload = {
-      event: 'typing.indicator',
-      type: 'typing', // For backward compatibility
+      type: 'typing.indicator',
+      event: isTyping ? 'start_typing' : 'stop_typing',
       is_typing: isTyping,
+      timestamp: new Date().toISOString()
     };
+
     console.log(`[WebSocket] ⌨️ Sending typing indicator: ${isTyping ? 'started' : 'stopped'}`);
     this.ws.send(JSON.stringify(payload));
   }
 
-  // Send reaction
-  sendReaction(messageId: string, reaction: string, action: 'add' | 'remove' = 'add'): void {
+  // Send read receipt - Updated to match backend format
+  sendReadReceipt(messageId: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] ⚠️ Cannot send read receipt - WebSocket not connected');
+      return;
+    }
+
+    const payload = {
+      type: 'read.receipt',
+      event: 'mark_read',
+      message_id: messageId,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log(`[WebSocket] 👁️ Sending read receipt for message: ${messageId}`);
+    this.ws.send(JSON.stringify(payload));
+  }
+
+  // Send reaction - Updated to match backend format
+  sendReaction(messageId: string, emoji: string, action: 'add' | 'remove' = 'add'): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       console.warn('[WebSocket] ⚠️ Cannot send reaction - WebSocket not connected');
       return;
     }
 
     const payload = {
-      event: 'message.reaction',
-      type: 'reaction', // For backward compatibility
+      type: 'message.reaction',
+      event: action === 'add' ? 'add_reaction' : 'remove_reaction',
       message_id: messageId,
-      reaction,
+      emoji,
       action,
+      timestamp: new Date().toISOString()
     };
 
-    console.log(`[WebSocket] 👍 Sending reaction: ${action} "${reaction}" to message ${messageId}`);
+    console.log(`[WebSocket] 👍 Sending reaction: ${action} "${emoji}" to message ${messageId}`);
+    this.ws.send(JSON.stringify(payload));
+  }
+
+  // Send user presence update
+  sendPresenceUpdate(status: 'online' | 'offline'): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] ⚠️ Cannot send presence update - WebSocket not connected');
+      return;
+    }
+
+    const payload = {
+      type: status === 'online' ? 'user.online' : 'user.offline',
+      event: 'presence_update',
+      presence_status: status,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log(`[WebSocket] 👤 Sending presence update: ${status}`);
     this.ws.send(JSON.stringify(payload));
   }
 
@@ -313,8 +352,7 @@ class WebSocketService {
   }
 
   // Get current conversation type
-  getCurrentConversationType(): 'one-to-one' | 'group' | null {
-    console.log(`[WebSocket] 🎭 Current conversation type: ${this.conversationType || 'none'}`);
+  getCurrentConversationType(): 'one-to-one' | 'group' {
     return this.conversationType;
   }
 
@@ -329,7 +367,9 @@ class WebSocketService {
       messagesReceived: this.messagesReceivedCount,
       connectionUptime: this.connectionStartTime ? Date.now() - this.connectionStartTime : 0,
       readyState: this.ws?.readyState || 'null',
-      lastPing: this.lastPingTime ? Date.now() - this.lastPingTime : 0
+      lastPing: this.lastPingTime ? Date.now() - this.lastPingTime : 0,
+      lastHeartbeat: this.lastHeartbeat ? Date.now() - this.lastHeartbeat : 0,
+      missedHeartbeats: this.missedHeartbeats
     };
     
     console.log('[WebSocket] 📊 Connection Statistics:', stats);
@@ -340,8 +380,7 @@ class WebSocketService {
   private logConnectionStatus(): void {
     console.group('[WebSocket] 📋 Connection Status');
     console.log(`🔗 State: ${this.getReadyStateText()}`);
-    console.log(`🆔 Conversation: ${this.conversationId}`);
-    console.log(`🎭 Type: ${this.conversationType}`);
+    console.log(`🆔 Conversation: ${this.conversationId} (${this.conversationType})`);
     console.log(`🔄 Reconnect attempts: ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
     console.log(`📤 Messages sent: ${this.messagesSentCount}`);
     console.log(`📥 Messages received: ${this.messagesReceivedCount}`);
@@ -363,7 +402,7 @@ class WebSocketService {
     }
   }
 
-  // Heartbeat monitoring methods
+  // Enhanced heartbeat monitoring methods
   private startHeartbeatMonitoring(): void {
     this.lastHeartbeat = Date.now();
     this.missedHeartbeats = 0;
@@ -373,13 +412,13 @@ class WebSocketService {
       clearInterval(this.heartbeatCheckTimer);
     }
 
-    // Start monitoring heartbeats
+    // Start monitoring heartbeats from server
     this.heartbeatCheckTimer = setInterval(() => {
       const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeat;
       
-      if (timeSinceLastHeartbeat > this.heartbeatInterval) {
+      if (timeSinceLastHeartbeat > this.heartbeatInterval + 5000) { // Add 5s grace period
         this.missedHeartbeats++;
-        console.log(`[WebSocket] ❤️ Missed heartbeat #${this.missedHeartbeats}`);
+        console.log(`[WebSocket] ❤️💔 Missed heartbeat #${this.missedHeartbeats} (${timeSinceLastHeartbeat}ms since last)`);
         
         if (this.missedHeartbeats >= this.MAX_MISSED_HEARTBEATS) {
           console.log('[WebSocket] 💔 Connection considered stale, initiating reconnection');
@@ -389,18 +428,35 @@ class WebSocketService {
     }, this.heartbeatInterval);
   }
 
+  // Start sending heartbeats to server
+  private startHeartbeatSending(): void {
+    // Clear any existing heartbeat send timer
+    if (this.heartbeatSendTimer) {
+      clearInterval(this.heartbeatSendTimer);
+    }
+
+    // Send heartbeat to server periodically
+    this.heartbeatSendTimer = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const pingMessage = {
+          type: 'heartbeat',
+          event: 'ping',
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('[WebSocket] ❤️ Sending heartbeat ping');
+        this.ws.send(JSON.stringify(pingMessage));
+      }
+    }, this.heartbeatInterval);
+  }
+
   private handleStaleConnection(): void {
     this.disconnect(true); // Force disconnect
-    // Attempt to reconnect if we have a conversation ID and type
-    if (this.conversationId && this.conversationType) {
+    
+    // Attempt to reconnect if we have a conversation ID
+    if (this.conversationId) {
       console.log('[WebSocket] 🔄 Attempting to reconnect due to stale connection');
-      // Fix: use the correct connect signature
-      this.connect({
-        userId: '', // You may want to store the last userId/username if needed
-        username: '',
-        conversationId: this.conversationId,
-        conversationType: this.conversationType
-      });
+      this.connect(this.conversationId, this.conversationType === 'group');
     }
   }
 
@@ -411,27 +467,29 @@ class WebSocketService {
     }
   }
 
-  private handleHeartbeat(): void {
-    this.lastHeartbeat = Date.now();
-    this.missedHeartbeats = 0;
-    console.log('[WebSocket] ❤️ Heartbeat received');
+  private stopHeartbeatSending(): void {
+    if (this.heartbeatSendTimer) {
+      clearInterval(this.heartbeatSendTimer);
+      this.heartbeatSendTimer = null;
+    }
   }
 
-  // Add this method to handle heartbeat messages
-  private handleHeartbeatMessage(): void {
+  private handleHeartbeatMessage(data: WebSocketMessage): void {
     this.lastHeartbeat = Date.now();
     this.missedHeartbeats = 0;
     
-    // Send a pong response back to the server
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    // If this is a ping, send a pong response
+    if (data.event === 'ping' && this.ws && this.ws.readyState === WebSocket.OPEN) {
       const pongMessage = {
         type: 'heartbeat',
         event: 'pong',
         timestamp: new Date().toISOString()
       };
       
-      console.log('[WebSocket] ❤️ Sending heartbeat response');
+      console.log('[WebSocket] ❤️ Responding to heartbeat ping with pong');
       this.ws.send(JSON.stringify(pongMessage));
+    } else if (data.event === 'pong') {
+      console.log('[WebSocket] ❤️ Received heartbeat pong response');
     }
   }
 
@@ -467,28 +525,10 @@ class WebSocketService {
     console.log(`[WebSocket] ⏰ Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
     console.log(`[WebSocket] 🎯 Will attempt to reconnect to conversation: ${this.conversationId} (${this.conversationType})`);
     
-    setTimeout(async () => {
-      if (this.conversationId && this.conversationType && this.reconnectAttempts <= this.maxReconnectAttempts) {
+    setTimeout(() => {
+      if (this.conversationId && this.reconnectAttempts <= this.maxReconnectAttempts) {
         console.log(`[WebSocket] 🔄 Executing reconnect attempt ${this.reconnectAttempts}`);
-        
-        try {
-          // Get user info from storage for reconnection
-          const userId = await AsyncStorage.getItem('userId');
-          const username = await AsyncStorage.getItem('username');
-          
-          if (userId && username) {
-            await this.connect({
-              userId,
-              username,
-              conversationId: this.conversationId,
-              conversationType: this.conversationType
-            });
-          } else {
-            console.error('[WebSocket] ❌ Missing user info for reconnection');
-          }
-        } catch (error) {
-          console.error('[WebSocket] ❌ Reconnection failed:', error);
-        }
+        this.connect(this.conversationId, this.conversationType === 'group');
       }
     }, delay);
   }
@@ -523,44 +563,54 @@ class WebSocketService {
     };
   }
 
+  // Enhanced message event handler to match new backend
   private handleMessageEvent = (event: MessageEvent) => {
     try {
       this.messagesReceivedCount++;
       const data: WebSocketMessage = JSON.parse(event.data);
       
       console.log(`[WebSocket] 📨 Message received (#${this.messagesReceivedCount}):`, data);
-      console.log(`[WebSocket] 📊 Event: ${data.event}, Type: ${data.type || 'N/A'}`);
+      console.log(`[WebSocket] 📊 Message type: ${data.type}, Event: ${data.event || 'N/A'}`);
       
       // Handle heartbeat messages first
-      if (data.event === 'heartbeat' || data.type === 'heartbeat') {
-        console.log(`[WebSocket] ❤️ Heartbeat received`);
-        this.lastHeartbeat = Date.now();
-        this.missedHeartbeats = 0;
-        
-        // Send heartbeat response
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          const pongMessage = {
-            event: 'heartbeat',
-            type: 'heartbeat',
-            timestamp: new Date().toISOString()
-          };
-          console.log('[WebSocket] ❤️ Sending heartbeat response');
-          this.ws.send(JSON.stringify(pongMessage));
-        }
+      if (data.type === 'heartbeat') {
+        this.handleHeartbeatMessage(data);
         return; // Don't propagate heartbeat messages to callbacks
       }
       
-      // Handle other message types
-      if (data.event === 'chat.message' && data.message) {
-        console.log(`[WebSocket] 💬 New message from ${data.message.sender_name}: "${data.message.content?.substring(0, 50)}${data.message.content?.length > 50 ? '...' : ''}"`);
-      } else if (data.event === 'typing.indicator') {
-        console.log(`[WebSocket] ⌨️ Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
-      } else if (data.event === 'read.receipt') {
-        console.log(`[WebSocket] 👁️ Read receipt from user ${data.read_by} for message ${data.message_id}`);
-      } else if (data.event === 'message.reaction') {
-        console.log(`[WebSocket] 👍 Reaction "${data.reaction}" ${data.action} on message ${data.message_id}`);
-      } else if (data.event === 'user.online' || data.event === 'user.offline') {
-        console.log(`[WebSocket] 👤 User presence: ${data.user?.username} is ${data.event.split('.')[1]}`);
+      // Handle error messages
+      if (data.error) {
+        console.error(`[WebSocket] ❌ Server error received:`, data.error);
+        // Still propagate error messages to callbacks for handling
+      }
+      
+      // Handle different message types with enhanced logging
+      switch (data.type) {
+        case 'chat.message':
+          if (data.message) {
+            console.log(`[WebSocket] 💬 New message from ${data.message.sender_name}: "${data.message.content?.substring(0, 50)}${(data.message.content?.length || 0) > 50 ? '...' : ''}"`);
+          }
+          break;
+          
+        case 'typing.indicator':
+          console.log(`[WebSocket] ⌨️ Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
+          break;
+          
+        case 'read.receipt':
+          console.log(`[WebSocket] 👁️ Read receipt from ${data.read_by_user || data.username} for message ${data.message_id}`);
+          break;
+          
+        case 'message.reaction':
+          console.log(`[WebSocket] 👍 Reaction ${data.action}: "${data.emoji || data.reaction}" on message ${data.message_id}`);
+          break;
+          
+        case 'user.online':
+        case 'user.offline':
+          console.log(`[WebSocket] 👤 Presence update: ${data.username} is ${data.type.split('.')[1]} ${data.last_seen ? `(last seen: ${data.last_seen})` : ''}`);
+          break;
+          
+        default:
+          console.log(`[WebSocket] ❓ Unknown message type: ${data.type}`);
       }
       
       this.notifyMessageCallbacks(data);

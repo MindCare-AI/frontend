@@ -26,9 +26,96 @@ interface UseMessagesReturn {
   retryMessage: (messageId: string | number) => Promise<void>;
   isConnected: boolean;
   retryConnection: () => Promise<void>;
+  markMessageAsRead: (messageId: string | number) => void;
+  loadMoreMessages: () => Promise<void>;
+  hasMoreMessages: boolean;
+  refreshMessages: () => Promise<void>;
 }
 
-export const useMessages = (conversationId: string | number): UseMessagesReturn => {
+interface MessageResponse {
+  messages?: any[];
+  results?: any[];
+  is_group?: boolean;
+  [key: string]: any;
+}
+
+interface UseMessagesParams {
+  conversationId: string | number;
+  isGroup: boolean;
+  getMessages: (conversationId: string | number) => Promise<MessageResponse>;
+  sendMessageApi: (conversationId: string | number, content: string, options?: any) => Promise<any>;
+}
+
+// Overload for simplified usage with just conversationId
+export function useMessages(conversationId: string | number): UseMessagesReturn;
+// Original implementation with full params
+export function useMessages(params: UseMessagesParams): UseMessagesReturn;
+// Implementation that handles both overloads
+export function useMessages(
+  paramsOrConversationId: UseMessagesParams | string | number
+): UseMessagesReturn {
+  // Default implementation for the simpler overload
+  let conversationId: string | number;
+  let isGroup: boolean = false;
+  
+  // Create wrapper functions that normalize response formats
+  let getMessagesWrapper = async (id: string | number): Promise<MessageResponse> => {
+    try {
+      const response = await getConversationById(id);
+      // Normalize the response format
+      return {
+        is_group: response.is_group || false,
+        // Normalize response for messages
+        messages: 'messages' in response ? (response.messages as any[]) : [],
+        // Normalize response for results
+        results: 'results' in response ? (response.results as any[]) : []
+      };
+    } catch (error) {
+      console.error("[useMessages] Error in getMessagesWrapper:", error);
+      // Return empty result on error
+      return {
+        is_group: false,
+        messages: [],
+        results: []
+      };
+    }
+  };
+  
+  let getMessages = getMessagesWrapper;
+  let sendMessageApi = apiSendMessage;
+
+  // Check if we're using the simple or complex version
+  if (typeof paramsOrConversationId === 'string' || typeof paramsOrConversationId === 'number') {
+    conversationId = paramsOrConversationId;
+  } else {
+    // Full params version
+    conversationId = paramsOrConversationId.conversationId;
+    isGroup = paramsOrConversationId.isGroup;
+    
+    // Wrap the provided getMessages function to ensure consistent response format
+    const originalGetMessages = paramsOrConversationId.getMessages;
+    getMessages = async (id: string | number): Promise<MessageResponse> => {
+      try {
+        const response = await originalGetMessages(id);
+        // Normalize the response format
+        return {
+          is_group: response.is_group || isGroup || false,
+          messages: response.messages || [],
+          results: response.results || []
+        };
+      } catch (error) {
+        console.error("[useMessages] Error in custom getMessages wrapper:", error);
+        // Return empty result on error
+        return {
+          is_group: isGroup || false,
+          messages: [],
+          results: []
+        };
+      }
+    };
+    
+    sendMessageApi = paramsOrConversationId.sendMessageApi;
+  }
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +203,30 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
 
   // Setup WebSocket connection and message handlers
   useEffect(() => {
-    console.log(`[useMessages] Setting up WebSocket for conversation: ${conversationId}`);
+    console.log(`[useMessages] Setting up WebSocket for conversation: ${conversationId}, type: ${isGroup ? 'group' : 'one-to-one'}`);
+    
+    // Connect to WebSocket
+    const connectWebSocket = async () => {
+      try {
+        if (!user?.id || !user?.username) {
+          console.error('[useMessages] Missing user information for WebSocket connection');
+          return;
+        }
+        
+        await websocketService.connect({
+          userId: user.id,
+          username: user.username,
+          conversationId: conversationId.toString(),
+          conversationType: isGroup ? 'group' : 'one-to-one'
+        });
+        
+        console.log(`[useMessages] WebSocket connected for ${isGroup ? 'group' : 'direct'} conversation: ${conversationId}`);
+      } catch (error) {
+        console.error('[useMessages] Error connecting to WebSocket:', error);
+      }
+    };
+    
+    connectWebSocket();
 
     // Message handler
     const handleMessage = (data: any) => {
@@ -208,7 +318,7 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
   const sendMessage = useCallback(async (content: string): Promise<void> => {
     if (!content.trim()) return;
 
-    console.log(`[useMessages] Sending message: "${content}"`);
+    console.log(`[useMessages] Sending message: "${content}" to ${isGroup ? 'group' : 'direct'} conversation ${conversationId}`);
 
     // Generate a unique, timestamped ID for the temporary message
     const tempId = `temp-${Date.now()}`;
@@ -228,8 +338,22 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
     setMessages(prev => [...prev, tempMessage]);
 
     try {
-      // Send via API (which will use WebSocket if available)
-      const response = await apiSendMessage(conversationId, content);
+      // Try to send via WebSocket first if connected
+      if (websocketService.isConnected()) {
+        try {
+          websocketService.sendMessage({
+            content,
+            message_type: 'text'
+          });
+          console.log('[useMessages] Message sent via WebSocket');
+        } catch (wsError) {
+          console.error('[useMessages] WebSocket send failed, falling back to API:', wsError);
+          // Fall back to API
+        }
+      }
+      
+      // Always send via API to ensure delivery (WebSocket might have failed)
+      const response = await sendMessageApi(conversationId, content);
       console.log(`[useMessages] Message sent successfully:`, response);
       
       // Only update the temp message if it still exists and hasn't been replaced by WebSocket
@@ -322,12 +446,118 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
   const retryConnection = useCallback(async (): Promise<void> => {
     console.log(`[useMessages] Retrying WebSocket connection for conversation: ${conversationId}`);
     try {
-      await websocketService.connect(conversationId.toString());
+      if (!user?.id || !user?.username) {
+        console.error('[useMessages] Missing user information for WebSocket connection');
+        throw new Error('Missing user information');
+      }
+      
+      await websocketService.connect({
+        userId: user.id,
+        username: user.username,
+        conversationId: conversationId.toString(),
+        conversationType: isGroup ? 'group' : 'one-to-one'
+      });
     } catch (error) {
       console.error('[useMessages] Failed to retry connection:', error);
       throw error;
     }
-  }, [conversationId]);
+  }, [conversationId, isGroup, user?.id, user?.username]);
+
+  // Mark message as read
+  const markMessageAsRead = useCallback((messageId: string | number): void => {
+    // Implement mark as read functionality
+    console.log(`[useMessages] Marking message ${messageId} as read`);
+    // Update UI immediately
+    setMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg.id === messageId ? { ...msg, status: 'read' } : msg
+      )
+    );
+    
+    // Send read receipt via WebSocket if connected
+    if (websocketService.isConnected()) {
+      websocketService.sendReadReceipt(messageId);
+    }
+  }, []);
+
+  // Load older messages (pagination)
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [page, setPage] = useState(1);
+  
+  const loadMoreMessages = useCallback(async (): Promise<void> => {
+    if (loading || !hasMoreMessages) return;
+    
+    try {
+      setLoading(true);
+      console.log(`[useMessages] Loading more messages for conversation: ${conversationId}, page: ${page + 1}`);
+      
+      // Get API response and extract messages from appropriate fields
+      try {
+        const response = await getMessages(conversationId);
+        
+        // Get messages from either field
+        const messagesList = response?.messages || response?.results || [];
+        
+        if (messagesList && messagesList.length > 0) {
+          // Format and add the older messages
+          const olderMessages = messagesList.map((msg: any) => ({
+            id: msg.id,
+            content: msg.content,
+            sender_id: msg.sender || msg.sender_id,
+            sender_name: msg.sender_name || 'Unknown',
+            timestamp: msg.timestamp,
+            message_type: msg.message_type || 'text',
+            status: 'sent' as const,
+            is_bot: msg.is_bot || false,
+          }));
+          
+          // Add older messages to the beginning of the array
+          setMessages(prevMessages => [...olderMessages, ...prevMessages]);
+          setPage(page + 1);
+        } else {
+          // No more messages to load
+          setHasMoreMessages(false);
+        }
+      } catch (err) {
+        console.error('[useMessages] Error processing messages:', err);
+        setHasMoreMessages(false);
+      }
+    } catch (error) {
+      console.error('[useMessages] Failed to load more messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [conversationId, getMessages, loading, hasMoreMessages, page]);
+
+  // Refresh all messages (e.g., after receiving a new message)
+  const refreshMessages = useCallback(async (): Promise<void> => {
+    try {
+      console.log(`[useMessages] Refreshing messages for conversation: ${conversationId}`);
+      
+      const response = await getMessages(conversationId);
+      
+      // Try to get messages from either 'messages' or 'results' field
+      const messagesList = response?.messages || response?.results || [];
+      
+      if (messagesList && messagesList.length > 0) {
+        // Format and update all messages
+        const formattedMessages = messagesList.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          sender_id: msg.sender || msg.sender_id,
+          sender_name: msg.sender_name || 'Unknown',
+          timestamp: msg.timestamp,
+          message_type: msg.message_type || 'text',
+          status: msg.status || 'sent',
+          is_bot: msg.is_bot || false,
+        }));
+        
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('[useMessages] Failed to refresh messages:', error);
+    }
+  }, [conversationId, getMessages]);
 
   return {
     messages,
@@ -339,5 +569,9 @@ export const useMessages = (conversationId: string | number): UseMessagesReturn 
     retryMessage,
     isConnected,
     retryConnection,
+    markMessageAsRead,
+    loadMoreMessages,
+    hasMoreMessages,
+    refreshMessages
   };
 };

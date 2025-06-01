@@ -17,6 +17,7 @@ import MessagesList from '../../components/Chat/MessagesList';
 import ChatHeader from '../../components/Chat/ChatHeader';
 import MessageInput from '../../components/Chat/MessageInput';
 import websocketService from '../../services/websocketService';
+import { sendMessage as apiSendMessage, getConversationById } from '../../API/conversations';
 
 type RootStackParamList = {
   ChatScreen: {
@@ -52,7 +53,15 @@ const ChatScreen = () => {
     retryMessage,
     isConnected,
     retryConnection
-  } = useMessages(conversationId);
+  } = useMessages({
+    conversationId,
+    isGroup: isGroup || false,
+    getMessages: async (id) => {
+      // Simple implementation using the existing getConversationById function
+      return getConversationById(id);
+    },
+    sendMessageApi: apiSendMessage
+  });
 
   const [inputText, setInputText] = useState('');
   const [isUserTyping, setIsUserTyping] = useState(false);
@@ -65,7 +74,13 @@ const ChatScreen = () => {
     
     const initConnection = async () => {
       try {
-        await websocketService.connect(conversationId.toString());
+        const conversationType = isGroup ? 'group' : 'one-to-one';
+        await websocketService.connect({
+          userId: user?.id || '',
+          username: user?.username || '',
+          conversationId: conversationId.toString(),
+          conversationType: conversationType
+        });
         console.log('[ChatScreen] ✅ WS connect promise resolved');
         setConnectionAttempts(0);
       } catch (err) {
@@ -156,7 +171,13 @@ const ChatScreen = () => {
       if (!isConnected) {
         console.log('[ChatScreen] 🔌 WS not connected, attempting reconnect before sending');
         try {
-          await websocketService.connect(conversationId.toString());
+          const conversationType = isGroup ? 'group' : 'one-to-one';
+          await websocketService.connect({
+            userId: user?.id || '',
+            username: user?.username || '',
+            conversationId: conversationId.toString(),
+            conversationType: conversationType
+          });
           console.log('[ChatScreen] ✅ Reconnected WS before sending message');
         } catch (err) {
           console.log('[ChatScreen] ⚠️ Reconnection failed, will send via REST API');

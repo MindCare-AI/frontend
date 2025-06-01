@@ -85,11 +85,18 @@ export type AppointmentStackParamList = {
   DeclineAppointment: { appointmentId: number };
 };
 
-// Updated Messaging navigation types
+// Updated Messaging navigation types with tab-based structure
 export type MessagingStackParamList = {
-  Home: undefined;
-  Chat: { 
-    id: string;
+  MessagingTabs: undefined;
+  DirectChat: { 
+    conversationId: string;
+    conversationTitle?: string;
+    otherUserId?: string;
+    highlightMessageId?: string;
+  };
+  GroupChat: { 
+    conversationId: string;
+    conversationTitle?: string;
     highlightMessageId?: string;
   };
   Profile: { id: string };
@@ -100,8 +107,13 @@ export type MessagingStackParamList = {
   GroupMembers: { id: string };
   Settings: undefined;
   NotificationSettings: undefined;
-  MessagingSettings: { conversationId?: string; conversationType?: 'one_to_one' | 'group' };
-  Messaging: undefined;
+  MessagingSettings: { conversationId?: string; conversationType?: 'direct' | 'group' };
+};
+
+// Tab navigator types for messaging
+export type MessagingTabParamList = {
+  DirectMessages: undefined;
+  GroupConversations: undefined;
 };
 
 export type MoodTrackerParamList = {
@@ -131,8 +143,10 @@ export type DrawerParamList = {
 };
 
 // Messaging Screen Navigation Props
-export type HomeScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Home">;
-export type ChatScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Chat">;
+export type DirectMessagesScreenNavigationProp = StackNavigationProp<MessagingTabParamList, "DirectMessages">;
+export type GroupMessagesScreenNavigationProp = StackNavigationProp<MessagingTabParamList, "GroupConversations">;
+export type DirectChatScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "DirectChat">;
+export type GroupChatScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "GroupChat">;
 export type ProfileScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "Profile">;
 export type NewConversationScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NewConversation">;
 export type NewGroupScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "NewGroup">;
@@ -144,7 +158,8 @@ export type NotificationSettingsScreenNavigationProp = StackNavigationProp<Messa
 export type MessagingSettingsScreenNavigationProp = StackNavigationProp<MessagingStackParamList, "MessagingSettings">;
 
 // Messaging Screen Route Props
-export type ChatScreenRouteProp = RouteProp<MessagingStackParamList, "Chat">;
+export type DirectChatScreenRouteProp = RouteProp<MessagingStackParamList, "DirectChat">;
+export type GroupChatScreenRouteProp = RouteProp<MessagingStackParamList, "GroupChat">;
 export type ProfileScreenRouteProp = RouteProp<MessagingStackParamList, "Profile">;
 export type MediaGalleryScreenRouteProp = RouteProp<MessagingStackParamList, "MediaGallery">;
 export type GroupMembersScreenRouteProp = RouteProp<MessagingStackParamList, "GroupMembers">;
