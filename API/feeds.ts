@@ -77,22 +77,52 @@ export const createPost = async (postData: any) => {
       // Handle link_url with support for both naming conventions
       const linkUrl = postData.link_url || postData.linkUrl;
       if (linkUrl) {
+        console.log("DEBUG: Adding link_url to form data:", linkUrl);
         formData.append('link_url', linkUrl);
       }
       
-      // Handle file upload
+      // Handle file upload and ensure link_url is set for media posts
       if (postData.file) {
+        console.log("DEBUG: Adding file to form data:", postData.file);
         formData.append('file', postData.file);
+        
+        // If file exists but no link_url provided, and it's a media post, 
+        // the backend should generate the URL. Make sure we're sending the right post_type
+        if (!linkUrl && (postType === 'image' || postType === 'video')) {
+          console.log("DEBUG: Media file detected without link_url - backend will generate URL");
+        }
       } else if (postData.media) {
+        console.log("DEBUG: Adding media to form data:", postData.media);
         formData.append('file', postData.media);
+        
+        // Same logic for media field
+        if (!linkUrl && (postType === 'image' || postType === 'video')) {
+          console.log("DEBUG: Media file detected without link_url - backend will generate URL");
+        }
       }
       
-      // Log form data keys for debugging
-      // const formDataKeys = [];
-      // formData.forEach((value, key) => {
-      //   formDataKeys.push(key);
-      // });
-      // console.log("DEBUG: Sending FormData with keys:", formDataKeys);
+      // If we have a media URI/URL that needs to be sent as link_url
+      if (postData.mediaUri && !linkUrl) {
+        console.log("DEBUG: Adding mediaUri as link_url:", postData.mediaUri);
+        formData.append('link_url', postData.mediaUri);
+      }
+      
+      // Handle case where image/video URL is provided directly
+      if (postData.imageUrl && !linkUrl) {
+        console.log("DEBUG: Adding imageUrl as link_url:", postData.imageUrl);
+        formData.append('link_url', postData.imageUrl);
+      }
+      
+      if (postData.videoUrl && !linkUrl) {
+        console.log("DEBUG: Adding videoUrl as link_url:", postData.videoUrl);
+        formData.append('link_url', postData.videoUrl);
+      }
+      
+      // Log form data for debugging
+      console.log("DEBUG: FormData contents:");
+      for (let pair of Array.from((formData as any).entries()) as [string, string | Blob][]) {
+        console.log(`DEBUG: ${pair[0]}: ${typeof pair[1] === 'object' ? '[File Object]' : pair[1]}`);
+      }
       
       const response = await axios.post(`${FEEDS_URL}/posts/`, formData, {
         headers: {
