@@ -252,7 +252,6 @@ const GroupMessagesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
       <ConversationHeader
         title="Group Messages"
         showSearch={true}
@@ -260,40 +259,49 @@ const GroupMessagesScreen: React.FC = () => {
         onSearchChange={setSearchQuery}
         searchInputRef={searchInputRef}
       />
-
-      <KeyboardAvoidingView 
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <FlatList
-          data={filteredConversations}
-          renderItem={renderConversationItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={[
-            styles.listContainer,
-            filteredConversations.length === 0 && styles.emptyListContainer
-          ]}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={renderEmptyList}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          refreshing={refreshing}
-          updateCellsBatchingPeriod={50}
-          onRefresh={refresh}
-          windowSize={10}
-        />
-
-        <FloatingButton
-          onPress={handleNewGroup}
-          icon="add"
-          style={styles.fab}
-        />
-      </KeyboardAvoidingView>
-
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={styles.content}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <FlatList
+            data={filteredConversations}
+            renderItem={renderConversationItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={[
+              styles.listContainer,
+              filteredConversations.length === 0 && styles.emptyListContainer,
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor="#007AFF"
+                colors={['#007AFF']}
+              />
+            }
+            ListEmptyComponent={renderEmptyList}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={10}
+          />
+          <FloatingButton
+            onPress={handleNewGroup}
+            icon="add"
+            style={styles.fab}
+          />
+        </KeyboardAvoidingView>
+      )}
       <UserSelectionModal
         visible={showUserSelection}
-        onClose={() => setShowUserSelection(false)}
         conversationType="group"
+        onClose={() => setShowUserSelection(false)}
         onCreateConversation={handleCreateGroup}
         currentUserId={user?.id || ''}
         creating={loadingUsers}
@@ -316,7 +324,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   emptyListContainer: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 64,
   },
   conversationItemContainer: {
     marginBottom: 1,

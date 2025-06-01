@@ -3,23 +3,19 @@ module.exports = function(api) {
   return {
     presets: [
       'babel-preset-expo',
-      '@babel/preset-typescript'
+      '@babel/preset-flow',
+      [
+        '@babel/preset-typescript',
+        {
+          allowDeclareFields: true,
+          allowNamespaces: true,
+        }
+      ]
     ],
     plugins: [
-      ['react-native-reanimated/plugin', {
-        relativeSourceLocation: true,
-      }],
-      ['module-resolver', {
-        alias: {
-          '^react-native$': 'react-native'
-        }
-      }],
-      '@babel/plugin-transform-runtime', // Handle platform constants
+      '@babel/plugin-syntax-flow',
+      '@babel/plugin-transform-flow-strip-types',
+      'react-native-reanimated/plugin',
     ],
-    env: {
-      production: {
-        plugins: ['react-native-paper/babel']
-      }
-    }
   };
 };

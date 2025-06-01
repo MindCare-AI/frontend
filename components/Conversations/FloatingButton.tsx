@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Use the correct type for Ionicons names
@@ -9,24 +9,23 @@ interface FloatingButtonProps {
   onPress: () => void;
   icon?: IoniconsNames; // Now using the proper type for Ionicons
   color?: string;
-  style?: any;
+  style?: ViewStyle;
 }
 
 const FloatingButton: React.FC<FloatingButtonProps> = ({
   onPress,
   icon = 'create-outline',
   color = '#FFFFFF',
+  style,
 }) => {
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={onPress}
-        activeOpacity={0.8}
-      >
-        <Ionicons name={icon} size={24} color={color} />
-      </TouchableOpacity>
-    </View>
+    <TouchableOpacity
+      style={[styles.container, style]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Ionicons name={icon} size={32} color={color} />
+    </TouchableOpacity>
   );
 };
 
@@ -36,8 +35,6 @@ const styles = StyleSheet.create({
     bottom: 24,
     right: 24,
     zIndex: 999,
-  },
-  button: {
     width: 56,
     height: 56,
     borderRadius: 28,

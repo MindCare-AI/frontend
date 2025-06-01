@@ -165,51 +165,32 @@ const DirectMessagesScreen: React.FC = () => {
 
   const searchInputRef = useRef<TextInput>(null);
 
-  // Map API conversations to UI Conversation type before filtering
-  const adaptedConversations: Conversation[] = (conversations || []).map((item) => ({
-    id: item.id,
-    is_group: false,
-    participants: item.other_participant ? [item.other_participant] : [],
-    last_message: item.last_message ? {
-      id: item.last_message.id || 0,
-      content: item.last_message.content || '',
-      sender_id: item.last_message.sender || '',
-      sender_name: item.last_message.sender_name || '',
-      timestamp: item.last_message.timestamp || new Date().toISOString(),
-      is_read: item.unread_count === 0
-    } : undefined,
-    unread_count: item.unread_count || 0,
-    other_participant: item.other_participant ? {
-      id: item.other_participant.id || 0,
-      username: item.other_participant.username || '',
-      user_type: (item.other_participant as any).user_type || 'user',
-      profile_pic: (item.other_participant as any).profile_pic || undefined
-    } : undefined
-  }));
-
-  const filteredConversations = adaptedConversations.filter((conversation) => {
+  // Filter conversations directly on the original array
+  const filteredConversations: DirectConversation[] = (conversations || []).filter((item) => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
-    const otherUser = conversation.other_participant;
+    const otherUser = item.other_participant;
     return (
       (otherUser && typeof otherUser.username === 'string' && otherUser.username.toLowerCase().includes(searchLower)) ||
       (otherUser && typeof (otherUser as any).full_name === 'string' && (otherUser as any).full_name.toLowerCase().includes(searchLower)) ||
-      (conversation.last_message && typeof conversation.last_message.content === 'string' && conversation.last_message.content.toLowerCase().includes(searchLower))
+      (item.last_message && typeof item.last_message.content === 'string' && item.last_message.content.toLowerCase().includes(searchLower))
     );
   });
 
   const handleConversationPress = useCallback((conversationId: string | number) => {
-    const conversation = adaptedConversations.find((c) => c.id === conversationId);
+    const conversation = filteredConversations.find((c) => c.id === conversationId);
     if (conversation) {
       navigation.navigate('DirectChat' as any, {
-        conversationId: conversationId.toString(),        conversationTitle: 
-                          (conversation.other_participant && 'full_name' in conversation.other_participant 
-                            ? conversation.other_participant.full_name 
-                            : conversation.other_participant?.username) || 
-                          'Direct Message',
+        conversationId: conversationId.toString(),
+        conversationTitle: 
+          (conversation.other_participant && 'full_name' in conversation.other_participant 
+            ? conversation.other_participant.full_name 
+            : conversation.other_participant?.username) || 
+          'Direct Message',
+        otherParticipantId: conversation.other_participant?.id
       });
     }
-  }, [navigation]);
+  }, [navigation, filteredConversations]);
 
   const handleDeleteConversation = useCallback((conversationId: string | number) => {
      Alert.alert(
@@ -302,63 +283,56 @@ const DirectMessagesScreen: React.FC = () => {
       filterMode="direct"
     />
   );
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
       <ConversationHeader
         title="Direct Messages"
         onSettingsPress={() => navigation.navigate('MessagingSettings' as any, { conversationType: 'direct' })}
       />
-
-      <KeyboardAvoidingView 
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <FlatList
-          data={filteredConversations}
-          renderItem={({ item, index }) => (
-            <AnimatedConversationItem
-              item={item as any}
-              index={index}
-              userId={user?.id || ''}
-              onPress={handleConversationPress}
-              onLongPress={() => handleDeleteConversation(item.id)}
-              deletingConversationId={deletingConversationId}
-            />
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={[
-            styles.listContainer,
-            filteredConversations.length === 0 && styles.emptyListContainer
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing || false}
-              onRefresh={refresh || (() => {})}
-              tintColor="#007AFF"
-              colors={['#007AFF']}
-            />
-          }
-          ListEmptyComponent={renderEmptyList}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          windowSize={10}
-        />
-
-        <FloatingButton
-          onPress={handleNewConversation}
-          icon="add"
-        />
-      </KeyboardAvoidingView>
-
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#007AFF" />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={styles.content}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <FlatList
+            data={filteredConversations}
+            renderItem={renderConversationItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={[
+              styles.listContainer,
+              filteredConversations.length === 0 && styles.emptyListContainer,
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refresh}
+                tintColor="#007AFF"
+                colors={['#007AFF']}
+              />
+            }
+            ListEmptyComponent={renderEmptyList}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={10}
+          />
+          <FloatingButton
+            onPress={handleNewConversation}
+            icon="add"
+            style={styles.fab}
+          />
+        </KeyboardAvoidingView>
+      )}
       <UserSelectionModal
         visible={showUserSelection}
-        onClose={() => setShowUserSelection(false)}
         conversationType="direct"
+        onClose={() => setShowUserSelection(false)}
         onCreateConversation={handleCreateConversation}
         currentUserId={user?.id || ''}
         creating={loadingUsers}
@@ -381,7 +355,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   emptyListContainer: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 64,
   },
   conversationItemContainer: {
     marginBottom: 1,
@@ -390,7 +367,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    ...createShadow(4),
+    justifyContent: 'center',
   },
 });
 

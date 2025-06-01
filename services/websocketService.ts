@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Backend-compatible WebSocket message interface
 export interface WebSocketMessage {
   event: 'chat.message' | 'typing.indicator' | 'read.receipt' | 'message.reaction' | 'user.online' | 'user.offline' | 'heartbeat';
-  type?: 'message' | 'typing' | 'read' | 'reaction' | 'presence' | 'heartbeat'; // For backward compatibility
+  type?: 'message' | 'typing' | 'read' | 'reaction' | 'presence' | 'heartbeat';
   
   // Message data for chat.message events
   message?: {
@@ -54,6 +54,9 @@ export interface MessageData {
   media_id?: string;
 }
 
+// Add debug flag at the top
+const DEBUG_WEBSOCKET = __DEV__ && false; // Set to false to reduce logs
+
 class WebSocketService {
   private ws: WebSocket | null = null;
   private conversationId: string | null = null;
@@ -73,6 +76,18 @@ class WebSocketService {
   private heartbeatCheckTimer: NodeJS.Timeout | null = null;
   private missedHeartbeats: number = 0;
   private readonly MAX_MISSED_HEARTBEATS = 3;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  
+  // Circuit breaker properties
+  private circuitBreakerOpen = false;
+  private circuitBreakerOpenTime = 0;
+  private circuitBreakerTimeout = 60000; // 1 minute
+  private consecutiveFailures = 0;
+  private maxConsecutiveFailures = 10;
+  
+  // Store user info for reconnection
+  private lastUserId: string | null = null;
+  private lastUsername: string | null = null;
 
   // Connect to WebSocket for a specific conversation with type
   async connect(params: {
@@ -81,7 +96,17 @@ class WebSocketService {
     conversationId: string;
     conversationType: 'one-to-one' | 'group';
   }): Promise<void> {
-    const { conversationId, conversationType } = params;
+    const { userId, username, conversationId, conversationType } = params;
+    
+    // Store user info for reconnection
+    this.lastUserId = userId.toString();
+    this.lastUsername = username;
+    
+    // Check circuit breaker
+    if (this.isCircuitBreakerOpen()) {
+      console.log('[WebSocket] Circuit breaker is open, skipping connection attempt');
+      throw new Error('Circuit breaker is open');
+    }
     
     // If already connected to the same conversation, don't reconnect
     if (this.isConnecting || 
@@ -89,14 +114,18 @@ class WebSocketService {
         this.ws.readyState === WebSocket.OPEN && 
         this.conversationId === conversationId &&
         this.conversationType === conversationType)) {
-      console.log('[WebSocket] 🔄 Already connected to conversation', conversationId, `(${conversationType})`);
+      if (DEBUG_WEBSOCKET) {
+        console.log('[WebSocket] Already connected to conversation', conversationId, `(${conversationType})`);
+      }
       return Promise.resolve();
     }
 
     // If connecting to a different conversation, disconnect first
     if (this.ws && this.conversationId && 
        (this.conversationId !== conversationId || this.conversationType !== conversationType)) {
-      console.log('[WebSocket] 🔄 Switching conversations, disconnecting first');
+      if (DEBUG_WEBSOCKET) {
+        console.log('[WebSocket] Switching conversations, disconnecting first');
+      }
       this.disconnect(true);
     }
 
@@ -108,39 +137,40 @@ class WebSocketService {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (!token) {
-        console.error('[WebSocket] ❌ No access token found');
+        console.error('[WebSocket] No access token found');
+        this.handleConnectionFailure();
         throw new Error('No access token found');
       }
 
-      // New backend URL pattern: /ws/<conversation-type>/<conversation_id>/?token=<JWT>
       const wsUrl = `${WS_BASE_URL}/ws/${conversationType}/${conversationId}/?token=${token}`;
-      console.log(`[WebSocket] 🚀 Connecting to: ${wsUrl}`);
-      console.log(`[WebSocket] 📊 Connection attempt #${this.reconnectAttempts + 1}`);
+      console.log(`[WebSocket] Connecting to ${conversationType} conversation: ${conversationId}`);
 
       this.ws = new WebSocket(wsUrl);
 
       // Create a promise to handle connection result
       return new Promise((resolve, reject) => {
         const connectionTimeout = setTimeout(() => {
-          console.error('[WebSocket] ⏰ Connection timeout');
+          console.error('[WebSocket] Connection timeout');
           this.isConnecting = false;
+          this.handleConnectionFailure();
           reject(new Error('Connection timeout'));
         }, 10000);
 
         this.ws!.onopen = () => {
           clearTimeout(connectionTimeout);
           const connectionTime = Date.now() - this.connectionStartTime;
-          console.log(`[WebSocket] ✅ Connected successfully for ${conversationType} conversation: ${conversationId}`);
-          console.log(`[WebSocket] ⏱️ Connection established in ${connectionTime}ms`);
-          console.log(`[WebSocket] 🔗 ReadyState: ${this.ws?.readyState} (OPEN)`);
+          console.log(`[WebSocket] Connected successfully (${connectionTime}ms)`);
           
           this.reconnectAttempts = 0;
+          this.consecutiveFailures = 0;
+          this.circuitBreakerOpen = false;
           this.isConnecting = false;
           this.lastPingTime = Date.now();
           this.notifyConnectionCallbacks(true);
           
-          // Log connection details
-          this.logConnectionStatus();
+          if (DEBUG_WEBSOCKET) {
+            this.logConnectionStatus();
+          }
           this.startHeartbeatMonitoring();
           resolve();
         };
@@ -148,49 +178,97 @@ class WebSocketService {
         this.ws!.onmessage = this.handleMessageEvent;
 
         this.ws!.onclose = (event) => {
-          console.log(`[WebSocket] 🔌 Connection closed - Code: ${event.code}, Reason: "${event.reason}"`);
-          console.log(`[WebSocket] 📊 Connection was open for: ${Date.now() - this.connectionStartTime}ms`);
-          console.log(`[WebSocket] 📈 Messages sent: ${this.messagesSentCount}, received: ${this.messagesReceivedCount}`);
+          if (DEBUG_WEBSOCKET) {
+            console.log(`[WebSocket] Connection closed - Code: ${event.code}, Reason: "${event.reason}"`);
+          }
           
           this.isConnecting = false;
           this.notifyConnectionCallbacks(false);
           this.stopHeartbeatMonitoring();
           
-          // Log close reasons
-          if (event.code === 1000) {
-            console.log('[WebSocket] ✅ Normal closure');
-          } else if (event.code === 1006) {
-            console.log('[WebSocket] ⚠️ Abnormal closure (connection lost)');
-          } else if (event.code === 4001) {
-            console.log('[WebSocket] 🔒 Authentication failed');
-          } else {
-            console.log(`[WebSocket] ❓ Unknown close code: ${event.code}`);
-          }
+          // Handle connection failure
+          this.handleConnectionFailure();
           
-          // Attempt to reconnect if not intentionally closed
-          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-            console.log(`[WebSocket] 🔄 Scheduling reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+          // Attempt to reconnect if not intentionally closed and circuit breaker allows
+          if (event.code !== 1000 && 
+              this.reconnectAttempts < this.maxReconnectAttempts &&
+              !this.isCircuitBreakerOpen()) {
+            if (DEBUG_WEBSOCKET) {
+              console.log(`[WebSocket] Scheduling reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+            }
             this.scheduleReconnect();
           } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('[WebSocket] ❌ Max reconnection attempts reached');
+            console.warn('[WebSocket] Max reconnection attempts reached');
+            this.openCircuitBreaker();
           }
         };
 
         this.ws!.onerror = (error) => {
           clearTimeout(connectionTimeout);
-          console.error('[WebSocket] ❌ WebSocket error occurred:', error);
-          console.log(`[WebSocket] 🔗 ReadyState at error: ${this.ws?.readyState}`);
+          console.error('[WebSocket] Connection error occurred:', error);
           this.isConnecting = false;
+          this.handleConnectionFailure();
           this.notifyConnectionCallbacks(false);
           reject(error);
         };
       });
 
     } catch (error) {
-      console.error('[WebSocket] ❌ Error during connection setup:', error);
+      console.error('[WebSocket] Error during connection setup:', error);
       this.isConnecting = false;
+      this.handleConnectionFailure();
       throw error;
     }
+  }
+
+  private handleConnectionFailure(): void {
+    this.consecutiveFailures++;
+    
+    if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+      console.warn(`[WebSocket] Too many consecutive failures (${this.consecutiveFailures}), opening circuit breaker`);
+      this.openCircuitBreaker();
+    }
+  }
+
+  private isCircuitBreakerOpen(): boolean {
+    if (!this.circuitBreakerOpen) {
+      return false;
+    }
+    
+    // Check if circuit breaker timeout has passed
+    if (Date.now() - this.circuitBreakerOpenTime > this.circuitBreakerTimeout) {
+      console.log('[WebSocket] Circuit breaker timeout passed, allowing connection attempts');
+      this.circuitBreakerOpen = false;
+      this.consecutiveFailures = 0;
+      return false;
+    }
+    
+    return true;
+  }
+
+  private openCircuitBreaker(): void {
+    this.circuitBreakerOpen = true;
+    this.circuitBreakerOpenTime = Date.now();
+    console.warn(`[WebSocket] Circuit breaker opened for ${this.circuitBreakerTimeout / 1000} seconds`);
+  }
+
+  // Add method to reset circuit breaker manually
+  resetCircuitBreaker(): void {
+    this.circuitBreakerOpen = false;
+    this.consecutiveFailures = 0;
+    this.reconnectAttempts = 0;
+    console.log('[WebSocket] Circuit breaker reset manually');
+  }
+
+  // Cleanup method to reset state
+  private cleanup(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.stopHeartbeatMonitoring();
+    this.reconnectAttempts = 0;
+    this.isConnecting = false;
   }
 
   // Disconnect from WebSocket
@@ -210,8 +288,7 @@ class WebSocketService {
     }
     this.conversationId = null;
     this.conversationType = null;
-    this.reconnectAttempts = 0;
-    this.isConnecting = false;
+    this.cleanup();
     this.messagesSentCount = 0;
     this.messagesReceivedCount = 0;
   }
@@ -219,102 +296,103 @@ class WebSocketService {
   // Send a message through WebSocket
   sendMessage(messageData: MessageData): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocket] ❌ Cannot send message - WebSocket not connected');
-      console.log(`[WebSocket] 🔗 Current state: ${this.ws?.readyState || 'null'}`);
+      console.warn('[WebSocket] Cannot send message - not connected');
       throw new Error('WebSocket is not connected');
     }
     const payload = {
       event: 'chat.message',
-      type: 'message', // For backward compatibility
+      type: 'message',
       content: messageData.content,
       message_type: messageData.message_type || 'text',
       metadata: messageData.metadata || {},
       ...(messageData.media_id && { media_id: messageData.media_id })
     };
     this.messagesSentCount++;
-    console.log(`[WebSocket] 📤 Sending message (#${this.messagesSentCount}):`, payload);
-    console.log(`[WebSocket] 💬 Content: "${payload.content.substring(0, 100)}${payload.content.length > 100 ? '...' : ''}"`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Sending message (#${this.messagesSentCount}):`, payload.content.substring(0, 50));
+    }
     try {
       this.ws.send(JSON.stringify(payload));
-      console.log('[WebSocket] ✅ Message sent successfully');
     } catch (error) {
-      console.error('[WebSocket] ❌ Error sending message:', error);
+      console.error('[WebSocket] Error sending message:', error);
       throw error;
     }
   }
 
-  // Send read receipt (keep only this version)
+  // Send read receipt
   sendReadReceipt(messageId: string | number): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[WebSocket] ❌ Cannot send read receipt - WebSocket not connected');
+      if (DEBUG_WEBSOCKET) {
+        console.warn('[WebSocket] Cannot send read receipt - not connected');
+      }
       return;
     }
     const payload = {
       event: 'read.receipt',
-      type: 'read', // For backward compatibility
+      type: 'read',
       message_id: messageId,
       conversation_id: this.conversationId,
       conversation_type: this.conversationType,
     };
-    console.log(`[WebSocket] 📤 Sending read receipt for message: ${messageId}`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Sending read receipt for message: ${messageId}`);
+    }
     try {
       this.ws.send(JSON.stringify(payload));
-      console.log('[WebSocket] ✅ Read receipt sent successfully');
     } catch (error) {
-      console.error('[WebSocket] ❌ Error sending read receipt:', error);
+      console.error('[WebSocket] Error sending read receipt:', error);
     }
   }
 
-  // Send typing indicator (keep only this version)
+  // Send typing indicator
   sendTyping(isTyping: boolean): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] ⚠️ Cannot send typing indicator - WebSocket not connected');
       return;
     }
     const payload = {
       event: 'typing.indicator',
-      type: 'typing', // For backward compatibility
+      type: 'typing',
       is_typing: isTyping,
     };
-    console.log(`[WebSocket] ⌨️ Sending typing indicator: ${isTyping ? 'started' : 'stopped'}`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Typing indicator: ${isTyping ? 'started' : 'stopped'}`);
+    }
     this.ws.send(JSON.stringify(payload));
   }
 
   // Send reaction
   sendReaction(messageId: string, reaction: string, action: 'add' | 'remove' = 'add'): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] ⚠️ Cannot send reaction - WebSocket not connected');
       return;
     }
 
     const payload = {
       event: 'message.reaction',
-      type: 'reaction', // For backward compatibility
+      type: 'reaction',
       message_id: messageId,
       reaction,
       action,
     };
 
-    console.log(`[WebSocket] 👍 Sending reaction: ${action} "${reaction}" to message ${messageId}`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Sending reaction: ${action} "${reaction}" to message ${messageId}`);
+    }
     this.ws.send(JSON.stringify(payload));
   }
 
   // Check if WebSocket is connected
   isConnected(): boolean {
     const connected = this.ws !== null && this.ws.readyState === WebSocket.OPEN;
-    console.log(`[WebSocket] 🔍 Connection check: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
     return connected;
   }
 
   // Get current conversation ID
   getCurrentConversationId(): string | null {
-    console.log(`[WebSocket] 🆔 Current conversation ID: ${this.conversationId || 'none'}`);
     return this.conversationId;
   }
 
   // Get current conversation type
   getCurrentConversationType(): 'one-to-one' | 'group' | null {
-    console.log(`[WebSocket] 🎭 Current conversation type: ${this.conversationType || 'none'}`);
     return this.conversationType;
   }
 
@@ -325,14 +403,20 @@ class WebSocketService {
       conversationId: this.conversationId,
       conversationType: this.conversationType,
       reconnectAttempts: this.reconnectAttempts,
+      consecutiveFailures: this.consecutiveFailures,
+      circuitBreakerOpen: this.circuitBreakerOpen,
       messagesSent: this.messagesSentCount,
       messagesReceived: this.messagesReceivedCount,
       connectionUptime: this.connectionStartTime ? Date.now() - this.connectionStartTime : 0,
       readyState: this.ws?.readyState || 'null',
-      lastPing: this.lastPingTime ? Date.now() - this.lastPingTime : 0
+      lastPing: this.lastPingTime ? Date.now() - this.lastPingTime : 0,
+      lastUserId: this.lastUserId,
+      lastUsername: this.lastUsername
     };
     
-    console.log('[WebSocket] 📊 Connection Statistics:', stats);
+    if (DEBUG_WEBSOCKET) {
+      console.log('[WebSocket] Connection Statistics:', stats);
+    }
     return stats;
   }
 
@@ -390,16 +474,23 @@ class WebSocketService {
   }
 
   private handleStaleConnection(): void {
+    console.log('[WebSocket] 💔 Handling stale connection');
     this.disconnect(true); // Force disconnect
-    // Attempt to reconnect if we have a conversation ID and type
-    if (this.conversationId && this.conversationType) {
+    
+    // Attempt to reconnect if we have the necessary info
+    if (this.conversationId && 
+        this.conversationType && 
+        this.lastUserId && 
+        this.lastUsername &&
+        !this.isCircuitBreakerOpen()) {
       console.log('[WebSocket] 🔄 Attempting to reconnect due to stale connection');
-      // Fix: use the correct connect signature
       this.connect({
-        userId: '', // You may want to store the last userId/username if needed
-        username: '',
+        userId: this.lastUserId,
+        username: this.lastUsername,
         conversationId: this.conversationId,
         conversationType: this.conversationType
+      }).catch(error => {
+        console.error('[WebSocket] Failed to reconnect after stale connection:', error);
       });
     }
   }
@@ -425,8 +516,8 @@ class WebSocketService {
     // Send a pong response back to the server
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const pongMessage = {
+        event: 'heartbeat',
         type: 'heartbeat',
-        event: 'pong',
         timestamp: new Date().toISOString()
       };
       
@@ -437,54 +528,78 @@ class WebSocketService {
 
   // Private methods
   private notifyMessageCallbacks(message: WebSocketMessage): void {
-    console.log(`[WebSocket] 📢 Notifying ${this.messageCallbacks.length} message callback(s)`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Notifying ${this.messageCallbacks.length} message callback(s)`);
+    }
     this.messageCallbacks.forEach((callback, index) => {
       try {
         callback(message);
-        console.log(`[WebSocket] ✅ Callback ${index + 1} executed successfully`);
       } catch (error) {
-        console.error(`[WebSocket] ❌ Error in message callback ${index + 1}:`, error);
+        console.error(`[WebSocket] Error in message callback ${index + 1}:`, error);
       }
     });
   }
 
   private notifyConnectionCallbacks(connected: boolean): void {
-    console.log(`[WebSocket] 📢 Notifying ${this.connectionCallbacks.length} connection callback(s) - Status: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Notifying ${this.connectionCallbacks.length} connection callback(s) - Status: ${connected ? 'CONNECTED' : 'DISCONNECTED'}`);
+    }
     this.connectionCallbacks.forEach((callback, index) => {
       try {
         callback(connected);
-        console.log(`[WebSocket] ✅ Connection callback ${index + 1} executed successfully`);
       } catch (error) {
-        console.error(`[WebSocket] ❌ Error in connection callback ${index + 1}:`, error);
+        console.error(`[WebSocket] Error in connection callback ${index + 1}:`, error);
       }
     });
   }
 
   private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
     this.reconnectAttempts++;
-    const delay = this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1);
+    const delay = Math.min(
+      this.reconnectInterval * Math.pow(2, this.reconnectAttempts - 1),
+      30000 // Max 30 seconds    
+    );
     
     console.log(`[WebSocket] ⏰ Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
     console.log(`[WebSocket] 🎯 Will attempt to reconnect to conversation: ${this.conversationId} (${this.conversationType})`);
     
-    setTimeout(async () => {
-      if (this.conversationId && this.conversationType && this.reconnectAttempts <= this.maxReconnectAttempts) {
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      
+      if (this.conversationId && 
+          this.conversationType && 
+          this.reconnectAttempts <= this.maxReconnectAttempts &&
+          !this.isCircuitBreakerOpen()) {
+        
         console.log(`[WebSocket] 🔄 Executing reconnect attempt ${this.reconnectAttempts}`);
         
         try {
-          // Get user info from storage for reconnection
-          const userId = await AsyncStorage.getItem('userId');
-          const username = await AsyncStorage.getItem('username');
-          
-          if (userId && username) {
+          if (this.lastUserId && this.lastUsername) {
             await this.connect({
-              userId,
-              username,
+              userId: this.lastUserId,
+              username: this.lastUsername,
               conversationId: this.conversationId,
               conversationType: this.conversationType
             });
           } else {
-            console.error('[WebSocket] ❌ Missing user info for reconnection');
+            const userData = await AsyncStorage.getItem('user');
+            if (userData) {
+              const user = JSON.parse(userData);
+              await this.connect({
+                userId: user.id || '',
+                username: user.username || '',
+                conversationId: this.conversationId,
+                conversationType: this.conversationType
+              });
+            } else {
+              console.error('[WebSocket] ❌ No user info available for reconnection');
+              this.openCircuitBreaker();
+            }
           }
         } catch (error) {
           console.error('[WebSocket] ❌ Reconnection failed:', error);
@@ -496,14 +611,18 @@ class WebSocketService {
   // Subscribe to WebSocket messages
   onMessage(callback: (message: WebSocketMessage) => void): () => void {
     this.messageCallbacks.push(callback);
-    console.log(`[WebSocket] 📝 Message callback registered (total: ${this.messageCallbacks.length})`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Message callback registered (total: ${this.messageCallbacks.length})`);
+    }
     
     // Return unsubscribe function
     return () => {
       const index = this.messageCallbacks.indexOf(callback);
       if (index > -1) {
         this.messageCallbacks.splice(index, 1);
-        console.log(`[WebSocket] 📝 Message callback unregistered (remaining: ${this.messageCallbacks.length})`);
+        if (DEBUG_WEBSOCKET) {
+          console.log(`[WebSocket] Message callback unregistered (remaining: ${this.messageCallbacks.length})`);
+        }
       }
     };
   }
@@ -511,14 +630,18 @@ class WebSocketService {
   // Subscribe to connection status changes
   onConnectionChange(callback: (connected: boolean) => void): () => void {
     this.connectionCallbacks.push(callback);
-    console.log(`[WebSocket] 📝 Connection callback registered (total: ${this.connectionCallbacks.length})`);
+    if (DEBUG_WEBSOCKET) {
+      console.log(`[WebSocket] Connection callback registered (total: ${this.connectionCallbacks.length})`);
+    }
     
     // Return unsubscribe function
     return () => {
       const index = this.connectionCallbacks.indexOf(callback);
       if (index > -1) {
         this.connectionCallbacks.splice(index, 1);
-        console.log(`[WebSocket] 📝 Connection callback unregistered (remaining: ${this.connectionCallbacks.length})`);
+        if (DEBUG_WEBSOCKET) {
+          console.log(`[WebSocket] Connection callback unregistered (remaining: ${this.connectionCallbacks.length})`);
+        }
       }
     };
   }
@@ -528,45 +651,39 @@ class WebSocketService {
       this.messagesReceivedCount++;
       const data: WebSocketMessage = JSON.parse(event.data);
       
-      console.log(`[WebSocket] 📨 Message received (#${this.messagesReceivedCount}):`, data);
-      console.log(`[WebSocket] 📊 Event: ${data.event}, Type: ${data.type || 'N/A'}`);
+      if (DEBUG_WEBSOCKET) {
+        console.log(`[WebSocket] Message received (#${this.messagesReceivedCount}):`, data.event);
+      }
       
       // Handle heartbeat messages first
       if (data.event === 'heartbeat' || data.type === 'heartbeat') {
-        console.log(`[WebSocket] ❤️ Heartbeat received`);
         this.lastHeartbeat = Date.now();
         this.missedHeartbeats = 0;
         
-        // Send heartbeat response
+        // Send a pong response back to the server
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           const pongMessage = {
             event: 'heartbeat',
             type: 'heartbeat',
             timestamp: new Date().toISOString()
           };
-          console.log('[WebSocket] ❤️ Sending heartbeat response');
           this.ws.send(JSON.stringify(pongMessage));
         }
-        return; // Don't propagate heartbeat messages to callbacks
+        return;
       }
       
       // Handle other message types
       if (data.event === 'chat.message' && data.message) {
-        console.log(`[WebSocket] 💬 New message from ${data.message.sender_name}: "${data.message.content?.substring(0, 50)}${data.message.content?.length > 50 ? '...' : ''}"`);
+        console.log(`[WebSocket] New message from ${data.message.sender_name}`);
       } else if (data.event === 'typing.indicator') {
-        console.log(`[WebSocket] ⌨️ Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
-      } else if (data.event === 'read.receipt') {
-        console.log(`[WebSocket] 👁️ Read receipt from user ${data.read_by} for message ${data.message_id}`);
-      } else if (data.event === 'message.reaction') {
-        console.log(`[WebSocket] 👍 Reaction "${data.reaction}" ${data.action} on message ${data.message_id}`);
-      } else if (data.event === 'user.online' || data.event === 'user.offline') {
-        console.log(`[WebSocket] 👤 User presence: ${data.user?.username} is ${data.event.split('.')[1]}`);
+        if (DEBUG_WEBSOCKET) {
+          console.log(`[WebSocket] Typing indicator from ${data.username}: ${data.is_typing ? 'started' : 'stopped'}`);
+        }
       }
       
       this.notifyMessageCallbacks(data);
     } catch (error) {
-      console.error('[WebSocket] ❌ Error parsing message:', error);
-      console.error('[WebSocket] 📄 Raw message data:', event.data);
+      console.error('[WebSocket] Error parsing message:', error);
     }
   };
 }

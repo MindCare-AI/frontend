@@ -18,6 +18,10 @@ import ChatHeader from '../../components/Chat/ChatHeader';
 import MessageInput from '../../components/Chat/MessageInput';
 import websocketService from '../../services/websocketService';
 import { sendMessage as apiSendMessage, getConversationById } from '../../API/conversations';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Add debug flag
+const DEBUG_WEBSOCKET = __DEV__ && false;
 
 type RootStackParamList = {
   ChatScreen: {
@@ -75,6 +79,13 @@ const ChatScreen = () => {
     const initConnection = async () => {
       try {
         const conversationType = isGroup ? 'group' : 'one-to-one';
+        
+        // Store user info for reconnection
+        await AsyncStorage.setItem('user', JSON.stringify({
+          id: user?.id || '',
+          username: user?.username || ''
+        }));
+        
         await websocketService.connect({
           userId: user?.id || '',
           username: user?.username || '',
@@ -83,46 +94,56 @@ const ChatScreen = () => {
         });
         console.log('[ChatScreen] ✅ WS connect promise resolved');
         setConnectionAttempts(0);
+        setShowConnectionRetry(false);
       } catch (err) {
         console.error('[ChatScreen] ❌ WS connect failed:', err);
         setConnectionAttempts(prev => prev + 1);
+        
+        // Show retry option after multiple failures
+        if (connectionAttempts >= 3) {
+          setShowConnectionRetry(true);
+        }
       }
     };
     
     // Initial connection
     initConnection();
     
-    // Start a periodic connection checker
+    // Start a periodic connection checker (less frequent to reduce noise)
     connectionCheckerRef.current = setInterval(() => {
       const isWsConnected = websocketService.isConnected();
       const currentConvoId = websocketService.getCurrentConversationId();
       
-      console.log('[ChatScreen] 🔍 Checking WS connection:', {
-        connected: isWsConnected,
-        currentConvo: currentConvoId,
-        targetConvo: conversationId.toString()
-      });
+      if (DEBUG_WEBSOCKET) {
+        console.log('[ChatScreen] 🔍 Checking WS connection:', {
+          connected: isWsConnected,
+          currentConvo: currentConvoId,
+          targetConvo: conversationId.toString()
+        });
+      }
       
-      if (!isWsConnected || currentConvoId !== conversationId.toString()) {
+      // Only reconnect if we're not already connected to the right conversation
+      // and we haven't exceeded reasonable retry attempts
+      if ((!isWsConnected || currentConvoId !== conversationId.toString()) && 
+          connectionAttempts < 5) {
         console.log('[ChatScreen] 🔄 Connection lost or wrong conversation, reconnecting...');
         initConnection();
       }
-    }, 5000);
+    }, 10000); // Check every 10 seconds instead of 5
     
     // Cleanup on unmount
     return () => {
       if (connectionCheckerRef.current) {
         clearInterval(connectionCheckerRef.current);
       }
-      // Don't disconnect WebSocket on screen unmount - we're keeping connection alive
-      // Just log the state for debugging
+      // Log the state for debugging
       console.log('[ChatScreen] 📋 Unmounting, WS stats:', websocketService.getConnectionStats());
     };
-  }, [conversationId]);
+  }, [conversationId, user?.id, user?.username, connectionAttempts]);
 
   // Log connection‐state callbacks
   useEffect(() => {
-    const unsub = websocketService.onConnectionChange(connected => {
+    const unsub = websocketService.onConnectionChange((connected: boolean) => {
       console.log(`[ChatScreen] onConnectionChange →`, connected);
     });
     return unsub;
@@ -156,6 +177,7 @@ const ChatScreen = () => {
     }
   }, [isUserTyping, sendTyping]);
 
+  // Handle message sending
   const handleSendMessage = useCallback(async () => {
     if (!inputText.trim()) return;
 
@@ -192,6 +214,7 @@ const ChatScreen = () => {
     }
   }, [inputText, sendMessage, sendTyping, isConnected, conversationId]);
 
+  // Handle message retry
   const handleRetryMessage = useCallback(async (messageId: string | number) => {
     console.log(`[ChatScreen] 🔄 Retrying message: ${messageId}`);
     try {
@@ -215,31 +238,37 @@ const ChatScreen = () => {
     if (isConnected) {
       console.log(`[ChatScreen] ✅ WebSocket connected for conversation ${conversationId}`);
       setShowConnectionRetry(false);
+      setConnectionAttempts(0);
     } else {
       console.log(`[ChatScreen] ❌ WebSocket disconnected for conversation ${conversationId}`);
       
-      // Show retry option after a delay if still not connected
+      // Show retry option after a delay and multiple attempts
       const timeout = setTimeout(() => {
-        if (!isConnected) {
+        if (!isConnected && connectionAttempts >= 2) {
           setShowConnectionRetry(true);
         }
-      }, 5000);
+      }, 10000); // Increased delay to 10 seconds
       
       return () => clearTimeout(timeout);
     }
-  }, [isConnected, conversationId]);
+  }, [isConnected, conversationId, connectionAttempts]);
 
   // Handle connection retry
   const handleRetryConnection = useCallback(async () => {
     console.log(`[ChatScreen] 🔄 User initiated connection retry`);
     setShowConnectionRetry(false);
+    setConnectionAttempts(0);
     
     try {
+      // Reset any circuit breakers
+      websocketService.resetCircuitBreaker();
+      
       await retryConnection();
       Alert.alert('Success', 'Reconnected to chat server');
     } catch (error) {
       console.error(`[ChatScreen] ❌ Manual retry failed:`, error);
       Alert.alert('Connection Failed', 'Unable to reconnect. Messages will be sent via backup method.');
+      setShowConnectionRetry(true);
     }
   }, [retryConnection]);
 
@@ -257,7 +286,9 @@ const ChatScreen = () => {
       {/* Connection retry banner */}
       {showConnectionRetry && (
         <View style={styles.retryBanner}>
-          <Text style={styles.retryText}>Connection lost. Messages will be sent via backup method.</Text>
+          <Text style={styles.retryText}>
+            Connection issues detected. Messages will be sent via backup method.
+          </Text>
           <TouchableOpacity onPress={handleRetryConnection} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -293,17 +324,16 @@ const ChatScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F2',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   retryBanner: {
     backgroundColor: '#FFF3CD',
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFC107',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -312,6 +342,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#856404',
+    marginRight: 10,
   },
   retryButton: {
     backgroundColor: '#FFC107',

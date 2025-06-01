@@ -53,10 +53,12 @@ const MessagesList: React.FC<MessagesListProps> = ({
       item.sender_id?.toString() !== currentUserId?.toString() &&
       !item.is_bot;
 
+    const isOwnMessage = String(item.sender_id) === String(currentUserId);
+
     console.log(`[MessagesList] Rendering message ${item.id}:`, {
       senderId: item.sender_id,
       currentUserId,
-      isOwnMessage: item.sender_id?.toString() === currentUserId?.toString(),
+      isOwnMessage,
       showSenderName,
       messageContent: item.content.substring(0, 50)
     });

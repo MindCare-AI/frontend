@@ -13,6 +13,9 @@ import { AppointmentProvider } from './contexts/appoint_patient/AppointmentConte
 import { AppContextProvider } from './contexts/appoint_therapist/AppContext';
 import { ChatProvider } from './contexts/ChatContext';
 
+// If you want to use DotLottieReact globally, import it here
+// import { DotLottieReact } from '@lottiefiles/dotlottie-react-native';
+
 LogBox.ignoreLogs(['Warning: ...']);
 
 export default function App() {
