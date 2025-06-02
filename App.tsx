@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import './patches/web-polyfill.js';
 import React from 'react';
 import RootNavigator from './navigation/RootNavigator';
 import { LogBox } from 'react-native';
@@ -13,10 +14,15 @@ import { AppointmentProvider } from './contexts/appoint_patient/AppointmentConte
 import { AppContextProvider } from './contexts/appoint_therapist/AppContext';
 import { ChatProvider } from './contexts/ChatContext';
 
-// If you want to use DotLottieReact globally, import it here
-// import { DotLottieReact } from '@lottiefiles/dotlottie-react-native';
 
-LogBox.ignoreLogs(['Warning: ...']);
+// Add specific LogBox ignores for SVG issues
+LogBox.ignoreLogs([
+  'Warning: ...',
+  'hasTouchableProperty',
+  'react-native-svg',
+  'Svg.render',
+  'WebShape.js'
+]);
 
 export default function App() {
   return (

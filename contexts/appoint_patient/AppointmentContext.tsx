@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useState, useContext, type ReactNode, useEffect } from "react"
+import { Platform, Dimensions } from "react-native"
 import type { AppointmentType, WaitingListEntryType } from "../../types/appoint_patient/appointmentTypes"
 import axios from 'axios'
 import {
@@ -27,6 +28,9 @@ type AppointmentContextType = {
   pastAppointments: AppointmentType[]
   waitingListEntries: WaitingListEntryType[]
   loading: boolean
+  screenWidth: number
+  isSmallScreen: boolean
+  platformOS: string
   addAppointment: (appointmentData: {
     therapist_id: number;
     appointment_date: string;
@@ -57,8 +61,19 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [waitingListEntries, setWaitingListEntries] = useState<WaitingListEntryType[]>([])
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentType | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
+  const [screenWidth, setScreenWidth] = useState<number>(Dimensions.get('window').width)
+  const isSmallScreen = screenWidth < 768
+  const platformOS = Platform.OS
   
   const { user } = useAuth()
+
+  // Handle screen dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width)
+    })
+    return () => subscription?.remove()
+  }, [])
 
   // Fetch appointments when the component mounts
   useEffect(() => {
@@ -67,22 +82,44 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, [user?.id])
 
-  // Helper to fetch all paginated results
+  // Helper to fetch all paginated results with improved error handling for cross-platform
   const fetchAllPaginated = async (fetchFn: (params: any) => Promise<any>, params: any = {}) => {
     let results: any[] = [];
     let page = 1;
     let hasNext = true;
-    while (hasNext) {
-      const resp = await fetchFn({ ...params, page });
-      if (resp && Array.isArray(resp.results)) {
-        results = results.concat(resp.results);
-        hasNext = !!resp.next;
-        page += 1;
-      } else {
-        hasNext = false;
+    
+    try {
+      while (hasNext) {
+        const resp = await fetchFn({ ...params, page });
+        if (resp && Array.isArray(resp.results)) {
+          results = results.concat(resp.results);
+          hasNext = !!resp.next;
+          page += 1;
+        } else {
+          hasNext = false;
+        }
       }
+      return results;
+    } catch (error) {
+      // Platform-specific error handling
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        console.error(`Mobile error fetching data: ${error}`);
+      } else {
+        console.error(`Web error fetching data: ${error}`);
+      }
+      return [];
     }
-    return results;
+  };
+
+  // Format date in a cross-platform safe way
+  const formatDateSafely = (dateString: string, formatStr: string): string => {
+    try {
+      const date = new Date(dateString);
+      return format(date, formatStr);
+    } catch (error) {
+      console.warn(`Error formatting date: ${dateString}, using fallback`);
+      return dateString;
+    }
   };
 
   // Function to refresh all appointment data
@@ -97,8 +134,8 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         therapist: appointment.therapist_name || `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`,
         patient: appointment.patient_name,
         appointment_date: appointment.appointment_date,
-        date: format(new Date(appointment.appointment_date), 'MMMM d, yyyy'),
-        time: format(new Date(appointment.appointment_date), 'h:mm a'),
+        date: formatDateSafely(appointment.appointment_date, 'MMMM d, yyyy'),
+        time: formatDateSafely(appointment.appointment_date, 'h:mm a'),
         status: (appointment.status || '').replace(/^./, (c: string) => c.toUpperCase()),
         isWithin15Min: isWithin15Minutes(appointment.appointment_date),
         is_upcoming: appointment.is_upcoming,
@@ -132,8 +169,8 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         therapist: appointment.therapist_name || `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`,
         patient: appointment.patient_name,
         appointment_date: appointment.appointment_date,
-        date: format(new Date(appointment.appointment_date), 'MMMM d, yyyy'),
-        time: format(new Date(appointment.appointment_date), 'h:mm a'),
+        date: formatDateSafely(appointment.appointment_date, 'MMMM d, yyyy'),
+        time: formatDateSafely(appointment.appointment_date, 'h:mm a'),
         status: (appointment.status || '').replace(/^./, (c: string) => c.toUpperCase()),
         feedbackSubmitted: Boolean(appointment.feedback),
         is_upcoming: appointment.is_upcoming,
@@ -165,7 +202,7 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         id: entry.id,
         therapist: `${entry.therapist?.first_name || ''} ${entry.therapist?.last_name || ''}`,
         requestedDate: entry.requested_date
-          ? format(new Date(entry.requested_date), 'MMMM d, yyyy')
+          ? formatDateSafely(entry.requested_date, 'MMMM d, yyyy')
           : '',
         preferredTimeSlots: Array.isArray(entry.preferred_time_slots)
           ? entry.preferred_time_slots.map((time: string) => {
@@ -180,13 +217,13 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       setWaitingListEntries(waitingList)
 
     } catch (error) {
-      console.error("Error refreshing appointments:", error)
+      console.error(`Error refreshing appointments on ${Platform.OS}:`, error)
     } finally {
       setLoading(false)
     }
   }
 
-  // Add a new appointment
+  // Add a new appointment with platform-specific error handling
   const addAppointment = async (appointmentData: {
     therapist_id: number;
     appointment_date: string;
@@ -202,7 +239,10 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       await apiCreateAppointment(apiData);
       await refreshAppointments(); // Refresh the list after adding
     } catch (error) {
-      console.error("Error adding appointment:", error);
+      const errorMsg = Platform.OS === 'web' 
+        ? "Error adding appointment in browser" 
+        : `Error adding appointment on ${Platform.OS}`;
+      console.error(`${errorMsg}:`, error);
       throw error;
     }
   }
@@ -213,28 +253,33 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       await apiCancelAppointment(id)
       await refreshAppointments() // Refresh the list after cancellation
     } catch (error) {
-      console.error("Error cancelling appointment:", error)
+      console.error(`Error cancelling appointment on ${Platform.OS}:`, error)
       throw error
     }
   }
 
-  // Reschedule an appointment
+  // Reschedule an appointment with improved cross-platform error handling
   const rescheduleAppointment = async (id: number, newDate: string, newTime: string) => {
     try {
       setLoading(true)
       // Format the appointment date
       const appointmentDate = `${newDate}T${newTime}`
       
+      // Configure axios with timeout for better mobile experience
+      const axiosConfig = { 
+        timeout: Platform.OS === 'web' ? 30000 : 60000 // Longer timeout for mobile
+      };
+      
       // Update the appointment with the new date
       await axios.put(`${APPOINTMENTS_URL}/${id}/reschedule/`, { 
         appointment_date: appointmentDate,
         notes: "Rescheduled by patient" 
-      })
+      }, axiosConfig)
       
       // Refresh appointments to get the updated list
       await refreshAppointments()
     } catch (error) {
-      console.error("Error rescheduling appointment:", error)
+      console.error(`Error rescheduling appointment on ${Platform.OS}:`, error)
       throw error
     } finally {
       setLoading(false)
@@ -247,7 +292,7 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       await submitAppointmentFeedback(id, { rating, comments: comment })
       await refreshAppointments() // Refresh to update the feedback status
     } catch (error) {
-      console.error("Error submitting feedback:", error)
+      console.error(`Error submitting feedback on ${Platform.OS}:`, error)
       throw error
     }
   }
@@ -263,7 +308,7 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       await apiAddToWaitingList(entryData)
       await refreshAppointments() // Refresh to show the new waiting list entry
     } catch (error) {
-      console.error("Error adding to waiting list:", error)
+      console.error(`Error adding to waiting list on ${Platform.OS}:`, error)
       throw error
     }
   }
@@ -274,7 +319,7 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
       await removeFromWaitingList(id)
       await refreshAppointments() // Refresh to update the waiting list
     } catch (error) {
-      console.error("Error cancelling waiting list entry:", error)
+      console.error(`Error cancelling waiting list entry on ${Platform.OS}:`, error)
       throw error
     }
   }
@@ -286,6 +331,9 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
         pastAppointments,
         waitingListEntries,
         loading,
+        screenWidth,
+        isSmallScreen,
+        platformOS,
         addAppointment,
         cancelAppointment,
         rescheduleAppointment,

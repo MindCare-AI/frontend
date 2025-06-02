@@ -10,6 +10,7 @@ import MoodFeedList from '../../components/moodTracker/MoodFeedList';
 import AnalyticsSummary from '../../components/moodTracker/AnalyticsSummary';
 import { MoodLog, MoodFormData } from '../../types/Mood';
 import { useFocusEffect } from '@react-navigation/native';
+import Drawer from '../../components/tips/drawer';
 
 // Check if platform is web to avoid using native driver
 const isWeb = Platform.OS === 'web';
@@ -134,115 +135,116 @@ function MoodScreenContent() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={[colors.lightBlue, colors.white]} style={styles.gradientContainer}>
-        <Animated.View 
-          style={[
-            styles.analyticsContainer, 
-            { 
-              opacity: fadeAnim, 
-              transform: [{ translateY: slideAnim }],
-              backgroundColor: colors.white,
-            }
-          ]}
-        >
-          <AnalyticsSummary style={styles.analytics} />
-        </Animated.View>
-        
-        <View style={styles.toggleContainer}>
-          <Button 
-            mode={showCards ? "contained" : "outlined"} 
-            onPress={toggleCardView}
-            style={styles.toggleButton}
-            labelStyle={{ color: showCards ? colors.white : colors.primary }}
-            buttonColor={colors.primary}
-          >
-            {showCards ? "Hide Entries" : "Show Entries"}
-          </Button>
-          <Button 
-            mode="contained" 
-            onPress={() => setMoodModalVisible(true)}
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            icon="plus"
-            labelStyle={{ color: colors.white }} // <-- ensure white text
-          >
-            Track Mood
-          </Button>
-        </View>
-        
-        {showCards && (
+    <Drawer>
+      <View style={styles.container}>
+        <LinearGradient colors={[colors.lightBlue, colors.white]} style={styles.gradientContainer}>
           <Animated.View 
             style={[
-              styles.cardsContainer,
+              styles.analyticsContainer, 
               { 
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
+                opacity: fadeAnim, 
+                transform: [{ translateY: slideAnim }],
+                backgroundColor: colors.white,
               }
             ]}
           >
-            <View style={styles.historyHeader}>
-              <Text 
-                variant="titleMedium" 
-                style={[styles.sectionTitle, { color: colors.textDark }]}
-              >
-                Your Mood History
-              </Text>
-              <Button
-                icon="refresh"
-                mode="text"
-                onPress={manualRefresh}
-                labelStyle={{ color: colors.primary }}
-              >
-                Refresh
-              </Button>
-            </View>
-            <MoodFeedList
-              moodLogs={moodLogs}
-              isLoading={isLoading}
-              onRefresh={fetchMoodLogs}
-              onEdit={handleEditMood}
-              onDelete={deleteMoodLog}
-              colors={colors}
-            />
+            <AnalyticsSummary style={styles.analytics} />
           </Animated.View>
-        )}
-        
-        {/* Modal for mood entry */}
-        <Portal>
-          <Modal
-            visible={moodModalVisible}
-            onDismiss={() => {
-              setMoodModalVisible(false);
-              setSelectedMood(null);
-            }}
-            contentContainerStyle={styles.modalContent}
-          >
-            <IconButton
-              icon="close"
-              size={24}
-              iconColor={colors.primary}
-              onPress={() => {
+          
+          <View style={styles.toggleContainer}>
+            <Button 
+              mode={showCards ? "contained" : "outlined"} 
+              onPress={toggleCardView}
+              style={styles.toggleButton}
+              labelStyle={{ color: showCards ? colors.white : colors.primary }}
+              buttonColor={colors.primary}
+            >
+              {showCards ? "Hide Entries" : "Show Entries"}
+            </Button>
+            <Button 
+              mode="contained" 
+              onPress={() => setMoodModalVisible(true)}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              icon="plus"
+              labelStyle={{ color: colors.white }} // <-- ensure white text
+            >
+              Track Mood
+            </Button>
+          </View>
+          
+          {showCards && (
+            <Animated.View 
+              style={[
+                styles.cardsContainer,
+                { 
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }]
+                }
+              ]}
+            >
+              <View style={styles.historyHeader}>
+                <Text 
+                  variant="titleMedium" 
+                  style={[styles.sectionTitle, { color: colors.textDark }]}
+                >
+                  Your Mood History
+                </Text>
+                <Button
+                  icon="refresh"
+                  mode="text"
+                  onPress={manualRefresh}
+                  labelStyle={{ color: colors.primary }}
+                >
+                  Refresh
+                </Button>
+              </View>
+              <MoodFeedList
+                moodLogs={moodLogs}
+                isLoading={isLoading}
+                onRefresh={fetchMoodLogs}
+                onEdit={handleEditMood}
+                onDelete={deleteMoodLog}
+                colors={colors}
+              />
+            </Animated.View>
+          )}
+          
+          {/* Modal for mood entry */}
+          <Portal>
+            <Modal
+              visible={moodModalVisible}
+              onDismiss={() => {
                 setMoodModalVisible(false);
                 setSelectedMood(null);
               }}
-              style={styles.closeButton}
-            />
-            <MoodEntryForm
-              onSubmit={handleMoodSubmit}
-              initialValues={selectedMood || undefined}
-              onCancel={() => {
-                setMoodModalVisible(false);
-                setSelectedMood(null);
-              }}
-              colors={colors}
-            />
-          </Modal>
-        </Portal>
+              contentContainerStyle={styles.modalContent}
+            >
+              <IconButton
+                icon="close"
+                size={24}
+                iconColor={colors.primary}
+                onPress={() => {
+                  setMoodModalVisible(false);
+                  setSelectedMood(null);
+                }}
+                style={styles.closeButton}
+              />
+              <MoodEntryForm
+                onSubmit={handleMoodSubmit}
+                initialValues={selectedMood || undefined}
+                onCancel={() => {
+                  setMoodModalVisible(false);
+                  setSelectedMood(null);
+                }}
+                colors={colors}
+              />
+            </Modal>
+          </Portal>
 
-        
-        
-      </LinearGradient>
-    </View>
+          
+        </LinearGradient>
+      </View>
+    </Drawer>
   );
 }
 

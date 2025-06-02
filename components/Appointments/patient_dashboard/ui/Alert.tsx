@@ -12,7 +12,7 @@ interface AlertProps {
   status?: AlertStatus;
   title?: string;
   children: React.ReactNode;
-  icon?: React.ReactElement;
+  icon?: React.ReactElement<{ color?: string; size?: number }>;
   style?: any;
 }
 

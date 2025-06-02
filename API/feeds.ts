@@ -84,6 +84,7 @@ export const createPost = async (postData: any) => {
       // Handle link_url with support for both naming conventions
       const linkUrl = postData.link_url || postData.linkUrl;
       if (linkUrl) {
+        console.log("DEBUG: Adding link_url to form data:", linkUrl);
         formData.append('link_url', linkUrl);
       }
       

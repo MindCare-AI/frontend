@@ -8,7 +8,7 @@
       "dom",
       "esnext"
     ],
-    "module": "Node16",
+    "module": "node16",
     "moduleResolution": "node16",
     "noEmit": true,
     "skipLibCheck": true,

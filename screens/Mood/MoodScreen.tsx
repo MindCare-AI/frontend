@@ -15,6 +15,7 @@ import { colors, spacing, fontSizes, shadows, borderRadius } from '../../compone
 import { MoodFeedList } from '../../components/Mood/MoodFeedList';
 import { MoodTracker } from '../../components/Mood/MoodTracker';
 import { MoodStats } from '../../components/Mood/MoodStats';
+import Drawer from '../../components/tips/drawer'; // Add this import
 
 const { width } = Dimensions.get('window');
 
@@ -119,56 +120,58 @@ export default function MoodScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Mood Tracker</Text>
-          <Text style={styles.subtitle}>Track and understand your emotions</Text>
-        </View>
-
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-            />
-          }
-          showsVerticalScrollIndicator={false}
+    <Drawer>
+      <SafeAreaView style={styles.container}>
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
         >
-          {/* Mood Tracker Component - Highlighted section */}
-          <Animated.View style={styles.trackerSection}>
-            <MoodTracker onMoodLogged={handleMoodLogged} />
-          </Animated.View>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Mood Tracker</Text>
+            <Text style={styles.subtitle}>Track and understand your emotions</Text>
+          </View>
 
-          {/* Mood Statistics */}
-          <Animated.View style={styles.section}>
-            <MoodStats moodLogs={moodLogs} />
-          </Animated.View>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primary}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Mood Tracker Component - Highlighted section */}
+            <Animated.View style={styles.trackerSection}>
+              <MoodTracker onMoodLogged={handleMoodLogged} />
+            </Animated.View>
 
-          {/* Recent Mood Logs */}
-          <Animated.View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Mood History</Text>
-            <MoodFeedList 
-              moodLogs={moodLogs} 
-              loading={loading}
-              onRefresh={onRefresh}
-            />
-          </Animated.View>
-        </ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+            {/* Mood Statistics */}
+            <Animated.View style={styles.section}>
+              <MoodStats moodLogs={moodLogs} />
+            </Animated.View>
+
+            {/* Recent Mood Logs */}
+            <Animated.View style={styles.section}>
+              <Text style={styles.sectionTitle}>Your Mood History</Text>
+              <MoodFeedList 
+                moodLogs={moodLogs} 
+                loading={loading}
+                onRefresh={onRefresh}
+              />
+            </Animated.View>
+          </ScrollView>
+        </Animated.View>
+      </SafeAreaView>
+    </Drawer>
   );
 }
 
