@@ -30,6 +30,12 @@ interface MediaFile {
   type: string;
 }
 
+interface CreatePostResponse {
+  media_files?: { url: string }[];
+  message?: string;
+  success: boolean;
+}
+
 const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-right" }) => {
   // Use HomeSettingsScreen color scheme
   const homeScreenColors = {
@@ -126,12 +132,12 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
         const fileType = selectedAsset.mimeType || 
                          (postType === "image" ? "image/jpeg" : "video/mp4");
         
-        // Create a file object for the API
+        // Create a file object for the API - React Native format for FormData
         const file = {
           uri: fileUri,
-          name: fileName,
+          name: fileName || `media.${postType === "image" ? "jpg" : "mp4"}`,
           type: fileType,
-        };
+        } as any;
         
         setMediaFile(file);
         setMediaPreview(fileUri);
@@ -152,7 +158,7 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
     
     try {
       // Import the API function
-      const { createPost } = await import('../../API/feeds');
+      const { createPost } = await import('../../API/feeds.js');
       
       // Create a FormData instance for multipart/form-data
       const formData = new FormData();
@@ -177,9 +183,77 @@ const CreatePostButton: React.FC<CreatePostButtonProps> = ({ position = "bottom-
         formData.append("tags", "mental_health");
       }
       
-      // Add media file if present
+      // Add media file if present with enhanced cross-platform support
       if (mediaFile && (postType === "image" || postType === "video")) {
-        formData.append("file", mediaFile);
+        console.log('DEBUG: Adding media file to FormData:', mediaFile);
+        
+        // Parse the mime type from the data URL correctly for both platforms
+        let mimeType = postType === "image" ? "image/jpeg" : "video/mp4";
+        let fileName = `media_${Date.now()}.${postType === "image" ? "jpg" : "mp4"}`;
+        
+        // Try to extract the actual mime type from URI if it's a data URL
+        if (mediaFile.uri && mediaFile.uri.startsWith('data:')) {
+          const mimeMatch = mediaFile.uri.match(/data:([^;]+);/);
+          if (mimeMatch && mimeMatch[1]) {
+            mimeType = mimeMatch[1];
+            const fileExt = mimeType.split('/')[1] || (postType === "image" ? "jpg" : "mp4");
+            fileName = `media_${Date.now()}.${fileExt}`;
+          }
+        }
+        
+        console.log('DEBUG: Media MIME type detected:', mimeType);
+        
+        // Enhanced platform-specific file handling
+        if (Platform.OS === 'web') {
+          if (mediaFile.uri && mediaFile.uri.startsWith('data:')) {
+            try {
+              // Convert data URL to blob for web
+              const response = await fetch(mediaFile.uri);
+              const blob = await response.blob();
+              
+              // Create a File object from the blob for better compatibility
+              const file = new File([blob], fileName, { 
+                type: mimeType,
+                lastModified: new Date().getTime()
+              });
+              
+              formData.append("file", file);
+              console.log('DEBUG: Added File object for web platform with name:', fileName, 'and type:', mimeType);
+            } catch (error) {
+              console.error('DEBUG: Web file handling error:', error);
+              // Fallback to blob with filename
+              try {
+                const response = await fetch(mediaFile.uri);
+                const blob = await response.blob();
+                formData.append("file", blob, fileName);
+                console.log('DEBUG: Added blob with filename for web platform');
+              } catch (e) {
+                console.error('DEBUG: Blob fallback failed, using standard approach:', e);
+                // Last resort fallback
+                formData.append('file', {
+                  uri: mediaFile.uri,
+                  name: fileName,
+                  type: mimeType
+                } as any);
+              }
+            }
+          } else {
+            // Already a file or blob
+            formData.append("file", mediaFile);
+            console.log('DEBUG: Added existing file or blob for web');
+          }
+        } else {
+          // Ensure proper file object format for React Native FormData
+          const fileObject = {
+            uri: mediaFile.uri,
+            name: fileName,
+            type: mimeType
+          };
+          
+          // Standard React Native approach
+          console.log('DEBUG: Using standard React Native file object with name:', fileName, 'and type:', mimeType);
+          formData.append("file", fileObject as any);
+        }
       }
       
       console.log('Creating post with data:', {
