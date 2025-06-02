@@ -53,6 +53,7 @@ import EmptyConversationsList from '../../components/Conversations/EmptyConversa
 import FloatingButton from '../../components/Conversations/FloatingButton';
 import ConversationTypeModal from '../../components/Chat/ConversationTypeModal';
 import UserSelectionModal, { User } from '../../components/Chat/UserSelectionModal';
+import ConversationLoadingScreen from '../../components/common/ConversationLoadingScreen';
 
 interface RootStackParamList {
   Splash: undefined;
@@ -438,9 +439,7 @@ const ConversationsScreen = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#002D62" />
         <ConversationHeader />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#002D62" />
-        </View>
+        <ConversationLoadingScreen message="Loading conversations..." />
       </SafeAreaView>
     );
   }

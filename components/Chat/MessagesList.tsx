@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import MessageBubble from './MessageBubble';
+import ConversationLoadingScreen from '../common/ConversationLoadingScreen';
 
 interface Message {
   id: string | number;
@@ -106,10 +107,7 @@ const MessagesList: React.FC<MessagesListProps> = ({
   const renderEmptyState = () => {
     if (loading) {
       return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.emptyText}>Loading messages...</Text>
-        </View>
+        <ConversationLoadingScreen message="Loading messages..." />
       );
     }
 
