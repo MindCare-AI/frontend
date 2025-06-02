@@ -10,6 +10,7 @@ import FeedContainer from "../../components/FeedsScreen/FeedContainer"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useToast } from "../../contexts/feeds/ToastContext"
 import type { FilterState, SortOption } from "../../types/feeds"
+import CreatePostScreen from "screens/CreatePostScreen/CreatePostScreen"
 
 const FeedScreen = () => {
   const { colors } = useTheme()

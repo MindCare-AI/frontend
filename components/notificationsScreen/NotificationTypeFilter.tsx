@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 
 // This component is for filtering notifications by type.
 // To match backend, types should be the notification "type" field from the notification serializer.
@@ -16,7 +16,10 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
   selectedType,
   onSelectType,
 }) => {
-  const theme = useTheme();
+  // Colors for light blue theme
+  const activeBackground = '#0088CC'; 
+  const activeText = '#FFFFFF';
+  const inactiveText = '#0088CC';
 
   return (
     <View style={styles.container}>
@@ -24,7 +27,10 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
         style={[
           styles.filterItem,
           selectedType === null && {
-            backgroundColor: theme.colors.primary,
+            backgroundColor: activeBackground,
+          },
+          selectedType !== null && {
+            borderColor: '#0088CC',
           },
         ]}
         onPress={() => onSelectType(null)}
@@ -32,7 +38,8 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
         <Text 
           style={[
             styles.filterText,
-            selectedType === null && { color: theme.colors.onPrimary },
+            selectedType === null && { color: activeText },
+            selectedType !== null && { color: inactiveText },
           ]}
         >
           All
@@ -45,7 +52,10 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
           style={[
             styles.filterItem,
             selectedType === type && {
-              backgroundColor: theme.colors.primary,
+              backgroundColor: activeBackground,
+            },
+            selectedType !== type && {
+              borderColor: '#0088CC',
             },
           ]}
           onPress={() => onSelectType(type)}
@@ -53,7 +63,8 @@ export const NotificationTypeFilter: React.FC<NotificationTypeFilterProps> = ({
           <Text 
             style={[
               styles.filterText,
-              selectedType === type && { color: theme.colors.onPrimary },
+              selectedType === type && { color: activeText },
+              selectedType !== type && { color: inactiveText },
             ]}
           >
             {/* Format type for display: e.g., "appointment_reminder" => "Appointment Reminder" */}
@@ -71,8 +82,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
   filterItem: {
     paddingVertical: 8,
@@ -81,9 +92,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
+    backgroundColor: 'transparent',
   },
   filterText: {
     fontSize: 14,
+    fontWeight: '500',
   },
 });
