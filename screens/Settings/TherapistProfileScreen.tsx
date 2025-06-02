@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image, Switch, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image, Switch, Alert, Modal, FlatList } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
   getTherapistProfile, 
   updateTherapistProfile,
@@ -278,16 +279,12 @@ const TherapistProfileScreen = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
   
   return (
     <ScrollView style={styles.container}>
+      <LoadingSpinner visible={saving} />
       <Text style={styles.title}>Edit Your Therapist Profile</Text>
       
       {error && <Text style={styles.errorMessage}>{error}</Text>}
@@ -726,17 +723,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#777',
   },
   title: {
     fontSize: 24,

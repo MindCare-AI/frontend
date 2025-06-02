@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from 'react-native';
-import { ActivityIndicator, Snackbar, Button } from 'react-native-paper';
+import { Snackbar, Button } from 'react-native-paper';
 import { getAppSettings, updateAppSettings, AppSettings } from '../../API/settings/settings';
 import { AppearanceSettings } from '../../components/SettingsScreen/AppearanceSettings';
 import { TimeZoneSettings } from '../../components/SettingsScreen/TimeZoneSettings';
 import { globalStyles } from '../../styles/global';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -74,15 +75,12 @@ const SettingsScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={globalStyles.colors.primary} />
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingSpinner visible={updating} />
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.contentContainer}

@@ -12,6 +12,7 @@ import { useComments } from "../../hooks/feeds/useComments"
 import { useToast } from "../../contexts/feeds/ToastContext"
 import MediaViewerModal from "./MediaViewerModal"
 import * as FeedsApi from "../../API/feeds"
+import LoadingSpinner from "../../components/LoadingSpinner"
 
 interface PostItemProps {
   post: Post
@@ -425,10 +426,10 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost, onDeletePost, c
                 onLoad={handleImageLoad}
                 resizeMode="cover"
               />
+              {/* Replace image loading indicators with LoadingSpinner */}
               {!imageLoaded && (
-                <View style={[styles.loader, { backgroundColor: colors.highlight }]}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={{ color: colors.muted, marginTop: 8 }}>Loading image...</Text>
+                <View style={styles.loader}>
+                  <LoadingSpinner visible={true} />
                 </View>
               )}
             </TouchableOpacity>

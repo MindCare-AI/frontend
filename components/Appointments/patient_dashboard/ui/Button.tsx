@@ -4,6 +4,7 @@ import type React from "react"
 import { Pressable, Text, StyleSheet, ActivityIndicator, Platform, View, useWindowDimensions } from "react-native"
 import { useTheme as useNativeBase } from "native-base"
 import { useTheme } from "../../../../theme/ThemeProvider"
+import { Ionicons } from "@expo/vector-icons"
 
 type ButtonVariant = "solid" | "outline" | "ghost" | "link"
 type ButtonSize = "xs" | "sm" | "md" | "lg"
@@ -40,6 +41,7 @@ interface ButtonProps {
   accessibilityLabel?: string
   accessibilityHint?: string
   testID?: string
+  icon?: string // Ionicons name
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -55,10 +57,11 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
   fullWidth = false,
-  borderRadius = 999,
+  borderRadius = 12, // More rounded but not pill shape by default
   accessibilityLabel,
   accessibilityHint,
   testID,
+  icon,
 }) => {
   const nbTheme = useNativeBase()
   const { isDarkMode, colors } = useTheme()
@@ -80,54 +83,106 @@ export const Button: React.FC<ButtonProps> = ({
     return nbTheme.colors.primary as ColorScale;
   }
   
-  const getBackgroundColor = (): string => {
-    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[300]
-    if (variant === "solid") {
-      const colorObj = getColorSchemeObject();
-      return colorObj[500];
-    }
-    return "transparent"
-  }
-
-  const getTextColor = (): string => {
-    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[400] : nbTheme.colors.gray[500]
-    if (variant === "solid") return "white"
+  // Get appropriate colors based on variant and state
+  const getBackgroundColor = () => {
+    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200]
     
     const colorObj = getColorSchemeObject();
-    return colorObj[isDarkMode ? 300 : 500];
+    switch (variant) {
+      case "solid":
+        return colorObj[500];
+      case "ghost":
+        return "transparent";
+      case "outline":
+        return "transparent";
+      case "link":
+        return "transparent";
+      default:
+        return colorObj[500];
+    }
   }
 
-  const getBorderColor = (): string => {
-    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[300]
-    if (variant === "outline") {
-      const colorObj = getColorSchemeObject();
-      return colorObj[isDarkMode ? 300 : 500];
+  const getHoverBackgroundColor = () => {
+    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200]
+    
+    const colorObj = getColorSchemeObject();
+    switch (variant) {
+      case "solid":
+        return colorObj[600];
+      case "ghost":
+        return isDarkMode ? `rgba(${hexToRgb(colorObj[200])}, 0.12)` : `rgba(${hexToRgb(colorObj[500])}, 0.08)`;
+      case "outline":
+        return isDarkMode ? `rgba(${hexToRgb(colorObj[200])}, 0.12)` : `rgba(${hexToRgb(colorObj[500])}, 0.08)`;
+      case "link":
+        return "transparent";
+      default:
+        return colorObj[600];
     }
-    return "transparent"
   }
+
+  const getPressedBackgroundColor = () => {
+    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200]
+    
+    const colorObj = getColorSchemeObject();
+    switch (variant) {
+      case "solid":
+        return colorObj[700];
+      case "ghost":
+        return isDarkMode ? `rgba(${hexToRgb(colorObj[200])}, 0.2)` : `rgba(${hexToRgb(colorObj[500])}, 0.12)`;
+      case "outline":
+        return isDarkMode ? `rgba(${hexToRgb(colorObj[200])}, 0.2)` : `rgba(${hexToRgb(colorObj[500])}, 0.12)`;
+      case "link":
+        return "transparent";
+      default:
+        return colorObj[700];
+    }
+  }
+
+  const getTextColor = () => {
+    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[400] : nbTheme.colors.gray[500]
+    
+    const colorObj = getColorSchemeObject();
+    switch (variant) {
+      case "solid":
+        return "#FFFFFF";
+      case "ghost":
+      case "outline":
+      case "link":
+        return colorObj[isDarkMode ? 300 : 600];
+      default:
+        return "#FFFFFF";
+    }
+  }
+
+  const getBorderColor = () => {
+    if (isDisabled) return isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[300]
+    
+    const colorObj = getColorSchemeObject();
+    return variant === "outline" ? colorObj[isDarkMode ? 300 : 600] : "transparent";
+  }
+  
+  // Calculate sizing based on screen size
   const getPadding = () => {
-    // Ensure minimum touch target size of 48px
-    const minHeight = 48;
     const basePadding: Record<ButtonSize, { paddingVertical: number, paddingHorizontal: number, minHeight: number }> = {
-      xs: { paddingVertical: 12, paddingHorizontal: 16, minHeight },
-      sm: { paddingVertical: 14, paddingHorizontal: 20, minHeight },
-      md: { paddingVertical: 16, paddingHorizontal: 24, minHeight },
-      lg: { paddingVertical: 20, paddingHorizontal: 32, minHeight }
+      xs: { paddingVertical: 8, paddingHorizontal: 12, minHeight: 32 },
+      sm: { paddingVertical: 10, paddingHorizontal: 16, minHeight: 36 },
+      md: { paddingVertical: 12, paddingHorizontal: 20, minHeight: 44 },
+      lg: { paddingVertical: 14, paddingHorizontal: 24, minHeight: 52 }
     }
     
-    // For small screens, maintain minimum touch target while adjusting padding
+    // Adjust for smaller screens
     if (isSmallScreen) {
       return {
-        paddingVertical: Math.max(basePadding[size].paddingVertical * 0.9, 12),
+        paddingVertical: Math.max(basePadding[size].paddingVertical * 0.9, 8),
         paddingHorizontal: basePadding[size].paddingHorizontal * 0.9,
-        minHeight
+        minHeight: basePadding[size].minHeight
       }
     }
     
     return basePadding[size]
   }
+  
   const getFontSize = () => {
-    // Adjust font size based on screen size for better readability
     const baseFontSize: Record<ButtonSize, number> = {
       xs: 12,
       sm: 14,
@@ -135,40 +190,53 @@ export const Button: React.FC<ButtonProps> = ({
       lg: 18
     }
     
-    // For small screens, reduce font size slightly
-    if (isSmallScreen) {
-      return baseFontSize[size] * 0.95
-    }
-    
-    return baseFontSize[size]
+    return isSmallScreen ? baseFontSize[size] * 0.95 : baseFontSize[size]
   }
 
-  // Get hover and active state styles for web
+  // Helper to convert hex to RGB for rgba usage
+  const hexToRgb = (hex: string) => {
+    // Remove # if present
+    hex = hex.replace('#', '');
+    
+    // Convert 3-digit hex to 6-digits
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // Parse the hex values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    return `${r}, ${g}, ${b}`;
+  }
+
+  // Enhanced interaction styles for better feedback
   const getInteractionStyles = (pressed: boolean) => {
     if (isDisabled || isLoading) return {}
     
-    const baseScale = 1;
-    const pressedScale = 0.98;
-    const baseOpacity = 1;
-    const pressedOpacity = 0.8;
-    
     return {
-      opacity: pressed ? pressedOpacity : baseOpacity,
-      transform: pressed ? [{ scale: pressedScale }] : [{ scale: baseScale }],
+      backgroundColor: pressed ? getPressedBackgroundColor() : getBackgroundColor(),
+      transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
       ...Platform.select({
         web: {
           transition: 'all 0.2s ease',
-          '&:hover': {
-            opacity: 0.9,
-            transform: [{ scale: 1.02 }],
-          },
-          '&:active': {
-            opacity: pressedOpacity,
-            transform: [{ scale: pressedScale }],
+          cursor: 'pointer',
+          ':hover': {
+            backgroundColor: getHoverBackgroundColor(),
+            transform: [{ scale: 1.01 }],
           },
         },
       }),
     }
+  }
+
+  // Auto-generate icon if needed
+  const renderIcon = () => {
+    if (icon) {
+      return <Ionicons name={icon as any} size={getFontSize() + 2} color={getTextColor()} />;
+    }
+    return null;
   }
 
   return (
@@ -194,36 +262,44 @@ export const Button: React.FC<ButtonProps> = ({
         accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
         accessibilityHint={accessibilityHint}
         testID={testID}
+        android_ripple={variant !== 'link' ? { 
+          color: getPressedBackgroundColor(),
+          borderless: false,
+          radius: -1
+        } : undefined}
       >
         {isLoading && (
           <ActivityIndicator 
-            size={size === "xs" ? "small" : "small"} 
+            size="small" 
             color={getTextColor()} 
             style={styles.loadingIndicator} 
-            accessibilityLabel="Loading"
           />
         )}
-        {!isLoading && leftIcon && (
+        
+        {!isLoading && (leftIcon || renderIcon()) && (
           <View style={styles.iconContainer}>
-            {leftIcon}
+            {leftIcon || renderIcon()}
           </View>
         )}
+        
         <Text
           style={[
             styles.text,
             {
               color: getTextColor(),
               fontSize: getFontSize(),
-              marginLeft: leftIcon && !isLoading ? 8 : 0,
+              marginLeft: (leftIcon || renderIcon()) && !isLoading ? 8 : 0,
               marginRight: rightIcon ? 8 : 0,
-              opacity: isLoading ? 0.7 : 1,
-              fontWeight: '700',
+              opacity: isLoading ? 0.8 : 1,
             },
             textStyle,
           ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {children}
         </Text>
+        
         {!isLoading && rightIcon && (
           <View style={styles.iconContainer}>
             {rightIcon}
@@ -241,28 +317,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: 'hidden',
     minWidth: 64,
-    minHeight: 48, // Ensure minimum touch target size
     ...Platform.select({
       web: {
-        cursor: "pointer",
         userSelect: "none" as any,
         outlineStyle: "none" as any,
-        transition: "all 0.2s ease",
         WebkitTapHighlightColor: "transparent",
         touchAction: "manipulation" as any,
         '&:focus-visible': {
-          outline: '2px solid #007AFF',
-          outlineOffset: '2px',
+          boxShadow: '0 0 0 3px rgba(66, 153, 225, 0.5)',
         },
       },
       ios: {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.22,
-        shadowRadius: 2.22,
+        shadowOpacity: 0.18,
+        shadowRadius: 2,
       },
       android: {
-        elevation: 3,
+        elevation: 2,
       },
     }),
   },

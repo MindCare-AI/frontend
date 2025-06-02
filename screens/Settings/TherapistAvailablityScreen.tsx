@@ -5,13 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Alert,
   TextInput,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
   getTherapistAvailability, 
   updateTherapistAvailability,
@@ -190,12 +190,7 @@ const TherapistAvailabilityScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text style={styles.loadingText}>Loading your availability...</Text>
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
@@ -203,6 +198,7 @@ const TherapistAvailabilityScreen: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <LoadingSpinner visible={saving} />
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.header}>
           <Text style={styles.title}>Manage Your Availability</Text>
@@ -273,11 +269,7 @@ const TherapistAvailabilityScreen: React.FC = () => {
           onPress={saveAvailability}
           disabled={saving}
         >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Availability</Text>
-          )}
+          <Text style={styles.saveButtonText}>Save Availability</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -292,16 +284,6 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#333',
   },
   header: {
     marginBottom: 24,

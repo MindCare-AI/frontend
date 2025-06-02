@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from 'react-native';
-import { ActivityIndicator, Snackbar, Button, Checkbox, Divider, Switch, List, Menu, Modal, Portal, TextInput } from 'react-native-paper';
+import { Snackbar, Button, Checkbox, Divider, Switch, List, Menu, Modal, Portal, TextInput } from 'react-native-paper';
 import { 
   getUserPreferences, 
   saveUserPreferences, 
@@ -11,6 +11,7 @@ import { SettingToggle } from '../../components/SettingsScreen/SettingToggle';
 import { SectionHeader } from '../../components/SettingsScreen/SectionHeader';
 import { globalStyles } from '../../styles/global';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 // Add this interface to define your notification structure
 interface NotificationPreferences {
@@ -278,15 +279,12 @@ const NotificationSettingsScreen: React.FC = () => {
   );
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={globalStyles.colors.primary} />
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingSpinner visible={updating} />
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.contentContainer}
@@ -575,11 +573,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 80, // Add padding at the bottom for the buttons
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   errorContainer: {
     padding: 20,

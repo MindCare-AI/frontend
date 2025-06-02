@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, Switch, SafeAreaView, StatusBar, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, Image, TouchableOpacity, Switch, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { SettingsStackParamList } from '../../types/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getUserProfile } from '../../API/settings/user';
-import { getNotificationTypes } from '../../API/settings/notifications'; // Remove updateNotificationSettings
+import { getNotificationTypes } from '../../API/settings/notifications';
 import { handleLogout } from '../auth/logoutHandler';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const HomeSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
@@ -95,12 +96,7 @@ const HomeSettingsScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#002D62" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
@@ -263,16 +259,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#002D62',
-    fontSize: 16,
   },
   gradientContainer: {
     flex: 1,

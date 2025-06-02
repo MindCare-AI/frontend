@@ -2,9 +2,10 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ActivityIndicator, Animated, Dimensions, Keyboard, Easing, FlatList } from "react-native"
+import { Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, Animated, Dimensions, Keyboard, Easing } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
+import LoadingSpinner from "../../components/LoadingSpinner"
 
 interface SearchModalProps {
   visible: boolean
@@ -251,7 +252,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           <View style={styles.content}>
             {isSearching ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
+                <LoadingSpinner visible={true} />
                 <Text style={[styles.loadingText, { color: colors.muted }]}>
                   Searching...
                 </Text>
@@ -349,7 +350,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         >
           {isSearching ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
+              <LoadingSpinner visible={true} />
               <Text style={[styles.loadingText, { color: colors.muted }]}>
                 Searching...
               </Text>

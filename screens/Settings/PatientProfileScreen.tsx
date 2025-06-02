@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Text,
   Image,
   Platform,
@@ -17,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { TextInput, Button, HelperText, RadioButton, IconButton } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
   getPatientProfile, 
   updatePatientProfile, 
@@ -363,15 +363,12 @@ const PatientProfileScreen = () => {
   ];
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={globalStyles.colors.primary} />
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingSpinner visible={isSaving} />
       <ScrollView style={styles.scrollContainer}>
         {profile && (
           <>
@@ -656,11 +653,6 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   section: {
     backgroundColor: globalStyles.colors.white,
