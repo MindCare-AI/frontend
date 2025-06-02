@@ -1,9 +1,20 @@
 import axios from "axios";
 import { API_URL } from "../../config";
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Helper to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("accessToken");
+// Helper to get auth headers with cross-platform storage
+const getAuthHeaders = async () => {
+  let token;
+  
+  if (Platform.OS === 'web') {
+    // Use localStorage for web
+    token = localStorage.getItem("accessToken");
+  } else {
+    // Use AsyncStorage for mobile (iOS/Android)
+    token = await AsyncStorage.getItem("accessToken");
+  }
+  
   console.log("Auth token used:", token);
   return {
     Authorization: `Bearer ${token}`,
@@ -20,7 +31,7 @@ export const getAppointments = async (params: any = {}) => {
   
   // Make a simple request without any filters
   const resp = await axios.get(url, {
-    headers: getAuthHeaders()
+    headers: await getAuthHeaders()
   });
   console.log("Appointments response:", resp.data);
   
@@ -64,7 +75,7 @@ export const createAppointment = async (data: {
   const getCurrentUserProfile = async (): Promise<UserProfile> => {
     try {
       const resp = await axios.get<UserProfile>(`${API_URL}/users/me/`, {
-        headers: getAuthHeaders(),
+        headers: await getAuthHeaders(),
       });
       console.log('getCurrentUserProfile response:', resp.data);
       return resp.data;
@@ -92,7 +103,7 @@ export const createAppointment = async (data: {
     };
 
     const resp = await axios.post(`${API_URL}/appointments/`, appointmentData, {
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
     });
     return resp.data;
   } catch (error) {
@@ -106,7 +117,7 @@ export const cancelAppointment = async (id: number) => {
   const resp = await axios.post(
     `${API_URL}/appointments/${id}/cancel/`,
     {},
-    { headers: getAuthHeaders() }
+    { headers: await getAuthHeaders() }
   );
   return resp.data;
 };
@@ -118,7 +129,7 @@ export const submitAppointmentFeedback = async (
   const resp = await axios.post(
     `${API_URL}/appointments/${id}/feedback/`,
     data,
-    { headers: getAuthHeaders() }
+    { headers: await getAuthHeaders() }
   );
   return resp.data;
 };
@@ -130,7 +141,7 @@ export const rescheduleAppointment = async (id: number, data: {
   const resp = await axios.put(
     `${API_URL}/appointments/${id}/`,
     data,
-    { headers: getAuthHeaders() }
+    { headers: await getAuthHeaders() }
   );
   return resp.data;
 };
@@ -140,7 +151,7 @@ export async function updateAppointmentDate(appointmentId: number, newDate: stri
   return fetch(`${API_URL}/appointments/${appointmentId}/`, {
     method: "PUT",
     headers: {
-      ...getAuthHeaders(),
+      ...(await getAuthHeaders()),
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ new_date: newDate }),
@@ -155,7 +166,7 @@ export async function updateAppointmentDate(appointmentId: number, newDate: stri
 export const getWaitingList = async (params: any = {}) => {
   const resp = await axios.get(`${API_URL}/appointments/waiting-list/`, {
     params,
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return resp.data;
 };
@@ -168,7 +179,7 @@ export const addToWaitingList = async (data: {
 }) => {
   // Backend expects therapist, requested_date, preferred_time_slots, notes
   // We'll send one entry per preferred_date
-  const promises = data.preferred_dates.map((date) =>
+  const promises = data.preferred_dates.map(async (date) =>
     axios.post(
       `${API_URL}/appointments/waiting-list/`,
       {
@@ -177,7 +188,7 @@ export const addToWaitingList = async (data: {
         preferred_time_slots: data.preferred_time_slots,
         notes: data.notes,
       },
-      { headers: getAuthHeaders() }
+      { headers: await getAuthHeaders() }
     )
   );
   return Promise.all(promises);
@@ -187,14 +198,14 @@ export const removeFromWaitingList = async (id: number) => {
   const resp = await axios.post(
     `${API_URL}/appointments/waiting-list/${id}/cancel/`,
     {},
-    { headers: getAuthHeaders() }
+    { headers: await getAuthHeaders() }
   );
   return resp.data;
 };
 
 export const getAllTherapistProfiles = async () => {
   const resp = await axios.get(`${API_URL}/therapist/profiles/all`, {
-    headers: getAuthHeaders(),
+    headers: await getAuthHeaders(),
   });
   return resp.data;
 };

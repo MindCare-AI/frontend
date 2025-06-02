@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform, Alert } from 'react-native';
 import {
   getAppointments,
   rescheduleAppointment,
@@ -51,6 +52,11 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
     // ...add other fields if needed
   };
 
+  // Cross-platform date formatting helper
+  const formatDate = (date: Date): string => {
+    return date.toISOString().slice(0, 10);
+  };
+
   // Fetch and split appointments into today/upcoming
   const refreshAppointments = async () => {
     setLoading(true);
@@ -58,7 +64,10 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       const data = await getAppointments() as AppointmentsApiResponse;
       const today: Appointment[] = [];
       const upcoming: Appointment[] = [];
-      const now = new Date().toISOString().slice(0, 10);
+      
+      // Use cross-platform date handling
+      const now = formatDate(new Date());
+      
       for (const appt of data.results || []) {
         // Use appointment_date from API response, fallback to date
         const apptDateString = appt.appointment_date || appt.date;
@@ -71,6 +80,13 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       // ...set other state as needed...
     } catch (error) {
       console.error('[AppContext] Error fetching appointments:', error);
+      // Cross-platform error handling
+      const errorMessage = 'Unable to load appointments. Please try again later.';
+      if (Platform.OS === 'web') {
+        console.error(errorMessage, error);
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -90,9 +106,19 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       // Refresh appointments to update the lists
       await refreshAppointments();
       
+      // Cross-platform success feedback
+      if (Platform.OS !== 'web') {
+        Alert.alert('Success', 'Appointment rescheduled successfully');
+      }
+      
       return updatedAppointment;
     } catch (error) {
       console.error('[AppContext] Error rescheduling appointment:', error);
+      // Cross-platform error handling
+      const errorMessage = 'Failed to reschedule appointment. Please try again.';
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -108,8 +134,18 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       
       // Refresh appointments to update the lists
       await refreshAppointments();
+      
+      // Cross-platform success feedback
+      if (Platform.OS !== 'web') {
+        Alert.alert('Success', 'Appointment confirmed successfully');
+      }
     } catch (error) {
       console.error('[AppContext] Error confirming appointment:', error);
+      // Cross-platform error handling
+      const errorMessage = 'Failed to confirm appointment. Please try again.';
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -125,8 +161,18 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       
       // Refresh appointments to update the lists
       await refreshAppointments();
+      
+      // Cross-platform success feedback
+      if (Platform.OS !== 'web') {
+        Alert.alert('Success', 'Appointment cancelled successfully');
+      }
     } catch (error) {
       console.error('[AppContext] Error canceling appointment:', error);
+      // Cross-platform error handling
+      const errorMessage = 'Failed to cancel appointment. Please try again.';
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -143,9 +189,19 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
       // Refresh appointments to update the lists
       await refreshAppointments();
       
+      // Cross-platform success feedback
+      if (Platform.OS !== 'web') {
+        Alert.alert('Success', 'Appointment marked as completed');
+      }
+      
       return completedAppointment;
     } catch (error) {
       console.error('[AppContext] Error completing appointment:', error);
+      // Cross-platform error handling
+      const errorMessage = 'Failed to complete appointment. Please try again.';
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -153,7 +209,12 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
   };
 
   useEffect(() => {
-    refreshAppointments();
+    // Use setTimeout to ensure the component is mounted properly across platforms
+    const timerId = setTimeout(() => {
+      refreshAppointments();
+    }, 0);
+    
+    return () => clearTimeout(timerId);
   }, []);
 
   return (

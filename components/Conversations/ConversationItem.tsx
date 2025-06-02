@@ -53,6 +53,7 @@ export interface ConversationItemProps {
   userId: string | number;
   onPress: () => void;
   onLongPress?: () => void;
+  isDeleting?: boolean;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({ 

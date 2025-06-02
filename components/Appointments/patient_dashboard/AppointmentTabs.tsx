@@ -25,6 +25,7 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({ onOpenFeedback }) => 
   
   const isMobile = useBreakpointValue({ base: true, md: false })
   const theme = useTheme()
+  // Fix: Ensure fadeAnim is properly initialized with useNativeDriver support
   const fadeAnim = useRef(new Animated.Value(1)).current
 
   // Fetch data when the active tab changes
@@ -214,6 +215,7 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({ onOpenFeedback }) => 
                 translateY: fadeAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [10, 0],
+                  extrapolate: 'clamp',
                 }),
               },
             ],
@@ -221,27 +223,27 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({ onOpenFeedback }) => 
           },
         ]}
       >
-        <TabContent tabKey="upcoming" activeTab={activeTab} style={{ flex: 1 }}>
+        {activeTab === "upcoming" && (
           <UpcomingAppointments 
             appointments={upcomingAppointments} 
-            loading={loading && activeTab === "upcoming"} 
+            loading={loading} 
           />
-        </TabContent>
+        )}
 
-        <TabContent tabKey="past" activeTab={activeTab} style={{ flex: 1 }}>
+        {activeTab === "past" && (
           <PastAppointments 
-            appointments={pastAppointments}
-            loading={loading && activeTab === "past"}
+            appointments={pastAppointments} 
+            loading={loading} 
             onOpenFeedback={onOpenFeedback} 
           />
-        </TabContent>
+        )}
 
-        <TabContent tabKey="waiting" activeTab={activeTab} style={{ flex: 1 }}>
+        {activeTab === "waiting" && (
           <WaitingList 
-            entries={waitingListEntries}
-            loading={loading && activeTab === "waiting"}
+            entries={waitingListEntries} 
+            loading={loading} 
           />
-        </TabContent>
+        )}
       </Animated.View>
     </View>
   )

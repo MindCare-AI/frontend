@@ -14,6 +14,7 @@ import { JournalItem } from "../../components/Journal/JournalItem"
 import { EntryItem } from "../../components/Journal/EntryItem"
 import { NewJournalCard } from "../../components/Journal/NewJournalCard"
 import { colors, spacing, fontSizes, journalColors, journalGradients, shadows, borderRadius } from "../../components/Journal/theme"
+import Drawer from "../../components/tips/drawer"
 
 // Simple icons for React Native
 const TrashIcon = () => <Text style={{ fontSize: 20, color: colors.white }}>🗑️</Text>
@@ -396,307 +397,309 @@ export default function JournalDashboard() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>My Journals</Text>
-          <Text style={styles.subtitle}>{journals.length} {journals.length === 1 ? 'journal' : 'journals'}</Text>
+    <Drawer tipType="journaling" title="Journaling Tips">
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>My Journals</Text>
+            <Text style={styles.subtitle}>{journals.length} {journals.length === 1 ? 'journal' : 'journals'}</Text>
+          </View>
         </View>
-      </View>
 
-      <FlatList
-        data={gridData}
-        renderItem={renderGridItem}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={numColumns}
-        columnWrapperStyle={numColumns > 1 ? styles.journalGrid : undefined}
-        contentContainerStyle={styles.journalList}
-        showsVerticalScrollIndicator={false}
-        // Improved spacing between items
-        ItemSeparatorComponent={() => <View style={{ height: cardSpacing }} />}
-      />
+        <FlatList
+          data={gridData}
+          renderItem={renderGridItem}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={numColumns}
+          columnWrapperStyle={numColumns > 1 ? styles.journalGrid : undefined}
+          contentContainerStyle={styles.journalList}
+          showsVerticalScrollIndicator={false}
+          // Improved spacing between items
+          ItemSeparatorComponent={() => <View style={{ height: cardSpacing }} />}
+        />
 
-      {/* Enhanced Journal Entry Modal */}
-      <Dialog
-        visible={isEntryModalVisible}
-        onClose={() => setIsEntryModalVisible(false)}
-        title={selectedJournal?.name}
-        enhanced={true}
-        footer={
-          isAddingEntry ? (
+        {/* Enhanced Journal Entry Modal */}
+        <Dialog
+          visible={isEntryModalVisible}
+          onClose={() => setIsEntryModalVisible(false)}
+          title={selectedJournal?.name}
+          enhanced={true}
+          footer={
+            isAddingEntry ? (
+              <View style={styles.dialogFooter}>
+                <Button 
+                  variant="outline" 
+                  onPress={() => setIsAddingEntry(false)}
+                  disabled={isCreatingEntry}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onPress={handleAddEntry}
+                  isLoading={isCreatingEntry}
+                  disabled={isCreatingEntry}
+                >
+                  Save Entry
+                </Button>
+              </View>
+            ) : null
+          }
+        >
+          <View>
+            <View style={styles.entryModalHeader}>
+              <View style={[styles.colorDot, { backgroundColor: selectedJournal?.color }]} />
+              <Text style={styles.entryCount}>
+                {selectedJournal?.entries_count ?? 0} {selectedJournal?.entries_count === 1 ? "entry" : "entries"}
+              </Text>
+              <Button variant="outline" size="sm" onPress={() => setIsAddingEntry(!isAddingEntry)}>
+                {isAddingEntry ? "View Entries" : "Add Entry"}
+              </Button>
+            </View>
+
+            {isAddingEntry ? (
+              <TextArea
+                placeholder="Write your thoughts here..."
+                value={newEntryContent}
+                onChangeText={setNewEntryContent}
+                height={200}
+              />
+            ) : (
+              <View style={styles.entriesList}>
+                {entriesForSelectedJournal.length > 0 ? (
+                  <FlatList
+                    data={entriesForSelectedJournal}
+                    renderItem={renderEntryItem}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={styles.entriesListContent}
+                  />
+                ) : (
+                  <View style={styles.emptyEntries}>
+                    <Text style={styles.emptyEntriesText}>No entries yet</Text>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onPress={() => setIsAddingEntry(true)}
+                      style={styles.createFirstEntryButton}
+                    >
+                      Create your first entry
+                    </Button>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </Dialog>
+
+        {/* Enhanced New Journal Modal */}
+        <Dialog
+          visible={isNewJournalModalVisible}
+          onClose={() => setIsNewJournalModalVisible(false)}
+          title="Create New Journal"
+          enhanced={true}
+          footer={
             <View style={styles.dialogFooter}>
               <Button 
                 variant="outline" 
-                onPress={() => setIsAddingEntry(false)}
-                disabled={isCreatingEntry}
+                onPress={() => setIsNewJournalModalVisible(false)}
+                disabled={isCreatingJournal}
               >
                 Cancel
               </Button>
               <Button 
-                onPress={handleAddEntry}
-                isLoading={isCreatingEntry}
-                disabled={isCreatingEntry}
+                onPress={handleAddJournal}
+                isLoading={isCreatingJournal}
+                disabled={isCreatingJournal}
               >
-                Save Entry
+                Create Journal
               </Button>
             </View>
-          ) : null
-        }
-      >
-        <View>
-          <View style={styles.entryModalHeader}>
-            <View style={[styles.colorDot, { backgroundColor: selectedJournal?.color }]} />
-            <Text style={styles.entryCount}>
-              {selectedJournal?.entries_count ?? 0} {selectedJournal?.entries_count === 1 ? "entry" : "entries"}
-            </Text>
-            <Button variant="outline" size="sm" onPress={() => setIsAddingEntry(!isAddingEntry)}>
-              {isAddingEntry ? "View Entries" : "Add Entry"}
-            </Button>
-          </View>
-
-          {isAddingEntry ? (
-            <TextArea
-              placeholder="Write your thoughts here..."
-              value={newEntryContent}
-              onChangeText={setNewEntryContent}
-              height={200}
+          }
+        >
+          <View>
+            <Input
+              label="Journal Name"
+              placeholder="e.g., Dream Journal"
+              value={newJournalTitle}
+              onChangeText={setNewJournalTitle}
             />
-          ) : (
-            <View style={styles.entriesList}>
-              {entriesForSelectedJournal.length > 0 ? (
-                <FlatList
-                  data={entriesForSelectedJournal}
-                  renderItem={renderEntryItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  contentContainerStyle={styles.entriesListContent}
-                />
-              ) : (
-                <View style={styles.emptyEntries}>
-                  <Text style={styles.emptyEntriesText}>No entries yet</Text>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onPress={() => setIsAddingEntry(true)}
-                    style={styles.createFirstEntryButton}
-                  >
-                    Create your first entry
-                  </Button>
+
+            <Text style={styles.colorPickerLabel}>Choose Color</Text>
+            <ColorPicker 
+              selectedColor={newJournalColor} 
+              onColorSelect={setNewJournalColor}
+            />
+          </View>
+        </Dialog>
+
+        {/* Edit Journal Modal */}
+        <Dialog
+          visible={isEditJournalModalVisible}
+          onClose={() => setIsEditJournalModalVisible(false)}
+          title="Edit Journal"
+          footer={
+            <View style={styles.dialogFooter}>
+              <Button 
+                variant="destructive" 
+                onPress={() => setIsDeleteJournalModalVisible(true)}
+                disabled={isUpdatingJournal}
+              >
+                <View style={styles.buttonWithIcon}>
+                  <TrashIcon />
+                  <Text style={styles.deleteButtonText}>Delete</Text>
                 </View>
-              )}
-            </View>
-          )}
-        </View>
-      </Dialog>
-
-      {/* Enhanced New Journal Modal */}
-      <Dialog
-        visible={isNewJournalModalVisible}
-        onClose={() => setIsNewJournalModalVisible(false)}
-        title="Create New Journal"
-        enhanced={true}
-        footer={
-          <View style={styles.dialogFooter}>
-            <Button 
-              variant="outline" 
-              onPress={() => setIsNewJournalModalVisible(false)}
-              disabled={isCreatingJournal}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onPress={handleAddJournal}
-              isLoading={isCreatingJournal}
-              disabled={isCreatingJournal}
-            >
-              Create Journal
-            </Button>
-          </View>
-        }
-      >
-        <View>
-          <Input
-            label="Journal Name"
-            placeholder="e.g., Dream Journal"
-            value={newJournalTitle}
-            onChangeText={setNewJournalTitle}
-          />
-
-          <Text style={styles.colorPickerLabel}>Choose Color</Text>
-          <ColorPicker 
-            selectedColor={newJournalColor} 
-            onColorSelect={setNewJournalColor}
-          />
-        </View>
-      </Dialog>
-
-      {/* Edit Journal Modal */}
-      <Dialog
-        visible={isEditJournalModalVisible}
-        onClose={() => setIsEditJournalModalVisible(false)}
-        title="Edit Journal"
-        footer={
-          <View style={styles.dialogFooter}>
-            <Button 
-              variant="destructive" 
-              onPress={() => setIsDeleteJournalModalVisible(true)}
-              disabled={isUpdatingJournal}
-            >
-              <View style={styles.buttonWithIcon}>
-                <TrashIcon />
-                <Text style={styles.deleteButtonText}>Delete</Text>
+              </Button>
+              <View style={styles.rightButtons}>
+                <Button 
+                  variant="outline" 
+                  onPress={() => setIsEditJournalModalVisible(false)} 
+                  style={styles.cancelButton}
+                  disabled={isUpdatingJournal}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onPress={handleEditJournal}
+                  isLoading={isUpdatingJournal}
+                  disabled={isUpdatingJournal}
+                >
+                  Save Changes
+                </Button>
               </View>
-            </Button>
-            <View style={styles.rightButtons}>
+            </View>
+          }
+          enhanced={true}
+        >
+          <View>
+            <Input label="Journal Name" value={newJournalTitle} onChangeText={setNewJournalTitle} />
+
+            <Text style={styles.colorPickerLabel}>Choose Color</Text>
+            <ColorPicker 
+              selectedColor={newJournalColor} 
+              onColorSelect={setNewJournalColor}
+            />
+          </View>
+        </Dialog>
+
+        {/* Delete Journal Confirmation Modal */}
+        <Dialog
+          visible={isDeleteJournalModalVisible}
+          onClose={() => setIsDeleteJournalModalVisible(false)}
+          title="Delete Journal"
+          footer={
+            <View style={styles.dialogFooter}>
               <Button 
                 variant="outline" 
-                onPress={() => setIsEditJournalModalVisible(false)} 
-                style={styles.cancelButton}
-                disabled={isUpdatingJournal}
+                onPress={() => setIsDeleteJournalModalVisible(false)}
+                disabled={isDeletingJournal}
               >
                 Cancel
               </Button>
               <Button 
-                onPress={handleEditJournal}
-                isLoading={isUpdatingJournal}
-                disabled={isUpdatingJournal}
+                variant="destructive" 
+                onPress={handleDeleteJournal}
+                isLoading={isDeletingJournal}
+                disabled={isDeletingJournal}
               >
-                Save Changes
+                Delete Journal
               </Button>
             </View>
+          }
+          enhanced={true}
+        >
+          <View style={styles.deleteConfirmation}>
+            <View style={styles.alertIconContainer}>
+              <AlertIcon />
+            </View>
+            <Text style={styles.deleteConfirmationText}>
+              Are you sure you want to delete "{editingJournal?.name}"? This will permanently remove the journal and all
+              its entries. This action cannot be undone.
+            </Text>
           </View>
-        }
-        enhanced={true}
-      >
-        <View>
-          <Input label="Journal Name" value={newJournalTitle} onChangeText={setNewJournalTitle} />
+        </Dialog>
 
-          <Text style={styles.colorPickerLabel}>Choose Color</Text>
-          <ColorPicker 
-            selectedColor={newJournalColor} 
-            onColorSelect={setNewJournalColor}
-          />
-        </View>
-      </Dialog>
-
-      {/* Delete Journal Confirmation Modal */}
-      <Dialog
-        visible={isDeleteJournalModalVisible}
-        onClose={() => setIsDeleteJournalModalVisible(false)}
-        title="Delete Journal"
-        footer={
-          <View style={styles.dialogFooter}>
-            <Button 
-              variant="outline" 
-              onPress={() => setIsDeleteJournalModalVisible(false)}
-              disabled={isDeletingJournal}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onPress={handleDeleteJournal}
-              isLoading={isDeletingJournal}
-              disabled={isDeletingJournal}
-            >
-              Delete Journal
-            </Button>
-          </View>
-        }
-        enhanced={true}
-      >
-        <View style={styles.deleteConfirmation}>
-          <View style={styles.alertIconContainer}>
-            <AlertIcon />
-          </View>
-          <Text style={styles.deleteConfirmationText}>
-            Are you sure you want to delete "{editingJournal?.name}"? This will permanently remove the journal and all
-            its entries. This action cannot be undone.
-          </Text>
-        </View>
-      </Dialog>
-
-      {/* Edit Entry Modal */}
-      <Dialog
-        visible={isEditEntryModalVisible}
-        onClose={() => setIsEditEntryModalVisible(false)}
-        title="Edit Entry"
-        footer={
-          <View style={styles.dialogFooter}>
-            <Button 
-              variant="destructive" 
-              onPress={() => setIsDeleteEntryModalVisible(true)}
-              disabled={isUpdatingEntry}
-            >
-              <View style={styles.buttonWithIcon}>
-                <TrashIcon />
-                <Text style={styles.deleteButtonText}>Delete</Text>
+        {/* Edit Entry Modal */}
+        <Dialog
+          visible={isEditEntryModalVisible}
+          onClose={() => setIsEditEntryModalVisible(false)}
+          title="Edit Entry"
+          footer={
+            <View style={styles.dialogFooter}>
+              <Button 
+                variant="destructive" 
+                onPress={() => setIsDeleteEntryModalVisible(true)}
+                disabled={isUpdatingEntry}
+              >
+                <View style={styles.buttonWithIcon}>
+                  <TrashIcon />
+                  <Text style={styles.deleteButtonText}>Delete</Text>
+                </View>
+              </Button>
+              <View style={styles.rightButtons}>
+                <Button 
+                  variant="outline" 
+                  onPress={() => setIsEditEntryModalVisible(false)} 
+                  style={styles.cancelButton}
+                  disabled={isUpdatingEntry}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onPress={handleUpdateEntry}
+                  isLoading={isUpdatingEntry}
+                  disabled={isUpdatingEntry}
+                >
+                  Save Changes
+                </Button>
               </View>
-            </Button>
-            <View style={styles.rightButtons}>
+            </View>
+          }
+          enhanced={true}
+        >
+          <TextArea
+            placeholder="Edit your entry..."
+            value={newEntryContent}
+            onChangeText={setNewEntryContent}
+            height={200}
+          />
+        </Dialog>
+
+        {/* Delete Entry Confirmation Modal */}
+        <Dialog
+          visible={isDeleteEntryModalVisible}
+          onClose={() => setIsDeleteEntryModalVisible(false)}
+          title="Delete Entry"
+          footer={
+            <View style={styles.dialogFooter}>
               <Button 
                 variant="outline" 
-                onPress={() => setIsEditEntryModalVisible(false)} 
-                style={styles.cancelButton}
-                disabled={isUpdatingEntry}
+                onPress={() => setIsDeleteEntryModalVisible(false)}
+                disabled={isDeletingEntry}
               >
                 Cancel
               </Button>
               <Button 
-                onPress={handleUpdateEntry}
-                isLoading={isUpdatingEntry}
-                disabled={isUpdatingEntry}
+                variant="destructive" 
+                onPress={handleDeleteEntry}
+                isLoading={isDeletingEntry}
+                disabled={isDeletingEntry}
               >
-                Save Changes
+                Delete Entry
               </Button>
             </View>
+          }
+          enhanced={true}
+        >
+          <View style={styles.deleteConfirmation}>
+            <View style={styles.alertIconContainer}>
+              <AlertIcon />
+            </View>
+            <Text style={styles.deleteConfirmationText}>
+              Are you sure you want to delete this entry? This action cannot be undone.
+            </Text>
           </View>
-        }
-        enhanced={true}
-      >
-        <TextArea
-          placeholder="Edit your entry..."
-          value={newEntryContent}
-          onChangeText={setNewEntryContent}
-          height={200}
-        />
-      </Dialog>
-
-      {/* Delete Entry Confirmation Modal */}
-      <Dialog
-        visible={isDeleteEntryModalVisible}
-        onClose={() => setIsDeleteEntryModalVisible(false)}
-        title="Delete Entry"
-        footer={
-          <View style={styles.dialogFooter}>
-            <Button 
-              variant="outline" 
-              onPress={() => setIsDeleteEntryModalVisible(false)}
-              disabled={isDeletingEntry}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="destructive" 
-              onPress={handleDeleteEntry}
-              isLoading={isDeletingEntry}
-              disabled={isDeletingEntry}
-            >
-              Delete Entry
-            </Button>
-          </View>
-        }
-        enhanced={true}
-      >
-        <View style={styles.deleteConfirmation}>
-          <View style={styles.alertIconContainer}>
-            <AlertIcon />
-          </View>
-          <Text style={styles.deleteConfirmationText}>
-            Are you sure you want to delete this entry? This action cannot be undone.
-          </Text>
-        </View>
-      </Dialog>
-    </SafeAreaView>
+        </Dialog>
+      </SafeAreaView>
+    </Drawer>
   )
 }
 

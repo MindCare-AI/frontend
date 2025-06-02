@@ -7,6 +7,10 @@ import { createBoxShadow } from '../../utils/shadows';
 interface ConversationHeaderProps {
   title?: string;
   onSettingsPress?: () => void;
+  showSearch?: boolean;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  searchInputRef?: React.RefObject<any>;
 }
 
 const ConversationHeader: React.FC<ConversationHeaderProps> = ({ 

@@ -173,7 +173,7 @@ export const useConversations = () => {
       
       switch (message.type) {
         case 'message':
-          if (message.event === 'new_message' && message.message) {
+          if (message.event === 'chat.message' && message.message) {
             handleNewMessage(message.message);
           }
           break;

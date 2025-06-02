@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import { API_URL } from '../config';
 
 const FEEDS_URL = `${API_URL}/feeds`;
@@ -42,11 +43,17 @@ export const createPost = async (postData: any) => {
     if (postData instanceof FormData) {
       console.log("DEBUG: postData is FormData, using directly");
       
-      const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Additional debugging for FormData - React Native web compatible
+      console.log("DEBUG: FormData type check passed");
+      
+      // Critical fix: NEVER set Content-Type header for multipart/form-data
+      // Let the browser/platform set it with the correct boundary automatically
+      // Also don't set custom headers that might trigger CORS preflight checks
+      
+      console.log('DEBUG: Sending FormData with automatic Content-Type handling');
+      console.log('DEBUG: Platform:', Platform.OS || 'unknown');
+      
+      const response = await axios.post(`${FEEDS_URL}/posts/`, postData);
       console.log("DEBUG: Post created successfully:", response.data);
       return response.data;
     } else {
@@ -77,28 +84,103 @@ export const createPost = async (postData: any) => {
       // Handle link_url with support for both naming conventions
       const linkUrl = postData.link_url || postData.linkUrl;
       if (linkUrl) {
+        console.log("DEBUG: Adding link_url to form data:", linkUrl);
         formData.append('link_url', linkUrl);
       }
       
-      // Handle file upload
+      // Handle file upload with improved cross-platform support
       if (postData.file) {
-        formData.append('file', postData.file);
+        const file = postData.file;
+        // Handle different file formats based on platform
+        if (typeof File !== 'undefined' && file instanceof File) {
+          // Web platform File object
+          console.log("DEBUG: Adding File directly to FormData");
+          formData.append('file', file);
+        } else if (typeof Blob !== 'undefined' && file instanceof Blob) {
+          // Web platform blob without name
+          console.log("DEBUG: Adding Blob directly to FormData");
+          formData.append('file', file, 'media.jpg');
+        } else if (file.uri && file.type) {
+          // Standard React Native file object
+          console.log("DEBUG: Adding React Native file object:", {
+            uri: file.uri.substring(0, 50) + '...',
+            name: file.name || 'media.jpg',
+            type: file.type
+          });
+          formData.append('file', file as any);
+        } else {
+          console.warn("DEBUG: Invalid file object, attempting to send anyway:", file);
+          formData.append('file', file as any);
+        }
       } else if (postData.media) {
-        formData.append('file', postData.media);
+        // Alternative media property - handle array vs single file
+        const media = postData.media;
+        
+        // Check if media is an array
+        if (Array.isArray(media)) {
+          console.log("DEBUG: Media is array, taking first file only");
+          if (media.length > 0) {
+            const firstMedia = media[0];
+            
+            // Apply the same cross-platform handling as above
+            if (typeof File !== 'undefined' && firstMedia instanceof File) {
+              console.log("DEBUG: Adding File directly from media array");
+              formData.append('file', firstMedia);
+            } else if (typeof Blob !== 'undefined' && firstMedia instanceof Blob) {
+              console.log("DEBUG: Adding Blob directly from media array");
+              formData.append('file', firstMedia, 'media.jpg');
+            } else if (firstMedia.uri && firstMedia.type) {
+              console.log("DEBUG: Adding first media file from array:", {
+                uri: firstMedia.uri.substring(0, 50) + '...',
+                name: firstMedia.name || 'media.jpg',
+                type: firstMedia.type
+              });
+              formData.append('file', firstMedia as any);
+            } else {
+              console.error("DEBUG: First media item missing properties:", firstMedia);
+              // Try anyway as a last resort
+              formData.append('file', firstMedia as any);
+            }
+          }
+        } else {
+          // Single media object - apply cross-platform handling
+          if (typeof File !== 'undefined' && media instanceof File) {
+            console.log("DEBUG: Adding File directly from media property");
+            formData.append('file', media);
+          } else if (typeof Blob !== 'undefined' && media instanceof Blob) {
+            console.log("DEBUG: Adding Blob directly from media property");
+            formData.append('file', media, 'media.jpg');
+          } else if (media.uri && media.type) {
+            console.log("DEBUG: Adding single media file:", {
+              uri: media.uri.substring(0, 50) + '...',
+              name: media.name || 'media.jpg',
+              type: media.type
+            });
+            formData.append('file', media as any);
+          } else {
+            console.warn("DEBUG: Media object missing required properties:", media);
+            // Try anyway as a last resort
+            formData.append('file', media as any);
+          }
+        }
       }
       
-      // Log form data keys for debugging
-      // const formDataKeys = [];
-      // formData.forEach((value, key) => {
-      //   formDataKeys.push(key);
-      // });
-      // console.log("DEBUG: Sending FormData with keys:", formDataKeys);
+      // Log form data contents for debugging
+      console.log("DEBUG: FormData prepared with post data");
+      console.log("DEBUG: Post content:", postData.content);
+      console.log("DEBUG: Post type:", postType);
+      console.log("DEBUG: Has file:", !!(postData.file || postData.media));
       
-      const response = await axios.post(`${FEEDS_URL}/posts/`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Cross-platform handling - no custom headers
+      // Critical fix: NEVER set Content-Type to multipart/form-data manually
+      // Let the browser/platform handle it automatically to ensure correct boundary
+      // This is different from previous approach and should fix the empty media_files issue
+      
+      console.log('DEBUG: Sending FormData without manually setting Content-Type header');
+      console.log('DEBUG: Current platform:', Platform.OS || 'unknown');
+      
+      // Don't set custom headers to avoid CORS preflight issues
+      const response = await axios.post(`${FEEDS_URL}/posts/`, formData);
       console.log("DEBUG: Post created successfully:", response.data);
       return response.data;
     }
@@ -114,11 +196,11 @@ export const createPost = async (postData: any) => {
 };
 
 export const updatePost = async (postId: number, postData: FormData) => {
-  const response = await axios.patch(`${FEEDS_URL}/posts/${postId}/`, postData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // Critical fix: Don't manually set Content-Type for FormData
+  // Don't set custom headers to avoid CORS preflight issues
+  console.log('DEBUG: Updating post on platform:', Platform.OS || 'unknown');
+  
+  const response = await axios.patch(`${FEEDS_URL}/posts/${postId}/`, postData);
   return response.data;
 };
 

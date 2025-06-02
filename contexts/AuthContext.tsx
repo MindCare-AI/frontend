@@ -88,6 +88,10 @@ interface TokenResponse {
   refresh?: string;
 }
 
+interface CSRFResponse {
+  csrfToken?: string;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -99,9 +103,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<PatientProfile | TherapistProfile | null>(null);
-  const refreshTokenTimeoutRef = useRef<NodeJS.Timeout>();
+  const refreshTokenTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Simplified CSRF token management for React Native
+  const getCSRFToken = async (): Promise<string | null> => {
+    try {
+      const response = await axios.get<CSRFResponse>(`${API_URL}/auth/csrf/`);
+      return response.data.csrfToken || null;
+    } catch (error) {
+      console.error('Failed to get CSRF token:', error);
+      return null;
+    }
+  };
+
+  const setupAxiosDefaults = async () => {
+    // Configure axios defaults for React Native
+    axios.defaults.withCredentials = false; // Disable for React Native
+    
+    // Set common headers
+    axios.defaults.headers.common['Accept'] = 'application/json';
+    axios.defaults.headers.common['Content-Type'] = 'application/json';
+    
+    // For React Native, typically CSRF is handled differently or not needed
+    // since we're using JWT tokens for authentication
+  };
 
   useEffect(() => {
+    setupAxiosDefaults();
     loadStoredTokens();
     return () => {
       if (refreshTokenTimeoutRef.current) {
@@ -112,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshTokens = async (refreshToken: string): Promise<string | null> => {
     try {
+      // For React Native with JWT, we typically don't need CSRF tokens
       const response = await axios.post<TokenResponse>(`${API_URL}/auth/token/refresh/`, {
         refresh: refreshToken
       });
@@ -145,10 +174,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
       }
     });
 
+    // For React Native, we typically don't need CSRF protection
+    // since we're using JWT tokens and the app doesn't run in a browser
     axiosInstance.interceptors.response.use(
       (response) => response,
       async (error) => {
@@ -168,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
+    // Update default axios headers
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   };
 

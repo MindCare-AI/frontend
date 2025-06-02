@@ -8,38 +8,30 @@ module.exports = (() => {
   config.transformer = {
     ...transformer,
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
+    assetPlugins: ['expo-asset/tools/hashAssetFiles'],
+    getTransformOptions: async () => ({
+      transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+      },
+    }),
   };
-  
-  config.resolver = {
+    config.resolver = {
     ...resolver,
     assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
     sourceExts: [...resolver.sourceExts, 'svg'],
-    blacklistRE: /node_modules\/react-native\/ReactCommon\/.*/,
+    platforms: ['native', 'android', 'ios', 'web', 'ts', 'tsx', 'js', 'jsx'],
+    alias: {
+      // Add this alias to help with web compatibility
+      'react-native-svg': require.resolve('react-native-svg/lib/module/index.js'),
+      // Add gesture handler alias for web compatibility
+      'react-native-gesture-handler': require.resolve('react-native-gesture-handler'),
+    },
   };
-
-  config.watcher = {
-    ...config.watcher,
-    ignore: [
-      /node_modules\/react-native\/ReactCommon\/.*/,
-      /node_modules\/@expo\/.*/,
-      /\.git\/.*/,
-      /android\/.*/,
-      /ios\/.*/,
-    ],
-    watchman: {
-      ignore_dirs: [
-        'node_modules/react-native/ReactCommon',
-        'node_modules/@expo',
-        'node_modules/@react-native-async-storage',
-        'node_modules/@react-native-community',
-        'node_modules/@shopify',
-        '.git',
-        '.expo',
-        'android',
-        'ios'
-      ]
-    }
-  };
+  config.watchFolders = [__dirname];
+  
+  // Add resolver for our polyfill
+  config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
   
   return config;
 })();

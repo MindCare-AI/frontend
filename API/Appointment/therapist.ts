@@ -1,18 +1,8 @@
 import axios from "axios";
 import { API_URL } from "../../config";
-
-interface AppointmentResponse {
-  appointment?: {
-    id: number;
-    appointment_date: string;
-    status: string;
-    notes?: string;
-  };
-  id?: number;
-  appointment_date?: string;
-  status?: string;
-  notes?: string;
-}
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppointmentResponse } from "types/appoint_therapist";
 
 /**
  * Appointment Status Flow:
@@ -24,9 +14,18 @@ interface AppointmentResponse {
  * Note: Appointments can also be canceled or rescheduled at various stages
  */
 
-// Helper to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("accessToken");
+// Helper to get auth headers with cross-platform storage
+const getAuthHeaders = async () => {
+  let token;
+  
+  if (Platform.OS === 'web') {
+    // Use localStorage for web
+    token = localStorage.getItem("accessToken");
+  } else {
+    // Use AsyncStorage for mobile (iOS/Android)
+    token = await AsyncStorage.getItem("accessToken");
+  }
+  
   console.log("[therapist.ts] Auth token used:", token);
   return {
     Authorization: `Bearer ${token}`,
@@ -43,7 +42,7 @@ export const getAppointments = async (params: any = {}) => {
 
   // Make a simple request without any filters
   const resp = await axios.get(url, {
-    headers: getAuthHeaders()
+    headers: await getAuthHeaders()
   });
   console.log("[therapist.ts] Appointments response:", resp.data);
 
@@ -74,7 +73,7 @@ export const rescheduleAppointment = async (
   
   try {
     const response = await axios.patch(url, requestBody, {
-      headers: getAuthHeaders()
+      headers: await getAuthHeaders()
     });
     console.log("[therapist.ts] Reschedule response:", response.data);
     return response.data;
@@ -97,11 +96,11 @@ export const confirmAppointment = async (appointmentId: number | string) => {
   
   try {
     const response = await axios.post<AppointmentResponse>(url, {}, {
-      headers: getAuthHeaders()
+      headers: await getAuthHeaders()
     });
     console.log("[therapist.ts] Confirm response:", response.data);
     // Ensure we return the appointment data in a consistent format
-    return response.data.appointment || response.data;
+    return response.data.appointment_id || response.data;
   } catch (error: any) {
     console.error("[therapist.ts] Confirm error:", error.response?.data || error.message);
     throw error;
@@ -125,7 +124,7 @@ export const cancelAppointment = async (id: number) => {
     const resp = await axios.post(
       url,
       {},
-      { headers: getAuthHeaders() }
+      { headers: await getAuthHeaders() }
     );
     console.log("[therapist.ts] Cancel response:", resp.data);
     return resp.data;
@@ -153,7 +152,7 @@ export const completeAppointment = async (appointmentId: number | string) => {
   
   try {
     const response = await axios.post(url, {}, {
-      headers: getAuthHeaders()
+      headers: await getAuthHeaders()
     });
     console.log("[therapist.ts] Complete response:", response.data);
     return response.data;

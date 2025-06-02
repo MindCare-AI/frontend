@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import MessageBubble from './MessageBubble';
+import ConversationLoadingScreen from '../common/ConversationLoadingScreen';
 
 interface Message {
   id: string | number;
@@ -47,27 +48,42 @@ const MessagesList: React.FC<MessagesListProps> = ({
   }, [messages]); // scroll on any change, not just length
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+    // Always ensure IDs are consistently handled as strings
+    const senderId = item.sender_id?.toString() || '';
+    const userId = currentUserId?.toString() || '';
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    const showSenderName = isGroup && 
-      (!previousMessage || previousMessage.sender_id !== item.sender_id) &&
-      item.sender_id?.toString() !== currentUserId?.toString() &&
-      !item.is_bot;
+    
+    // Ensure previous message ID is also stringified for comparison
+    const previousSenderId = previousMessage?.sender_id?.toString() || '';
+    
+    // Determine whether to show sender name in group chats
+    const showSenderName = Boolean(
+      isGroup && 
+      previousSenderId !== senderId &&
+      senderId !== userId &&
+      !item.is_bot
+    );
+
+    // Use explicit string comparison for consistent behavior
+    const isOwnMessage = senderId === userId;
 
     console.log(`[MessagesList] Rendering message ${item.id}:`, {
-      senderId: item.sender_id,
-      currentUserId,
-      isOwnMessage: item.sender_id?.toString() === currentUserId?.toString(),
+      senderId,
+      userId,
+      isOwnMessage,
       showSenderName,
       messageContent: item.content.substring(0, 50)
     });
 
     return (
-      <MessageBubble
-        message={item}
-        currentUserId={currentUserId}
-        onRetry={onRetryMessage}
-        showSenderName={showSenderName}
-      />
+      <View key={`message-${item.id}`}>
+        <MessageBubble
+          message={item}
+          currentUserId={currentUserId}
+          onRetry={onRetryMessage}
+          showSenderName={showSenderName}
+        />
+      </View>
     );
   };
 
@@ -91,10 +107,7 @@ const MessagesList: React.FC<MessagesListProps> = ({
   const renderEmptyState = () => {
     if (loading) {
       return (
-        <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.emptyText}>Loading messages...</Text>
-        </View>
+        <ConversationLoadingScreen message="Loading messages..." />
       );
     }
 
@@ -105,6 +118,14 @@ const MessagesList: React.FC<MessagesListProps> = ({
       </View>
     );
   };
+
+  const EmptyComponent = () => (
+    <View>{renderEmptyState()}</View>
+  );
+
+  const FooterComponent = () => (
+    <View>{renderTypingIndicator()}</View>
+  );
 
   return (
     <View style={styles.container}>
@@ -119,10 +140,14 @@ const MessagesList: React.FC<MessagesListProps> = ({
         ]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
+          setTimeout(() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToEnd({ animated: false });
+            }
+          }, 100);
         }}
-        ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderTypingIndicator}
+        ListEmptyComponent={EmptyComponent}
+        ListFooterComponent={FooterComponent}
         removeClippedSubviews={true}
         maxToRenderPerBatch={10}
         windowSize={10}
