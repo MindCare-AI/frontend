@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { ChatbotConversation, ChatbotMessage } from '../types/chatbot/chatbot';
+import { ChatbotConversation, ChatMessage } from '../types/chatbot/chatbot';
 import chatbotService from '../services/chatbotService';
 
 interface ChatContextType {
@@ -20,7 +20,8 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearConversation = () => {
     if (activeConversation) {
-      chatbotService.setCurrentConversation(null);
+      // Use createConversation with empty object to clear conversation
+      chatbotService.createConversation({});
       setActiveConversation(null);
     }
   };
@@ -31,9 +32,9 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // This would typically fetch conversations from an API
       // For now, we'll just use the current conversation if it exists
-      const currentConversation = chatbotService.getCurrentConversation();
-      if (currentConversation) {
-        setConversations([currentConversation]);
+      const response = await chatbotService.getConversations();
+      if (response.success && response.data) {
+        setConversations(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -50,7 +51,10 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Update active conversation in service when changed
   useEffect(() => {
     if (activeConversation) {
-      chatbotService.setCurrentConversation(activeConversation);
+      // Update conversation using the correct method
+      chatbotService.createConversation({ 
+        title: activeConversation.title || 'New Conversation' 
+      });
     }
   }, [activeConversation]);
 

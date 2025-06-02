@@ -11,14 +11,19 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAllUsers } from '../../API/conversations';
+import { createGroupConversation } from '../../API/group';
 
 export interface User {
   id: string | number;
-  username: string;
+  username: string; // Made required
   email?: string;
   full_name?: string;
+  user_name?: string;
+  first_name?: string;
+  last_name?: string;
+  profile_picture?: string | null;
   user_type?: 'patient' | 'therapist';
+  is_verified?: boolean;
 }
 
 interface UserSelectionModalProps {
@@ -47,17 +52,17 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
   onCreateConversation,
   currentUserId,
   creating = false,
+  loading = false,
+  users: initialUsers = [],
 }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
 
+  // Effect for handling visibility changes
   useEffect(() => {
-    if (visible) {
-      loadUsers();
-    } else {
+    if (!visible) {
       // Reset state when modal closes
       setSelectedUsers([]);
       setGroupName('');
@@ -65,33 +70,34 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
     }
   }, [visible]);
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await getAllUsers();
-      // Ensure response is an array before filtering
-      if (Array.isArray(response)) {
-        const filteredUsers = response.filter((user: User) => user.id !== currentUserId);
-        setUsers(filteredUsers);
-      } else {
-        throw new Error('Invalid response format');
+  // Separate effect for handling initialUsers updates
+  useEffect(() => {
+    // Only update users if the filtered result would be different
+    const filteredUsers = initialUsers.filter((user: User) => 
+      user.id !== currentUserId && String(user.id) !== String(currentUserId)
+    );
+    // Remove duplicates based on user ID
+    const uniqueUsers = filteredUsers.reduce((acc: User[], user: User) => {
+      if (!acc.find(u => String(u.id) === String(user.id))) {
+        acc.push(user);
       }
-    } catch (error) {
-      console.error('Error loading users:', error);
-      Alert.alert('Error', 'Failed to load users');
-    } finally {
-      setLoading(false);
+      return acc;
+    }, []);
+    // Use JSON stringify for deep comparison
+    if (JSON.stringify(users) !== JSON.stringify(uniqueUsers)) {
+      setUsers(uniqueUsers);
     }
-  };
+  }, [initialUsers, currentUserId, users]);
 
   const handleUserToggle = (user: User) => {
     if (conversationType === 'direct') {
       setSelectedUsers([user]);
     } else {
       setSelectedUsers(prev => {
-        const isSelected = prev.find(u => u.id === user.id);
+        // Use string comparison to ensure proper matching
+        const isSelected = prev.find(u => String(u.id) === String(user.id));
         if (isSelected) {
-          return prev.filter(u => u.id !== user.id);
+          return prev.filter(u => String(u.id) !== String(user.id));
         } else {
           return [...prev, user];
         }
@@ -111,11 +117,36 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
     }
 
     try {
-      if (onCreateConversation) {
+      if (conversationType === 'group') {
+        const participantIds = selectedUsers.map(user => user.id);
+        const trimmedName = groupName.trim();
+        const trimmedDesc = groupDescription.trim();
+        console.log('[UserSelectionModal] Creating group with:', {
+          name: trimmedName,
+          description: trimmedDesc,
+          participants: participantIds,
+        });
+        const response = await createGroupConversation({
+          name: trimmedName,
+          description: trimmedDesc || "", // Ensure empty string instead of undefined
+          participants: participantIds,
+        });
+
+        if (onCreateConversation) {
+          await onCreateConversation(selectedUsers, trimmedName, trimmedDesc);
+        }
+
+        // Close modal after successful creation
+        onClose();
+      } else if (onCreateConversation) {
         await onCreateConversation(selectedUsers, groupName, groupDescription);
+        // Close modal after successful creation
+        onClose();
       }
-    } catch (error) {
-      // Error handling is done in parent component
+    } catch (error: any) {
+      console.error('[UserSelectionModal] Error creating conversation:', error);
+      const errorMessage = error?.data?.message || error?.message || 'Failed to create conversation';
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -164,19 +195,21 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
           ) : (
             <FlatList
               data={users}
-              keyExtractor={(item) => item.id.toString()}
+              keyExtractor={(item, index) => `user_${String(item.id || index)}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.userItem,
-                    selectedUsers.find(u => u.id === item.id) && styles.selectedUser
+                    selectedUsers.find(u => String(u.id) === String(item.id)) && styles.selectedUser
                   ]}
                   onPress={() => handleUserToggle(item)}
                   disabled={creating}
                 >
-                  <Text style={styles.userName}>{item.username}</Text>
+                  <Text style={styles.userName}>
+                    {item.user_name || item.full_name || item.username || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Unknown User'}
+                  </Text>
                   <Text style={styles.userType}>{item.user_type}</Text>
-                  {selectedUsers.find(u => u.id === item.id) && (
+                  {selectedUsers.find(u => String(u.id) === String(item.id)) && (
                     <Ionicons name="checkmark" size={20} color="#007AFF" />
                   )}
                 </TouchableOpacity>
