@@ -16,7 +16,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useConversations } from '../../hooks/messagingScreen/useConversations';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,7 +52,8 @@ import ConversationHeader from '../../components/Conversations/ConversationHeade
 import EmptyConversationsList from '../../components/Conversations/EmptyConversationsList';
 import FloatingButton from '../../components/Conversations/FloatingButton';
 import ConversationTypeModal from '../../components/Chat/ConversationTypeModal';
-import UserSelectionModal from '../../components/Chat/UserSelectionModal';
+import UserSelectionModal, { User } from '../../components/Chat/UserSelectionModal';
+import ConversationLoadingScreen from '../../components/common/ConversationLoadingScreen';
 
 interface RootStackParamList {
   Splash: undefined;
@@ -142,15 +143,6 @@ const AnimatedConversationItem = ({
 };
 
 // Add this interface with other type definitions
-interface User {
-  id: string | number;
-  username: string;
-  email?: string;
-  full_name?: string;
-  user_type?: 'patient' | 'therapist';
-}
-
-// Add this interface near the top with other type definitions
 interface ConversationCreateResponse {
   id: string | number;
   name?: string;
@@ -202,6 +194,17 @@ const ConversationsScreen = () => {
       ]).start();
     }
   }, [loading, conversations.length]);
+
+  // Auto-refresh conversations when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we're not already loading or refreshing
+      if (!loading && !refreshing) {
+        console.log('[ConversationsScreen] Screen focused, refreshing conversations...');
+        refreshConversations();
+      }
+    }, [loading, refreshing, refreshConversations])
+  );
 
   // Filter conversations based on search query and selected filter mode
   const filteredConversations = useCallback(() => {
@@ -289,75 +292,49 @@ const ConversationsScreen = () => {
       if (selectedConversationType === 'direct') {
         // Create one-to-one conversation
         const participant = selectedUsers[0];
+        if (!participant || !participant.id) {
+          throw new Error('Invalid participant selected.');
+        }
         newConversation = await createConversation(participant.id);
-        
+
         console.log('[ConversationsScreen] ✅ Direct conversation created:', newConversation);
-        
+
         // Close modals first
         setShowUserModal(false);
         setShowTypeModal(false);
-        
+
         Alert.alert(
           'Success',
-          `Direct conversation with ${participant.username} created successfully!`,
-          [
-            {
-              text: 'Open Chat',
-              onPress: () => {
-                navigation.navigate('ChatScreen', {
-                  conversationId: newConversation.id,
-                  conversationTitle: participant.username,
-                  isGroup: false
-                });
-              }
-            },
-            { text: 'OK' }
-          ]
+          `Conversation with ${participant.username || participant.full_name || 'Unknown User'} created successfully!`
         );
+
+        // Refresh conversations list to show the new conversation
+        await refreshConversations();
       } else {
         // Create group conversation
-        const participantIds = selectedUsers.map(u => u.id);
+        if (!groupName) {
+          throw new Error('Group name is required for group conversations.');
+        }
         newConversation = await createGroupConversation(
-          groupName || '',
+          groupName,
           groupDescription || '',
-          participantIds
+          selectedUsers.map((user) => user.id)
         );
-        
+
         console.log('[ConversationsScreen] ✅ Group conversation created:', newConversation);
-        
+
         // Close modals first
         setShowUserModal(false);
         setShowTypeModal(false);
-        
-        Alert.alert(
-          'Success',
-          `Group "${groupName}" created successfully!`,
-          [
-            {
-              text: 'Open Chat',
-              onPress: () => {
-                navigation.navigate('ChatScreen', {
-                  conversationId: newConversation.id,
-                  conversationTitle: groupName || 'Group Chat',
-                  isGroup: true
-                });
-              }
-            },
-            { text: 'OK' }
-          ]
-        );
-      }
 
-      // Refresh conversations list after successful creation
-      console.log('[ConversationsScreen] 🔄 Refreshing conversations after creation...');
-      await refreshConversations();
-      
+        Alert.alert('Success', `Group '${groupName}' created successfully!`);
+
+        // Refresh conversations list to show the new conversation
+        await refreshConversations();
+      }
     } catch (error) {
-      console.error('Error creating conversation:', error);
-      Alert.alert(
-        'Error',
-        'Failed to create conversation. Please try again.'
-      );
+      console.error('[ConversationsScreen] ❌ Error creating conversation:', error);
+      Alert.alert('Error', 'Failed to create conversation. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -462,9 +439,7 @@ const ConversationsScreen = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#002D62" />
         <ConversationHeader />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#002D62" />
-        </View>
+        <ConversationLoadingScreen message="Loading conversations..." />
       </SafeAreaView>
     );
   }

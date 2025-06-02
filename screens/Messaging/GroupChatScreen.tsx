@@ -59,7 +59,15 @@ const GroupChatScreen = () => {
   } = useMessages({
     conversationId,
     isGroup: true,
-    getMessages: getGroupMessages,
+    getMessages: async (id: string | number) => {
+      const response = await getGroupMessages(id);
+      // Type assertion to handle the response properly
+      return { 
+        messages: (response as any).results || (response as any).messages || [], 
+        results: (response as any).results || [], 
+        is_group: true 
+      };
+    },
     sendMessageApi: sendGroupMessage
   });
 

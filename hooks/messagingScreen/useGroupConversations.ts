@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GroupConversation } from '../../API/groupMessages';
-import { getGroupConversations, deleteGroupConversation as apiDeleteConversation } from '../../API/groupMessages';
+import { GroupConversation } from '../../types/messaging/group_messages';
+// Since we have the implementation now, we can use it directly
+import { 
+  getGroupConversations, 
+  deleteGroupConversation as apiDeleteConversation 
+} from '../../API/groupMessages';
 
 export function useGroupConversations() {
   const [conversations, setConversations] = useState<GroupConversation[]>([]);
@@ -12,7 +16,7 @@ export function useGroupConversations() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getGroupConversations();
+      const response = await getGroupConversations() as { results: GroupConversation[] };
       setConversations(Array.isArray(response.results) ? response.results : []);
     } catch (err) {
       setError('Failed to load conversations');
@@ -25,7 +29,7 @@ export function useGroupConversations() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await getGroupConversations();
+      const response = await getGroupConversations() as { results: GroupConversation[] };
       setConversations(Array.isArray(response.results) ? response.results : []);
     } catch (err) {
       console.error('Error refreshing group conversations:', err);

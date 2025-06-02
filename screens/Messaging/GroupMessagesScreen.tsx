@@ -21,7 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { createShadow } from '../../styles/global';
 import { getAllUsers } from '../../API/conversations';
-import { createGroupConversation } from '../../API/groupMessages';
+import { createGroupConversation } from '../../API/group';
+import { GroupConversation as APIGroupConversation } from '../../types/messaging/group_messages';
 
 // Import components
 import ConversationItem from '../../components/Conversations/ConversationItem';
@@ -32,7 +33,6 @@ import UserSelectionModal from '../../components/Chat/UserSelectionModal';
 
 // Import hooks
 import { useGroupConversations } from '../../hooks/messagingScreen/useGroupConversations';
-import { GroupConversation as APIGroupConversation } from '../../API/groupMessages';
 import type { User } from '../../components/Chat/UserSelectionModal';
 
 // Navigation types
@@ -102,7 +102,13 @@ const AnimatedConversationItem = ({
           id: item.id,
           is_group: true,
           name: item.name,
-          participants: item.participants || [],
+          participants: (item.participants || []).map(p => {
+            // Convert string or number to Participant object format
+            if (typeof p === 'string' || typeof p === 'number') {
+              return { id: p };
+            }
+            return p;
+          }) as Participant[],
           last_message: item.last_message ? {
             id: 0, // Default ID
             content: item.last_message.content || '',
@@ -213,7 +219,16 @@ const GroupMessagesScreen: React.FC = () => {
   const handleCreateGroup = async (selectedUsers: User[], groupName?: string, groupDescription?: string) => {
     try {
       const participantIds = selectedUsers.map(u => u.id);
-      const group = await createGroupConversation(groupName || '', participantIds, groupDescription || '');
+      console.log('[GroupMessagesScreen] Creating group with:', {
+        name: groupName || '',
+        description: groupDescription || '',
+        participants: participantIds,
+      });
+      const group = await createGroupConversation({
+        name: groupName || '',
+        description: groupDescription || '',
+        participants: participantIds
+      });
       navigation.navigate('GroupChat', {
         conversationId: group.id.toString(),
         conversationTitle: groupName?.trim() || 'Group Chat',
@@ -305,6 +320,8 @@ const GroupMessagesScreen: React.FC = () => {
         onCreateConversation={handleCreateGroup}
         currentUserId={user?.id || ''}
         creating={loadingUsers}
+        loading={loadingUsers}
+        users={availableUsers}
       />
     </SafeAreaView>
   );

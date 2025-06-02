@@ -38,6 +38,46 @@ interface ConversationData {
   [key: string]: any;
 }
 
+interface PatientProfile {
+  id: number;
+  user: number;
+  user_name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone_number: string | null;
+  profile_pic: string | null;
+  blood_type: string | null;
+  gender: string | null;
+  emergency_contact: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface TherapistProfile {
+  id: number;
+  first_name: string;
+  last_name: string;
+  profile_picture: string | null;
+  bio: string;
+  specializations: string[];
+  years_of_experience: number;
+  education: string[];
+  license_number: string | null;
+  languages: string[];
+  is_verified: boolean;
+  rating: number;
+  hourly_rate: number | null;
+  availability: Record<string, any>;
+}
+
+interface PatientResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: PatientProfile[];
+}
+
 // Get the auth token from storage
 const getAuthHeaders = async () => {
   try {
@@ -360,8 +400,37 @@ const isGroupType = async (conversationId: ConversationId): Promise<boolean> => 
 export const getAllUsers = async () => {
   try {
     const config = await getAuthHeaders();
-    const response = await axios.get(`${API_URL}/users/list-all/`, config);
-    return response.data;
+    
+    // Fetch both patient and therapist profiles in parallel
+    const [patientResponse, therapistResponse] = await Promise.all([
+      axios.get<PatientResponse>(`${API_URL}/patient/profiles/all/`, config),
+      axios.get<TherapistProfile[]>(`${API_URL}/therapist/profiles/all/`, config)
+    ]);
+
+    // Transform patient data
+    const patients = (patientResponse.data.results || []).map((patient) => ({
+      id: patient.id,
+      user_id: patient.user,
+      user_name: patient.user_name,
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      profile_picture: patient.profile_pic,
+      user_type: 'patient'
+    }));
+
+    // Transform therapist data
+    const therapists = (therapistResponse.data || []).map((therapist) => ({
+      id: therapist.id,
+      user_name: `${therapist.first_name} ${therapist.last_name}`.trim() || 'Unnamed Therapist',
+      first_name: therapist.first_name,
+      last_name: therapist.last_name,
+      profile_picture: therapist.profile_picture,
+      user_type: 'therapist',
+      is_verified: therapist.is_verified
+    }));
+
+    // Combine and return all users
+    return [...patients, ...therapists];
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
