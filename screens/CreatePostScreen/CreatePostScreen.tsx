@@ -27,6 +27,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import * as FeedsApi from '../../API/feeds';
 import { useAuth } from '../../contexts/AuthContext';
 import { prepareMediaForUpload } from '../../utils/mediaUtils';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +72,7 @@ const CreatePostScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
 
   // Video player for expo-video
   const videoPlayer = useVideoPlayer(
@@ -151,6 +153,7 @@ const CreatePostScreen = () => {
     
     try {
       setIsSubmitting(true);
+      setShowLoadingSpinner(true);
       
       const formData = new FormData();
       formData.append('content', content);
@@ -241,7 +244,15 @@ const CreatePostScreen = () => {
         type: "success"
       });
       
-      navigation.goBack();
+      // Trigger refresh and navigate back
+      if (navigation.canGoBack()) {
+        // Pass refresh param back to previous screen
+        navigation.navigate({
+          name: navigation.getState().routes[navigation.getState().routes.length - 2].name,
+          params: { refresh: Date.now() },
+          merge: true,
+        });
+      }
       
     } catch (error) {
       console.error("Error creating post:", error);
@@ -252,6 +263,7 @@ const CreatePostScreen = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setShowLoadingSpinner(false);
     }
   };
 
@@ -389,7 +401,7 @@ const CreatePostScreen = () => {
                     disabled={mediaLoading}
                   >
                     {mediaLoading ? (
-                      <ActivityIndicator size="large" color={colors.primary} />
+                      <LoadingSpinner visible={mediaLoading} />
                     ) : (
                       <>
                         <Ionicons 
@@ -508,6 +520,9 @@ const CreatePostScreen = () => {
             </View>
           </ScrollView>
         </Animated.View>
+        
+        {/* Global loading spinner */}
+        <LoadingSpinner visible={showLoadingSpinner} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

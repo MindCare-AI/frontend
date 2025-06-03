@@ -72,31 +72,96 @@ const TabNavigator = () => {
   const userType = user?.user_type || 'patient'; // Default to patient if not set
 
   // Define tab screens based on user type
-  const tabScreens = [
-    // Common tabs for all users
-    {
-      name: "Feeds",
-      component: FeedsStackNavigator,
-      options: { 
-        tabBarLabel: 'Home',
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
-          <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
-        ),
-      }
-    },
-    {
-      name: "Appointments",
-      component: userType === 'therapist' ? DashboardScreenT : DashboardScreen,
-      options: { 
-        tabBarLabel: 'Appointments',
-        tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
-          <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
-        ),
-      }
-    },
-    // Conditional tabs for patients only
-    ...(userType !== 'therapist' ? [
+  const tabScreens = userType === 'therapist' 
+    ? [
+      // Tabs for therapists
+      {
+        name: "Feeds",
+        component: FeedsStackNavigator,
+        options: { 
+          tabBarLabel: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Appointments",
+        component: DashboardScreenT,
+        options: { 
+          tabBarLabel: 'Appointments',
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      // Chatbot tab with floating hexagon button
+      {
+        name: "Chatbot",
+        component: ChatbotNavigator,
+        options: { 
+          tabBarLabel: '',
+          headerShown: false,
+          tabBarIcon: ({ focused, color }: { focused: boolean, color: string, size: number }) => (
+            <View style={styles.hexagonContainer}>
+              <View style={styles.hexagon}>
+                <FontAwesome5 
+                  name="brain" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+            </View>
+          ),
+        }
+      },
+      {
+        name: "Messaging",
+        component: MessagingNavigator,
+        options: { 
+          tabBarLabel: 'Messages',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Settings",
+        component: SettingsStack,
+        options: { 
+          tabBarLabel: 'Settings',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+          ),
+        }
+      },
+    ]
+    : [
+      // Tabs for patients - Left side: Home, Appointments, Journal
+      {
+        name: "Feeds",
+        component: FeedsStackNavigator,
+        options: { 
+          tabBarLabel: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Appointments",
+        component: DashboardScreen,
+        options: { 
+          tabBarLabel: 'Appointments',
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }
+      },
       {
         name: "Journal",
         component: JournalNavigator,
@@ -107,6 +172,27 @@ const TabNavigator = () => {
           ),
         }
       },
+      // Chatbot tab in the middle with floating hexagon button
+      {
+        name: "Chatbot",
+        component: ChatbotNavigator,
+        options: { 
+          tabBarLabel: '',
+          headerShown: false,
+          tabBarIcon: ({ focused, color }: { focused: boolean, color: string, size: number }) => (
+            <View style={styles.hexagonContainer}>
+              <View style={styles.hexagon}>
+                <FontAwesome5 
+                  name="brain" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+            </View>
+          ),
+        }
+      },
+      // Right side: Mood, Messages, Settings
       {
         name: "MoodTracker",
         component: MoodNavigator,
@@ -118,51 +204,29 @@ const TabNavigator = () => {
           ),
         }
       },
-    ] : []),
-    // Chatbot tab with floating hexagon button
-    {
-      name: "Chatbot",
-      component: ChatbotNavigator,
-      options: { 
-        tabBarLabel: '',
-        headerShown: false,
-        tabBarIcon: ({ focused, color }: { focused: boolean, color: string, size: number }) => (
-          <View style={styles.hexagonContainer}>
-            <View style={styles.hexagon}>
-              <FontAwesome5 
-                name="brain" 
-                size={28} 
-                color="#FFFFFF" 
-              />
-            </View>
-          </View>
-        ),
-      }
-    },
-    // Common tabs for all users (continued)
-    {
-      name: "Messaging",
-      component: MessagingNavigator,
-      options: { 
-        tabBarLabel: 'Messages',
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
-          <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
-        ),
-      }
-    },
-    {
-      name: "Settings",
-      component: SettingsStack,
-      options: { 
-        tabBarLabel: 'Settings',
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
-          <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
-        ),
-      }
-    },
-  ];
+      {
+        name: "Messaging",
+        component: MessagingNavigator,
+        options: { 
+          tabBarLabel: 'Messages',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Settings",
+        component: SettingsStack,
+        options: { 
+          tabBarLabel: 'Settings',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+          ),
+        }
+      },
+    ];
 
   return (
     <Tab.Navigator

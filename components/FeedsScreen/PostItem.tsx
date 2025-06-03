@@ -394,19 +394,95 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost, onDeletePost, c
           </View>
         </View>
       ) : (
-        <TouchableOpacity activeOpacity={0.9} onPress={() => setExpanded(!expanded)}>
-          <Text
-            style={[styles.content, { color: colors.text }]}
-            numberOfLines={expanded ? undefined : 4}
-          >
-            {post.content}
-          </Text>
-          {!expanded && post.content && post.content.length > 300 && (
-            <Text style={[styles.readMore, { color: colors.primary }]}>
-              Read more
+        <View>
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setExpanded(!expanded)}>
+            <Text
+              style={[styles.content, { color: colors.text }]}
+              numberOfLines={expanded ? undefined : 4}
+            >
+              {post.content}
             </Text>
+            {!expanded && post.content && post.content.length > 300 && (
+              <Text style={[styles.readMore, { color: colors.primary }]}>
+                Read more
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Tags and Topics Section */}
+          {(post.tags || post.topics) && (
+            <View style={styles.tagsTopicsContainer}>
+              {/* Topics Display - Simplified logic */}
+              {post.topics && (
+                <View style={styles.topicsContainer}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="bulb-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.sectionLabel, { color: colors.primary }]}>Topic</Text>
+                  </View>
+                  <View style={styles.tagsWrapper}>
+                    {(() => {
+                      // Handle different topic data structures
+                      let topicsToRender = [];
+                      
+                      if (Array.isArray(post.topics)) {
+                        topicsToRender = post.topics;
+                      } else if (post.topics) {
+                        topicsToRender = [post.topics];
+                      }
+                      
+                      return topicsToRender.map((topic, index) => {
+                        let topicName = '';
+                        
+                        if (typeof topic === 'string') {
+                          topicName = topic;
+                        } else if (topic && typeof topic === 'object') {
+                          topicName = topic.name || topic.title || topic.label || 'Unknown Topic';
+                        }
+                        
+                        if (!topicName) return null;
+                        
+                        return (
+                          <View key={`topic-${index}`} style={[styles.topicTag, { 
+                            backgroundColor: `${colors.primary}15`,
+                            borderColor: `${colors.primary}30`
+                          }]}
+                          >
+                            <Text style={[styles.topicText, { color: colors.primary }]}>
+                              {topicName}
+                            </Text>
+                          </View>
+                        );
+                      }).filter(Boolean);
+                    })()}
+                  </View>
+                </View>
+              )}
+
+              {/* Tags Display - Multiple tags still allowed */}
+              {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (
+                <View style={styles.tagsContainer}>
+                  <View style={styles.sectionHeader}>
+                    <Ionicons name="pricetag-outline" size={14} color={colors.accent || colors.secondary} />
+                    <Text style={[styles.sectionLabel, { color: colors.accent || colors.secondary }]}>Tags</Text>
+                  </View>
+                  <View style={styles.tagsWrapper}>
+                    {post.tags.map((tag, index) => (
+                      <View key={`tag-${index}`} style={[styles.hashTag, { 
+                        backgroundColor: `${colors.accent || colors.secondary}15`,
+                        borderColor: `${colors.accent || colors.secondary}30`
+                      }]}
+                      >
+                        <Text style={[styles.tagText, { color: colors.accent || colors.secondary }]}>
+                          #{typeof tag === 'string' ? tag : tag.name || tag.title || 'tag'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
           )}
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Enhanced Media display with better video support */}
@@ -896,6 +972,57 @@ const styles = StyleSheet.create({
   editButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  tagsTopicsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  topicsContainer: {
+    marginBottom: 8,
+  },
+  tagsContainer: {
+    marginBottom: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tagsWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  topicTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  topicText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  hashTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginRight: 4,
+    marginBottom: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 })
 
