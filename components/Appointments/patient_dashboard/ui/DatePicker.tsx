@@ -340,6 +340,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 6,
+    color: "#374151",
   },
   inputContainer: {
     flexDirection: "row",
@@ -348,7 +349,9 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 8,
     paddingHorizontal: 16,
-    backgroundColor: "white",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -361,15 +364,18 @@ const styles = StyleSheet.create({
   inputText: {
     fontSize: 16,
     flex: 1,
+    color: "#374151",
   },
   error: {
     fontSize: 12,
     marginTop: 4,
     fontWeight: "500",
+    color: "#EF4444",
   },
   helperText: {
     fontSize: 12,
     marginTop: 4,
+    color: "#6B7280",
   },
   modalOverlay: {
     flex: 1,
@@ -381,6 +387,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     borderWidth: 1,
     paddingBottom: 20,
+    backgroundColor: "#FFFFFF",
   },
   modalHeader: {
     flexDirection: "row",
@@ -388,11 +395,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
+    borderBottomColor: "#E5E5E5",
+    backgroundColor: "#FFFFFF",
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
+    color: "#1A202C",
   },
   modalButton: {
     padding: 8,

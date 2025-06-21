@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 import { View, Text, Pressable, StyleSheet, Platform, Dimensions, ScrollView } from "react-native"
 import { useTheme } from "native-base"
 import { Ionicons } from "@expo/vector-icons"
@@ -15,6 +15,41 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl" | "full"
   closeOnOverlayClick?: boolean
   style?: any
+}
+
+// Helper function to safely render children
+const renderSafeChildren = (children: React.ReactNode): React.ReactNode => {
+  // Handle null or undefined
+  if (children === null || children === undefined) {
+    return null
+  }
+
+  // Handle arrays of elements
+  if (Array.isArray(children)) {
+    return children.map((child, index) => (
+      <React.Fragment key={`fragment-${index}`}>
+        {renderSafeChildren(child)}
+      </React.Fragment>
+    ))
+  }
+
+  // Handle string text nodes with extra validation
+  if (typeof children === "string") {
+    // Skip rendering empty strings, whitespace-only, or single periods that often cause View errors
+    const trimmed = children.trim();
+    if (!trimmed || trimmed === "." || /^\s*$/.test(trimmed)) {
+      return null;
+    }
+    return <Text>{children}</Text>
+  }
+  
+  // Handle number text nodes
+  if (typeof children === "number") {
+    return <Text>{children.toString()}</Text>
+  }
+
+  // Return other types of nodes unchanged
+  return children
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -62,6 +97,8 @@ export const Modal: React.FC<ModalProps> = ({
       animationIn="slideInUp"
       animationOut="slideOutDown"
       backdropTransitionOutTiming={0}
+      // Use modern React 19 approach for refs
+      ref={undefined}
     >
       <View
         style={[
@@ -89,9 +126,9 @@ export const Modal: React.FC<ModalProps> = ({
           </View>
         )}
         <ScrollView style={styles.content}>
-          {children}
+          {renderSafeChildren(children)}
         </ScrollView>
-        {footer && <View style={styles.footer}>{footer}</View>}
+        {footer && <View style={styles.footer}>{renderSafeChildren(footer)}</View>}
       </View>
     </RNModal>
   )

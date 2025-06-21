@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Dimensions, FlatList, TextInput, ActivityIndicator, Alert } from "react-native"
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, Dimensions, FlatList, TextInput, ActivityIndicator, Alert, Platform } from "react-native"
 import { VideoView, useVideoPlayer } from "expo-video"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
@@ -84,12 +84,12 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost, onDeletePost, c
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(scaleAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       })
     ]).start()
   }, [])
@@ -100,7 +100,7 @@ const PostItem: React.FC<PostItemProps> = ({ post, onUpdatePost, onDeletePost, c
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start()
   }
 

@@ -317,21 +317,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: 'hidden',
     minWidth: 64,
+    borderWidth: 1,
+    borderColor: 'transparent',
     ...Platform.select({
       web: {
         userSelect: "none" as any,
         outlineStyle: "none" as any,
         WebkitTapHighlightColor: "transparent",
         touchAction: "manipulation" as any,
-        '&:focus-visible': {
-          boxShadow: '0 0 0 3px rgba(66, 153, 225, 0.5)',
-        },
+        cursor: 'pointer',
       },
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.18,
-        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
       },
       android: {
         elevation: 2,

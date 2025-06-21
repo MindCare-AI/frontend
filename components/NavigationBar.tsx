@@ -3,6 +3,10 @@ import { View, TouchableOpacity, Text, StyleSheet, Animated, Platform } from 're
 import * as Haptics from 'expo-haptics';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RootStackParamList } from '../navigation/types';
+
+type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 interface NavigationBarProps {
   routes: {
@@ -13,7 +17,7 @@ interface NavigationBarProps {
 }
 
 export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp>();
   const route = useRoute();
   const fadeAnims = React.useRef(
     routes.map(() => new Animated.Value(0))
@@ -72,7 +76,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    navigation.navigate(routeName);
+    (navigation as any).navigate(routeName);
   };
 
   return (

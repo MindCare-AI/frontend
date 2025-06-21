@@ -3,6 +3,8 @@
 
 import { Platform } from 'react-native';
 
+declare const global: any;
+
 // Polyfill for hasTouchableProperty
 (function setupSvgTouchablePolyfill() {
   if (typeof global !== 'undefined') {
@@ -10,7 +12,7 @@ import { Platform } from 'react-native';
     const originalRequire = global.require || require;
     
     // Create a patched require function
-    function patchedRequire(id) {
+    function patchedRequire(id: string): any {
       const module = originalRequire(id);
       
       // Patch react-native-gesture-handler
@@ -50,14 +52,14 @@ import { Platform } from 'react-native';
           gestureHandler.hasTouchableProperty = () => false;
         }
       } catch (error) {
-        console.warn('Could not patch gesture handler:', error.message);
+        console.warn('Could not patch gesture handler:', (error as Error).message || 'Unknown error');
       }
     }
   }
 })();
 
 // Additional SVG compatibility fixes
-if (typeof global !== 'undefined' && global.__DEV__) {
+if (typeof global !== 'undefined' && (global as any).__DEV__) {
   // Suppress SVG-related warnings in development
   const originalConsoleWarn = console.warn;
   console.warn = function(...args) {

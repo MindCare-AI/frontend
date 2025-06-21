@@ -55,13 +55,28 @@ const TherapistAvailabilityScreen: React.FC = () => {
       const firstWithSlots = days.find(d => (data[d.key]?.length || 0) > 0);
       setSelectedDay(firstWithSlots?.key ?? days[0].key);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load availability:', error);
-      Alert.alert(
-        'Error',
-        'Failed to load your availability schedule. Please try again.',
-        [{ text: 'OK' }]
-      );
+      
+      // Provide specific error messages based on the error type
+      let errorMessage = 'Failed to load your availability schedule. Please try again.';
+      let errorTitle = 'Error';
+      
+      if (error.message.includes('Access denied')) {
+        errorTitle = 'Access Denied';
+        errorMessage = 'You do not have permission to access availability settings. Please ensure you are logged in as a therapist.';
+      } else if (error.message.includes('Authentication failed')) {
+        errorTitle = 'Authentication Error';
+        errorMessage = 'Your session has expired. Please log in again.';
+      } else if (error.message.includes('therapist profile')) {
+        errorTitle = 'Profile Required';
+        errorMessage = 'Please complete your therapist profile setup before managing availability.';
+      } else if (error.message.includes('Network error')) {
+        errorTitle = 'Connection Error';
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      }
+      
+      Alert.alert(errorTitle, errorMessage, [{ text: 'OK' }]);
     } finally {
       setLoading(false);
     }

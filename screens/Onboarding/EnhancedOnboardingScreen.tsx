@@ -3,7 +3,7 @@ import { View, StyleSheet, SafeAreaView, Animated } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CommonActions } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 
 // Import onboarding components
 import UserTypeSelection from '../../components/Onboarding/UserTypeSelection';
@@ -36,6 +36,7 @@ const EnhancedOnboardingScreen: React.FC<EnhancedOnboardingScreenProps> = ({
   onBack 
 }) => {
   const { accessToken, updateUserRole } = useAuth();
+  const navigation = useNavigation();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('userType');
   const [userType, setUserTypeState] = useState<'patient' | 'therapist' | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);

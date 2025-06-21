@@ -15,6 +15,14 @@ interface BookAppointmentResult {
   message?: string;
 }
 
+interface TherapistDropdownResponse {
+  results: any[];
+}
+
+interface TimeSlotsResponse {
+  available_slots: string[];
+}
+
 export const useBookAppointment = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +35,7 @@ export const useBookAppointment = () => {
       setLoading(true);
       setError(null);
       
-      const response = await AppointmentAPI.getTherapistDropdownOptions();
+      const response = await AppointmentAPI.getTherapistDropdownOptions() as TherapistDropdownResponse;
       setAvailableTherapists(response.results || []);
       
       return response.results || [];
@@ -47,7 +55,7 @@ export const useBookAppointment = () => {
       setLoading(true);
       setError(null);
       
-      const response = await AppointmentAPI.getAvailableTimeSlots(therapistId, date);
+      const response = await AppointmentAPI.getAvailableTimeSlots(therapistId, date) as TimeSlotsResponse;
       setAvailableTimeSlots(response.available_slots || []);
       
       return response.available_slots || [];
@@ -69,7 +77,7 @@ export const useBookAppointment = () => {
       
       console.log('Booking appointment with data:', appointmentData);
       
-      const result = await AppointmentAPI.bookAppointment(appointmentData);
+      const result = await AppointmentAPI.bookAppointment(appointmentData) as BookAppointmentResult;
       
       console.log('Appointment booking result:', result);
       

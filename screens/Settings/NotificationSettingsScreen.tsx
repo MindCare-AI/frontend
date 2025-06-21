@@ -13,8 +13,12 @@ import { globalStyles } from '../../styles/global';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
-// Add this interface to define your notification structure
+// Updated interfaces to match API response structure
 interface NotificationPreferences {
+  appointment_reminders?: boolean;
+  message_notifications?: boolean;
+  system_updates?: boolean;
+  marketing_emails?: boolean;
   frequency?: {
     appointment_reminder?: {
       timing?: string[];
@@ -30,7 +34,6 @@ interface NotificationPreferences {
       enabled?: boolean;
     };
   };
-  // Add other properties as needed
 }
 
 interface UserPreferences {
@@ -46,7 +49,7 @@ interface NotificationType {
   id: string;
   name: string;
   description: string;
-  is_global: boolean;
+  is_global?: boolean; // Made optional since API doesn't return this
 }
 
 const NotificationSettingsScreen: React.FC = () => {
@@ -114,7 +117,7 @@ const NotificationSettingsScreen: React.FC = () => {
       setPreferences(prefsData);
       setOriginalPreferences(prefsData);
       setNotificationTypes(typesData);
-      setUserType(userTypeData); // Set the user type from API
+      setUserType(userTypeData as 'patient' | 'therapist'); // Set the user type from API
       setHasChanges(false);
     } catch (err) {
       console.error('Failed to load notification settings:', err);
