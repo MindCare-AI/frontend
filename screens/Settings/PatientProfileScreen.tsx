@@ -24,11 +24,13 @@ import {
   uploadPatientProfilePicture, 
   PatientProfile 
 } from '../../API/settings/patient_profile';
-import UserAvatarCard from '../../components/ui/UserAvatarCard';
+import { Avatar } from '../../components/common/Avatar';
 import SectionHeader from '../../components/ui/SectionHeader';
 import { globalStyles } from '../../styles/global';
 import { SettingsStackParamList } from '../../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
+// Import Tunisian mock data
+import { MOCK_PATIENTS, getRandomPlaceholderImage } from '../../data/tunisianMockData';
 
 type NavigationProp = NativeStackNavigationProp<SettingsStackParamList>;
 
@@ -96,8 +98,26 @@ const PatientProfileScreen = () => {
   const fetchPatientProfile = async () => {
     try {
       setIsLoading(true);
-      const data = await getPatientProfile();
-      setProfile(data);
+      // Use mock data instead of API call - simulate API response format
+      const mockPatient = MOCK_PATIENTS[0]; // Use first mock patient
+      const mockProfile = {
+        id: mockPatient.id,
+        first_name: mockPatient.first_name,
+        last_name: mockPatient.last_name,
+        email: mockPatient.email,
+        phone_number: mockPatient.phone_number,
+        date_of_birth: mockPatient.date_of_birth,
+        gender: mockPatient.gender,
+        blood_type: mockPatient.blood_type,
+        profile_pic: mockPatient.profile_pic,
+        emergency_contact: mockPatient.emergency_contact,
+        address: mockPatient.address,
+        // Add any other required fields
+        user: user?.id || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      setProfile(mockProfile as any); // Use any to bypass type checking for demo
     } catch (error) {
       Alert.alert('Error', 'Failed to load profile information');
       console.error('Error fetching profile:', error);
@@ -243,44 +263,19 @@ const PatientProfileScreen = () => {
           length: 1,  // Add required length property
         } : undefined;
         
-        // Only include the fields expected by the API
-        const updateData: Partial<PatientProfile> = {
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          phone_number: formData.phone_number,
-          blood_type: formData.blood_type,
-          gender: formData.gender,
-          date_of_birth: formData.date_of_birth,
-          emergency_contact: emergencyContactData,
-        };
+        // Simulate API call delay for demo
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        await updatePatientProfile(updateData);
-        
-        // Update local state
+        // Update local state with form data (demo mode)
         const updatedProfile = {
           ...formData,
           emergency_contact: emergencyContactData,
         };
         
         setProfile(prev => prev ? { ...prev, ...updatedProfile } : null);
-        Alert.alert('Success', 'Profile updated successfully');
+        Alert.alert('Success', 'Profile updated successfully (Demo Mode)');
       } catch (error: any) {
-        // Handle API error responses
-        if (error.response && error.response.data) {
-          const apiErrors = error.response.data;
-          const formattedErrors: Record<string, string> = {};
-          
-          Object.keys(apiErrors).forEach(key => {
-            formattedErrors[key] = Array.isArray(apiErrors[key]) 
-              ? apiErrors[key][0] 
-              : apiErrors[key].toString();
-          });
-          
-          setErrors(formattedErrors);
-          Alert.alert('Validation Error', 'Please check the form for errors');
-        } else {
-          Alert.alert('Error', 'Failed to update profile. Please try again.');
-        }
+        Alert.alert('Error', 'Profile update failed (Demo Mode)');
         console.error('Error updating profile:', error);
       } finally {
         setIsSaving(false);
@@ -288,7 +283,7 @@ const PatientProfileScreen = () => {
     }
   };
 
-  // Add the image picker function
+  // Add the image picker function - mock version for demo
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -300,20 +295,16 @@ const PatientProfileScreen = () => {
       });
 
       if (!result.canceled) {
-        // Enhance the image object with additional metadata needed for upload
-        const selectedImage = {
-          ...result.assets[0],
-          fileName: `patient_profile_${Date.now()}.jpg`,
-          mimeType: 'image/jpeg'
-        };
+        // Use the selected image directly for demo
+        const selectedImage = result.assets[0];
         
         console.log('Selected image:', selectedImage);
         
         setProfilePicture(selectedImage);
         setProfilePictureUrl(selectedImage.uri);
         
-        // Upload the image immediately
-        handleProfilePictureUpload(selectedImage);
+        // Simulate upload success
+        Alert.alert('Success', 'Profile picture updated successfully! (Demo Mode)');
       }
     } catch (err) {
       console.error('Error picking image:', err);
@@ -321,23 +312,22 @@ const PatientProfileScreen = () => {
     }
   };
 
-  // Add function to handle profile picture upload
+  // Mock function to handle profile picture upload
   const handleProfilePictureUpload = async (imageData: any) => {
     if (!imageData) return;
     
     try {
       setUploadingImage(true);
       
-      // Use the dedicated function for uploading profile pictures
-      const updatedProfile = await uploadPatientProfilePicture(imageData);
+      // Simulate upload delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Update profile state with the new profile pic URL
-      if (updatedProfile.profile_pic) {
-        setProfilePictureUrl(updatedProfile.profile_pic);
-        setProfile(prev => prev ? { ...prev, profile_pic: updatedProfile.profile_pic } : null);
-      }
+      // Use a random placeholder image or the selected image
+      const newImageUrl = imageData.uri || getRandomPlaceholderImage();
+      setProfilePictureUrl(newImageUrl);
+      setProfile(prev => prev ? { ...prev, profile_pic: newImageUrl } : null);
       
-      Alert.alert('Success', 'Profile picture updated successfully!');
+      Alert.alert('Success', 'Profile picture updated successfully! (Demo Mode)');
     } catch (error) {
       console.error('Error uploading profile picture:', error);
       Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
@@ -372,21 +362,30 @@ const PatientProfileScreen = () => {
       <ScrollView style={styles.scrollContainer}>
         {profile && (
           <>
-            <UserAvatarCard
-              avatar={profilePictureUrl}
-              name={profile ? `${profile.first_name} ${profile.last_name}` : ''}
-              role="Patient"
-              onAvatarChange={(newAvatarUri) => {
-                const selectedImage = {
-                  uri: newAvatarUri,
-                  fileName: `patient_profile_${Date.now()}.jpg`,
-                  mimeType: 'image/jpeg'
-                };
-                setProfilePicture(selectedImage);
-                setProfilePictureUrl(newAvatarUri);
-                handleProfilePictureUpload(selectedImage);
-              }}
-            />
+            <View style={styles.avatarSection}>
+              <Avatar
+                source={profilePictureUrl}
+                name={profile ? `${profile.first_name} ${profile.last_name}` : ''}
+                size="xl"
+                editable={true}
+                onAvatarChange={(newAvatarUri: string) => {
+                  const selectedImage = {
+                    uri: newAvatarUri,
+                    fileName: `patient_profile_${Date.now()}.jpg`,
+                    mimeType: 'image/jpeg'
+                  };
+                  setProfilePicture(selectedImage);
+                  setProfilePictureUrl(newAvatarUri);
+                  handleProfilePictureUpload(selectedImage);
+                }}
+              />
+              <View style={styles.avatarInfo}>
+                <Text style={styles.avatarName}>
+                  {profile ? `${profile.first_name} ${profile.last_name}` : ''}
+                </Text>
+                <Text style={styles.avatarRole}>Patient</Text>
+              </View>
+            </View>
 
             <View style={styles.section}>
               <SectionHeader title="Patient Information" />
@@ -485,7 +484,7 @@ const PatientProfileScreen = () => {
                   <Text style={styles.dateInputText}>
                     {formData.date_of_birth || 'Select Date'}
                   </Text>
-                  <Ionicons name="calendar" size={20} color="#000000" />
+                  <Ionicons name="calendar" size={20} color={globalStyles.colors.primary} />
                 </TouchableOpacity>
                 {errors.date_of_birth && <HelperText type="error">{errors.date_of_birth}</HelperText>}
               </View>
@@ -676,7 +675,7 @@ const styles = StyleSheet.create({
     backgroundColor: globalStyles.colors.inputBackground,
   },
   inputText: {
-    color: '#000000', // Explicitly set to black
+    color: globalStyles.colors.text, // Use theme color instead of hardcoded black
     fontSize: 16, 
     fontWeight: '500',
   },
@@ -793,9 +792,35 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dateInputText: {
-    color: '#000000', // Explicitly set to black
+    color: globalStyles.colors.text, // Use theme color instead of hardcoded black
     fontSize: 16,
     fontWeight: '500',
+  },
+  avatarSection: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: globalStyles.colors.white,
+    margin: 16,
+    borderRadius: 8,
+    shadowColor: globalStyles.colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  avatarInfo: {
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  avatarName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: globalStyles.colors.text,
+    marginBottom: 4,
+  },
+  avatarRole: {
+    fontSize: 14,
+    color: globalStyles.colors.neutralDark,
   },
 });
 

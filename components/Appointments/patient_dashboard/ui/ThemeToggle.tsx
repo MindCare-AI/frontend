@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Animated, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../../../theme/ThemeProvider"
 import { useEffect, useRef } from "react"
+import { globalStyles } from "../../../../styles/global"
 
 interface ThemeToggleProps {
   size?: number
@@ -67,7 +68,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ size = 24, style }) =>
           <Ionicons
             name={isDarkMode ? "sunny" : "moon"}
             size={size}
-            color={isDarkMode ? "#FFD700" : "#333"}
+            color={isDarkMode ? "#FFD700" : globalStyles.colors.primary}
           />
         </Animated.View>
       </Pressable>

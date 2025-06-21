@@ -36,20 +36,32 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
 
   const fetchTherapists = async () => {
     try {
+      console.log("📱 [BookAppointmentModal] Fetching therapists...");
       const response = await getAllTherapistProfiles();
+      console.log("📱 [BookAppointmentModal] Raw response:", response);
+      
       if (!Array.isArray(response)) {
+        console.warn("📱 [BookAppointmentModal] Response is not an array:", response);
         setTherapists([]);
         setTherapistProfiles([]);
         return;
       }
+      
+      console.log(`📱 [BookAppointmentModal] Found ${response.length} therapists`);
       setTherapistProfiles(response);
-      setTherapists(
-        response.map((therapist: any) => ({
+      
+      const mappedTherapists = response.map((therapist: any) => {
+        console.log("📱 [BookAppointmentModal] Mapping therapist:", therapist);
+        return {
           label: `${therapist.first_name} ${therapist.last_name}`,
           value: therapist.id?.toString() || "",
-        }))
-      );
+        };
+      });
+      
+      console.log("📱 [BookAppointmentModal] Mapped therapists:", mappedTherapists);
+      setTherapists(mappedTherapists);
     } catch (error) {
+      console.error("📱 [BookAppointmentModal] Error fetching therapists:", error);
       setTherapists([]);
       setTherapistProfiles([]);
     }
@@ -130,9 +142,12 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
       await createAppointment({
         therapist: parseInt(therapist),
         appointment_date: appointmentDate,
-        duration: 60,
+        duration: "60",
         // notes: "..." // Add notes if you have a notes field in the UI
       });
+
+      // Show success message
+      console.log("Appointment booked successfully!");
 
       onClose();
       // Reset form

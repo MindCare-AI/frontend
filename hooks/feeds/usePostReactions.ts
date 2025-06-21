@@ -13,7 +13,7 @@ export const usePostReactions = (postId: number, initialReaction: string | null 
         await FeedsApi.removeReaction(postId);
         setUserReaction(null);
       } else {
-        await FeedsApi.addReaction(postId, { reaction_type: reactionType });
+        await FeedsApi.reactToPost(postId, reactionType);
         setUserReaction(reactionType);
       }
       setError(null);
@@ -30,12 +30,17 @@ export const usePostReactions = (postId: number, initialReaction: string | null 
   const toggleLike = useCallback(async () => {
     try {
       setLoading(true);
-      // Use the dedicated likePost function instead of generic addReaction
-      await FeedsApi.likePost(postId);
+      // Use the reactToPost function with 'like' reaction type instead of dedicated likePost function
+      if (userReaction === 'like') {
+        await FeedsApi.removeReaction(postId);
+        setUserReaction(null);
+      } else {
+        await FeedsApi.reactToPost(postId, 'like');
+        setUserReaction('like');
+      }
       
       // Toggle the reaction state
       const newReaction = userReaction === 'like' ? null : 'like';
-      setUserReaction(newReaction);
       setError(null);
       
       return newReaction;

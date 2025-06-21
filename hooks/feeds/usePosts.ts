@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useIsFocused } from '@react-navigation/native';
-import axios from 'axios'; // Add this import to fix "axios is not defined" error
-import * as FeedsApi from '../../API/feeds';
+import { MOCK_POSTS, MOCK_USERS } from '../../data/tunisianMockData';
 import { Post, FilterState, SortOption } from '../../types/feeds/index';
 
 interface UsePostsParams {
@@ -43,76 +42,97 @@ export const usePosts = ({
 
         setError(null);
 
-        // Build query params - SIMPLIFIED to ensure posts are shown
-        const params: Record<string, any> = {
-          page: loadMore ? page + 1 : 1,
-          ordering: '-created_at', // Always sort by newest to ensure we see posts
-        };
-
-        // Only apply filters if explicitly set
-        if (initialFilters.topics.length > 0) {
-          params.topic = initialFilters.topics.join(',');
-        }
-        if (initialFilters.types.length > 0) {
-          params.post_type = initialFilters.types.map(type => type.toLowerCase()).join(',');
-        }
-        if (initialFilters.tags.length > 0) {
-          params.tag = initialFilters.tags.join(',');
-        }
+        console.log("DEBUG: Using mock data for posts");
+        
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Use mock data instead of API
+        let filteredPosts = [...MOCK_POSTS].map(mockPost => ({
+          id: typeof mockPost.id === 'string' ? parseInt(mockPost.id.toString().replace(/\D/g, '')) || Math.floor(Math.random() * 1000) : mockPost.id as number,
+          author: typeof mockPost.author.id === 'string' ? parseInt(mockPost.author.id.toString().replace(/\D/g, '')) || Math.floor(Math.random() * 1000) : mockPost.author.id as number,
+          author_name: mockPost.author.full_name,
+          author_profile_pic: mockPost.author.profile_pic,
+          author_user_type: mockPost.author.user_type,
+          content: mockPost.content,
+          post_type: 'discussion',
+          topics: mockPost.topics?.[0] || 'Mental Health',
+          visibility: 'public',
+          created_at: mockPost.created_at,
+          updated_at: mockPost.updated_at,
+          media_files: mockPost.media_files?.map(media => ({
+            id: parseInt(media.id.replace(/\D/g, '')) || Math.floor(Math.random() * 1000),
+            file: media.url,
+            media_type: media.type,
+            uploaded_by: {
+              id: typeof mockPost.author.id === 'string' ? parseInt(mockPost.author.id.toString().replace(/\D/g, '')) || Math.floor(Math.random() * 1000) : mockPost.author.id as number,
+              username: mockPost.author.username,
+              name: mockPost.author.full_name,
+              profile_pic: mockPost.author.profile_pic
+            }
+          })) || [],
+          views_count: Math.floor(Math.random() * 100) + 10,
+          tags: mockPost.tags?.join(',') || '',
+          reactions_summary: {
+            like: mockPost.reactions.filter(r => r.type === 'like').length,
+            love: mockPost.reactions.filter(r => r.type === 'love').length,
+            support: mockPost.reactions.filter(r => r.type === 'support').length,
+            insightful: mockPost.reactions.filter(r => r.type === 'insightful').length,
+          },
+          current_user_reaction: null,
+          comments_count: mockPost.comments.length,
+          poll_options: []
+        } as Post));
+        
+        // Apply search filter
         if (searchQuery) {
-          params.search = searchQuery;
+          filteredPosts = filteredPosts.filter(post => 
+            post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            post.author_name.toLowerCase().includes(searchQuery.toLowerCase())
+          );
         }
-        // Remove following filter to see all posts
-        // if (activeTab === 'following') {
-        //   params.following = true;
-        // }
-
-        console.log("DEBUG: Fetching posts with params:", params);
         
-        // Fix the axios reference
-        // Instead of directly checking axios, we'll use a safer approach
-        try {
-          const authHeader = axios.defaults.headers.common['Authorization'];
-          console.log("DEBUG: Auth header present:", !!authHeader);
-        } catch (e) {
-          console.log("DEBUG: Could not check auth header:", e);
+        // Apply topic filter
+        if (initialFilters.topics.length > 0) {
+          filteredPosts = filteredPosts.filter(post => {
+            const postTopic = typeof post.topics === 'string' ? post.topics : post.topics?.name || '';
+            return initialFilters.topics.includes(postTopic);
+          });
+        }
+        
+        // Apply sorting
+        switch (initialSort) {
+          case 'newest':
+            filteredPosts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            break;
+          case 'most-viewed':
+            filteredPosts.sort((a, b) => b.views_count - a.views_count);
+            break;
+          case 'most-reactions':
+            const getReactionCount = (post: Post) => {
+              const summary = post.reactions_summary;
+              return (summary.like || 0) + (summary.love || 0) + (summary.support || 0) + (summary.insightful || 0);
+            };
+            filteredPosts.sort((a, b) => getReactionCount(b) - getReactionCount(a));
+            break;
+          case 'popular':
+            filteredPosts.sort((a, b) => (b.views_count + b.comments_count) - (a.views_count + a.comments_count));
+            break;
+          default:
+            break;
         }
 
-        const response = await FeedsApi.fetchPosts(params) as { results: Post[]; next?: string } | Post[];
-        console.log("DEBUG: Raw API response:", JSON.stringify(response));
-        
-        let newPosts: Post[];
-        let hasNext = false;
-        if (Array.isArray(response)) {
-          newPosts = response;
-        } else {
-          newPosts = response.results;
-          hasNext = !!response.next;
-        }
+        console.log("DEBUG: Processed posts count:", filteredPosts.length);
 
-        console.log("DEBUG: Processed posts count:", newPosts?.length || 0);
-
-        // Remove sensitive content filter to ensure ALL posts show
-        // const filteredPosts = newPosts.filter(post => 
-        //   post.content !== 'i want to die' && post.content?.trim() !== ''
-        // );
-        const filteredPosts = newPosts; // Show all posts
-        
-        console.log("DEBUG: Posts after processing:", filteredPosts.length);
-        console.log("DEBUG: First post:", filteredPosts.length > 0 ? JSON.stringify(filteredPosts[0]) : "No posts");
-
-        if (refresh) {
+        if (refresh || !loadMore) {
           setPosts(filteredPosts);
         } else {
-          setPosts(prevPosts => [...prevPosts, ...filteredPosts]);
+          // For load more, just append (though with mock data we don't really paginate)
+          setPosts(prevPosts => [...prevPosts, ...filteredPosts.slice(prevPosts.length)]);
         }
 
-        // Update hasMore based on response
-        if (!hasNext || newPosts.length === 0) {
-          setHasMore(false);
-        } else {
-          setHasMore(true);
-        }
+        // Mock pagination - assume we have more if we're showing less than total
+        setHasMore(false); // For demo, don't implement pagination
         
       } catch (err) {
         console.error('Error loading posts:', err);
@@ -125,7 +145,7 @@ export const usePosts = ({
         setIsInitialLoading(false);
       }
     },
-    [searchQuery, initialSort, initialTab, initialFilters, page, posts.length]
+    [searchQuery, initialSort, initialTab, initialFilters]
   );
 
   const isFocused = useIsFocused();

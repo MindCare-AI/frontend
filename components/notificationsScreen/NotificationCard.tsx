@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { globalStyles } from '../../styles/global';
 
 interface NotificationCardProps {
   type?: 'success' | 'info' | 'warning' | 'error';
@@ -17,18 +18,18 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
   onClose,
   style,
 }) => {
-  // Light blue scheme
+  // Use theme colors from globalStyles
   const cardColors = {
-    success: { bg: '#E6F3FA', icon: 'checkmark-circle' as const, iconColor: '#0088CC' },
-    info: { bg: '#E6F3FA', icon: 'information-circle' as const, iconColor: '#0088CC' },
-    warning: { bg: '#FFF8E1', icon: 'warning' as const, iconColor: '#FFA000' },
-    error: { bg: '#FFEBEE', icon: 'alert-circle' as const, iconColor: '#D32F2F' },
+    success: { bg: `${globalStyles.colors.success}20`, icon: 'checkmark-circle' as const, iconColor: globalStyles.colors.success },
+    info: { bg: `${globalStyles.colors.primary}20`, icon: 'information-circle' as const, iconColor: globalStyles.colors.primary },
+    warning: { bg: `${globalStyles.colors.accent}20`, icon: 'warning' as const, iconColor: globalStyles.colors.accent },
+    error: { bg: `${globalStyles.colors.error}20`, icon: 'alert-circle' as const, iconColor: globalStyles.colors.error },
   };
 
   const { bg, icon, iconColor } = cardColors[type];
 
   return (
-    <View style={[styles.card, { backgroundColor: '#FFFFFF' }, style]}>
+    <View style={[styles.card, { backgroundColor: globalStyles.colors.white }, style]}>
       <View style={[styles.waveBackground, { backgroundColor: bg }]} />
 
       <View style={styles.iconContainer}>
@@ -42,7 +43,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 
       {onClose && (
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Ionicons name="close" size={18} color="#777777" />
+          <Ionicons name="close" size={18} color={globalStyles.colors.textSecondary} />
         </TouchableOpacity>
       )}
     </View>
@@ -51,13 +52,13 @@ const NotificationCard: React.FC<NotificationCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: globalStyles.colors.white,
     borderRadius: 12,
     padding: 16,
     margin: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: globalStyles.colors.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -68,7 +69,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: globalStyles.colors.border,
     width: '95%',
     alignSelf: 'center',
     minHeight: 80,
@@ -92,12 +93,12 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
+    color: globalStyles.colors.text,
     marginBottom: 4,
   },
   subText: {
     fontSize: 14,
-    color: '#666666',
+    color: globalStyles.colors.textSecondary,
   },
   closeButton: {
     padding: 4,

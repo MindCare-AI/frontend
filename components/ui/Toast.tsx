@@ -140,11 +140,11 @@ const Toast = React.forwardRef<
   const getIcon = () => {
     switch (variant) {
       case 'success':
-        return <Check size={20} color="#059669" />;
+        return <Check size={20} />;
       case 'error':
-        return <AlertCircle size={20} color="#DC2626" />;
+        return <AlertCircle size={20} />;
       case 'info':
-        return <Info size={20} color="#2563EB" />;
+        return <Info size={20} />;
       default:
         return null;
     }
@@ -204,7 +204,7 @@ const Toast = React.forwardRef<
           </Text>
         </View>
         <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
-          <X size={20} color={variant === "destructive" ? "#fff" : "#000"} />
+          <X size={20} />
         </TouchableOpacity>
       </View>
 

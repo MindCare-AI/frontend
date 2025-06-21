@@ -215,9 +215,9 @@ const Input = forwardRef<TextInput, InputProps>(
               }
             >
               {isSecureTextVisible ? (
-                <EyeOff size={20} color="#6B7280" />
+                <EyeOff size={20} />
               ) : (
-                <Eye size={20} color="#6B7280" />
+                <Eye size={20} />
               )}
             </TouchableOpacity>
           )}
@@ -229,7 +229,7 @@ const Input = forwardRef<TextInput, InputProps>(
           <View style={styles.messageContainer}>
             {error && (
               <View style={styles.errorContainer}>
-                <AlertCircle size={16} color="#DC2626" />
+                <AlertCircle size={16} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}

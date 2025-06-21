@@ -18,16 +18,18 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, description
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 16,
+    marginVertical: 20,
+    paddingHorizontal: 4,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: globalStyles.colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   description: {
     fontSize: 14,
     color: globalStyles.colors.textSecondary,
+    lineHeight: 20,
   },
 });

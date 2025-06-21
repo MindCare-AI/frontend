@@ -24,7 +24,7 @@ import { useToast } from '../../contexts/feeds/ToastContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import * as FeedsApi from '../../API/feeds';
+import { AZIZ_BAHLOUL } from '../../data/tunisianMockData';
 import { useAuth } from '../../contexts/AuthContext';
 import { prepareMediaForUpload } from '../../utils/mediaUtils';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -222,7 +222,9 @@ const CreatePostScreen = () => {
       
       formData.append('visibility', 'public');
       
-      await FeedsApi.createPost(formData);
+      // Mock post creation - simulate success
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Mock post created successfully');
       
       // Success animation
       Animated.sequence([
@@ -244,14 +246,9 @@ const CreatePostScreen = () => {
         type: "success"
       });
       
-      // Trigger refresh and navigate back
+      // Navigate back to previous screen
       if (navigation.canGoBack()) {
-        // Pass refresh param back to previous screen
-        navigation.navigate({
-          name: navigation.getState().routes[navigation.getState().routes.length - 2].name,
-          params: { refresh: Date.now() },
-          merge: true,
-        });
+        navigation.goBack();
       }
       
     } catch (error) {

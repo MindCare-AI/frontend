@@ -98,6 +98,9 @@ const WaitingListModal: React.FC<WaitingListModalProps> = ({ isOpen, onClose }) 
           preferred_time_slots: preferredTimeSlots,
         });
 
+        // Show success message
+        console.log("Successfully joined waiting list!");
+        
         // Close modal and reset form
         onClose()
         setDate(null)

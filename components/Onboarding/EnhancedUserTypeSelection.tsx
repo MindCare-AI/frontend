@@ -70,7 +70,7 @@ const EnhancedUserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect,
           ]}
         >
           <View style={styles.iconContainer}>
-            <Brain size={48} color={selected === "patient" ? "#fff" : "#002D62"} />
+            <Brain size={48} />
           </View>
           <Text style={[styles.optionTitle, selected === "patient" && styles.selectedText]}>
             I'm seeking support
@@ -89,7 +89,7 @@ const EnhancedUserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect,
           ]}
         >
           <View style={styles.iconContainer}>
-            <Stethoscope size={48} color={selected === "therapist" ? "#fff" : "#002D62"} />
+            <Stethoscope size={48} />
           </View>
           <Text style={[styles.optionTitle, selected === "therapist" && styles.selectedText]}>
             I'm a mental health professional
@@ -107,7 +107,7 @@ const EnhancedUserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect,
           style={styles.nextButton}
         >
           <Text style={styles.nextButtonText}>Continue</Text>
-          <ArrowRight size={20} color="#fff" />
+          <ArrowRight size={20} />
         </TouchableOpacity>
       )}
     </View>

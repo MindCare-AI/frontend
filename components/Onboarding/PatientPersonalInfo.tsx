@@ -63,7 +63,7 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="First Name *"
@@ -73,7 +73,7 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
           </View>
 
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="Last Name *"
@@ -83,7 +83,7 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
           </View>
 
           <View style={styles.inputGroup}>
-            <Phone size={20} color="#002D62" />
+            <Phone size={20} />
             <TextInput
               style={styles.input}
               placeholder="Phone Number *"

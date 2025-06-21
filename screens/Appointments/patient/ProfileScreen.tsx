@@ -1,7 +1,10 @@
 import { Box, Text, Heading, VStack, Avatar, Divider } from "native-base"
 import Header from "../../../components/Appointments/patient_dashboard/Header"
+import { AZIZ_BAHLOUL } from "../../../data/tunisianMockData"
 
 const ProfileScreen = () => {
+  const patientData = AZIZ_BAHLOUL;
+
   return (
     <Box flex={1} bg="secondary.50" safeArea>
       <Header />
@@ -11,14 +14,14 @@ const ProfileScreen = () => {
           <Avatar
             size="xl"
             source={{
-              uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=687&q=80",
+              uri: patientData.profile_pic,
             }}
             borderWidth={2}
             borderColor="primary.500"
           />
 
-          <Heading size="lg">Jane Doe</Heading>
-          <Text color="gray.500">Patient ID: 12345678</Text>
+          <Heading size="lg">{patientData.full_name}</Heading>
+          <Text color="gray.500">Patient ID: {patientData.id}</Text>
 
           <Divider my={2} />
 
@@ -30,15 +33,47 @@ const ProfileScreen = () => {
               <VStack space={2}>
                 <HStack justifyContent="space-between">
                   <Text color="gray.500">Email</Text>
-                  <Text>jane.doe@example.com</Text>
+                  <Text>{patientData.email}</Text>
                 </HStack>
                 <HStack justifyContent="space-between">
                   <Text color="gray.500">Phone</Text>
-                  <Text>(123) 456-7890</Text>
+                  <Text>{patientData.phone_number}</Text>
                 </HStack>
                 <HStack justifyContent="space-between">
                   <Text color="gray.500">Date of Birth</Text>
-                  <Text>January 1, 1990</Text>
+                  <Text>{new Date(patientData.date_of_birth).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}</Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">Gender</Text>
+                  <Text>{patientData.gender === 'M' ? 'Male' : patientData.gender === 'F' ? 'Female' : 'Other'}</Text>
+                </HStack>
+              </VStack>
+            </Box>
+
+            <Box bg="white" p={4} rounded="md" shadow={1}>
+              <Heading size="sm" mb={2}>
+                Address Information
+              </Heading>
+              <VStack space={2}>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">Street</Text>
+                  <Text flex={1} textAlign="right">{patientData.address.street}</Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">City</Text>
+                  <Text>{patientData.address.city}</Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">State</Text>
+                  <Text flex={1} textAlign="right">{patientData.address.state}</Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">Country</Text>
+                  <Text>{patientData.address.country}</Text>
                 </HStack>
               </VStack>
             </Box>
@@ -49,12 +84,22 @@ const ProfileScreen = () => {
               </Heading>
               <VStack space={2}>
                 <HStack justifyContent="space-between">
-                  <Text color="gray.500">Primary Care</Text>
-                  <Text>Dr. John Smith</Text>
+                  <Text color="gray.500">Blood Type</Text>
+                  <Text>{patientData.blood_type}</Text>
                 </HStack>
                 <HStack justifyContent="space-between">
-                  <Text color="gray.500">Insurance</Text>
-                  <Text>BlueCross #987654321</Text>
+                  <Text color="gray.500">Medical History</Text>
+                  <Text flex={1} textAlign="right">
+                    {patientData.medical_history.map(h => h.condition).join(', ')}
+                  </Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">Emergency Contact</Text>
+                  <Text flex={1} textAlign="right">{patientData.emergency_contact.name}</Text>
+                </HStack>
+                <HStack justifyContent="space-between">
+                  <Text color="gray.500">Emergency Phone</Text>
+                  <Text>{patientData.emergency_contact.phone}</Text>
                 </HStack>
               </VStack>
             </Box>

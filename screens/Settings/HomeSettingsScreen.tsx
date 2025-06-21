@@ -5,10 +5,10 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { SettingsStackParamList } from '../../types/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getUserProfile } from '../../API/settings/user';
-import { getNotificationTypes } from '../../API/settings/notifications';
+import { AZIZ_BAHLOUL } from '../../data/tunisianMockData';
 import { handleLogout } from '../auth/logoutHandler';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { globalStyles } from '../../styles/global';
 
 const HomeSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
@@ -19,17 +19,11 @@ const HomeSettingsScreen: React.FC = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        // Fetch user profile data
-        const profileData = await getUserProfile();
+        // Mock user profile data - simulate loading delay
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Fetch notification settings - use the correct function
-        const notificationData = await getNotificationTypes(); // Fix: Use correct function
-        
-        // Update notification state based on available data
-        if (notificationData) {
-          // Set a default value since getNotificationTypes returns different data
-          setNotificationsEnabled(false); // Or derive from notificationData structure
-        }
+        // Set notification default state
+        setNotificationsEnabled(true);
         
         setLoading(false);
       } catch (error) {
@@ -63,36 +57,19 @@ const HomeSettingsScreen: React.FC = () => {
     });
   };
 
-  // Get profile picture from patient_profile or therapist_profile
+  // Get profile picture - use mock data for Aziz Bahloul
   const getProfilePic = () => {
-    if (user?.user_type === 'patient' && user.patient_profile?.profile_pic) {
-      const profilePic = user.patient_profile.profile_pic;
-      // Handle relative URLs
-      if (profilePic.startsWith('/media/')) {
-        return { uri: `http://127.0.0.1:8000${profilePic}` };
-      }
-      return { uri: profilePic };
-    }
-    if (user?.user_type === 'therapist' && user.therapist_profile?.profile_pic) {
-      const profilePic = user.therapist_profile.profile_pic;
-      // Handle relative URLs
-      if (profilePic.startsWith('/media/')) {
-        return { uri: `http://127.0.0.1:8000${profilePic}` };
-      }
-      return { uri: profilePic };
+    // For demo, always show Aziz Bahloul's profile
+    if (AZIZ_BAHLOUL.profile_pic) {
+      return { uri: AZIZ_BAHLOUL.profile_pic };
     }
     return require('../../assets/default-avatar.png');
   };
 
-  // Get user's full name from patient_profile or therapist_profile
+  // Get user's full name - use mock data for Aziz Bahloul
   const getUserFullName = () => {
-    if (user?.user_type === 'patient' && user.patient_profile?.first_name) {
-      return `${user.patient_profile.first_name} ${user.patient_profile.last_name || ''}`;
-    }
-    if (user?.user_type === 'therapist' && user.therapist_profile?.first_name) {
-      return `${user.therapist_profile.first_name} ${user.therapist_profile.last_name || ''}`;
-    }
-    return 'User Profile';
+    // For demo, always show Aziz Bahloul's name
+    return AZIZ_BAHLOUL.full_name;
   };
 
   if (loading) {
@@ -143,7 +120,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="person-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>Profile</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -154,7 +131,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="settings-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>App Settings</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -165,7 +142,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="notifications-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>Notification Preferences</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             {user?.user_type === 'patient' && (
@@ -177,7 +154,7 @@ const HomeSettingsScreen: React.FC = () => {
                   <Ionicons name="medical-outline" size={24} color="#002D62" />
                   <Text style={styles.settingsItemText}>Medical Information</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#888" />
+                <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
               </TouchableOpacity>
             )}
             
@@ -190,7 +167,7 @@ const HomeSettingsScreen: React.FC = () => {
                   <Ionicons name="briefcase-outline" size={24} color="#002D62" />
                   <Text style={styles.settingsItemText}>Availability</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color="#888" />
+                <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -203,7 +180,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="help-circle-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>Help & Support</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingsItem}>
@@ -211,7 +188,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="shield-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>Privacy Policy</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.settingsItem}>
@@ -219,7 +196,7 @@ const HomeSettingsScreen: React.FC = () => {
                 <Ionicons name="document-text-outline" size={24} color="#002D62" />
                 <Text style={styles.settingsItemText}>Terms of Service</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#888" />
+              <Ionicons name="chevron-forward" size={20} color={globalStyles.colors.textSecondary} />
             </TouchableOpacity>
             
             <View style={styles.notificationContainer}>
@@ -280,12 +257,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 22,
     fontWeight: '600',
-    color: '#333',
+    color: globalStyles.colors.text,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: globalStyles.colors.textSecondary,
     textTransform: 'capitalize',
     marginBottom: 15,
   },
@@ -315,7 +292,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: globalStyles.colors.text,
     marginBottom: 16,
   },
   settingsItem: {
@@ -332,7 +309,7 @@ const styles = StyleSheet.create({
   },
   settingsItemText: {
     fontSize: 16,
-    color: '#444',
+    color: globalStyles.colors.text,
     marginLeft: 16,
   },
   notificationContainer: {

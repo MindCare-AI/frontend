@@ -3,6 +3,7 @@ import { API_URL } from "../../config";
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppointmentResponse } from "types/appoint_therapist";
+import { MOCK_APPOINTMENTS, MOCK_THERAPISTS, SLIMEN_ABYADH } from '../../data/tunisianMockData';
 
 /**
  * Appointment Status Flow:
@@ -36,17 +37,46 @@ const getAuthHeaders = async () => {
 // --- Appointment APIs ---
 
 export const getAppointments = async (params: any = {}) => {
-  console.log("[therapist.ts] getAppointments params:", params);
-  const url = `${API_URL}/appointments/`;
-  console.log("[therapist.ts] getAppointments URL:", url);
-
-  // Make a simple request without any filters
-  const resp = await axios.get(url, {
-    headers: await getAuthHeaders()
-  });
-  console.log("[therapist.ts] Appointments response:", resp.data);
-
-  return resp.data;
+  // MOCK IMPLEMENTATION - Returns mock appointments for therapist
+  console.log("[therapist.ts] Mock getAppointments called with params:", params);
+  
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 800));
+  
+  // Filter appointments for current therapist (using Slimen Abyadh as the main therapist)
+  const therapistId = SLIMEN_ABYADH.id;
+  const therapistAppointments = MOCK_APPOINTMENTS.filter(apt => 
+    apt.therapist.id === therapistId
+  );
+  
+  console.log(`[therapist.ts] Debug: Total mock appointments: ${MOCK_APPOINTMENTS.length}`);
+  console.log(`[therapist.ts] Debug: Therapist appointments: ${therapistAppointments.length}`);
+  
+  // Transform to expected format for therapist dashboard
+  const results = therapistAppointments.map(apt => ({
+    id: apt.id,
+    appointment_date: apt.date, // Use the date field
+    appointment_id: apt.id.toString(),
+    patient_name: apt.patient.full_name,
+    patientName: apt.patient.full_name, // Add both formats for compatibility
+    patientId: apt.patient.id,
+    time: apt.time,
+    date: apt.date,
+    status: apt.status,
+    notes: apt.notes || "No notes available",
+    video_session_link: apt.video_session_link || "https://meet.google.com/abc-defg-hij",
+    confirmed_by: apt.status === 'confirmed' ? 'Dr. Slimen Abyadh' : undefined,
+    confirmation_date: apt.status === 'confirmed' ? new Date().toISOString() : undefined,
+    completed_by: apt.status === 'completed' ? 'Dr. Slimen Abyadh' : undefined,
+    completion_date: apt.status === 'completed' ? new Date().toISOString() : undefined,
+  }));
+  
+  return {
+    results,
+    count: results.length,
+    next: null,
+    previous: null
+  };
 };
 
 /**
@@ -61,26 +91,23 @@ export const rescheduleAppointment = async (
   appointmentDate: string,
   notes?: string
 ) => {
-  console.log(`[therapist.ts] Rescheduling appointment ${appointmentId} to ${appointmentDate}`);
+  // MOCK IMPLEMENTATION - Always succeeds
+  console.log(`[therapist.ts] Mock rescheduleAppointment called: ${appointmentId} to ${appointmentDate}`);
   
-  const url = `${API_URL}/appointments/${appointmentId}/`;
-  console.log("[therapist.ts] Reschedule URL:", url);
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1200));
   
-  const requestBody = {
+  // Return mock updated appointment
+  return {
+    id: appointmentId,
+    appointment_id: appointmentId.toString(),
     appointment_date: appointmentDate,
-    notes: notes || "Appointment rescheduled"
+    patient_name: "Aziz Bahloul",
+    status: "rescheduled",
+    notes: notes || "Appointment rescheduled by therapist",
+    updated_at: new Date().toISOString(),
+    video_session_link: "https://meet.google.com/abc-defg-hij",
   };
-  
-  try {
-    const response = await axios.patch(url, requestBody, {
-      headers: await getAuthHeaders()
-    });
-    console.log("[therapist.ts] Reschedule response:", response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error("[therapist.ts] Reschedule error:", error.response?.data || error.message);
-    throw error;
-  }
 };
 
 /**
@@ -89,22 +116,23 @@ export const rescheduleAppointment = async (
  * @returns The confirmed appointment data
  */
 export const confirmAppointment = async (appointmentId: number | string) => {
-  console.log(`[therapist.ts] Confirming appointment ${appointmentId}`);
+  // MOCK IMPLEMENTATION - Always succeeds
+  console.log(`[therapist.ts] Mock confirmAppointment called: ${appointmentId}`);
   
-  const url = `${API_URL}/appointments/${appointmentId}/confirm/`;
-  console.log("[therapist.ts] Confirm URL:", url);
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
   
-  try {
-    const response = await axios.post<AppointmentResponse>(url, {}, {
-      headers: await getAuthHeaders()
-    });
-    console.log("[therapist.ts] Confirm response:", response.data);
-    // Ensure we return the appointment data in a consistent format
-    return response.data.appointment_id || response.data;
-  } catch (error: any) {
-    console.error("[therapist.ts] Confirm error:", error.response?.data || error.message);
-    throw error;
-  }
+  // Return mock confirmed appointment
+  return {
+    id: appointmentId,
+    appointment_id: appointmentId.toString(),
+    patient_name: "Aziz Bahloul",
+    status: "confirmed",
+    confirmed_by: "Dr. Slimen Abyadh",
+    confirmation_date: new Date().toISOString(),
+    notes: "Appointment confirmed by therapist",
+    video_session_link: "https://meet.google.com/abc-defg-hij",
+  };
 };
 
 /**
@@ -115,23 +143,22 @@ export const confirmAppointment = async (appointmentId: number | string) => {
  * Status Change: any status → canceled
  */
 export const cancelAppointment = async (id: number) => {
-  console.log(`[therapist.ts] Canceling appointment ${id}`);
+  // MOCK IMPLEMENTATION - Always succeeds
+  console.log(`[therapist.ts] Mock cancelAppointment called: ${id}`);
   
-  const url = `${API_URL}/appointments/${id}/cancel/`;
-  console.log("[therapist.ts] Cancel URL:", url);
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 900));
   
-  try {
-    const resp = await axios.post(
-      url,
-      {},
-      { headers: await getAuthHeaders() }
-    );
-    console.log("[therapist.ts] Cancel response:", resp.data);
-    return resp.data;
-  } catch (error: any) {
-    console.error("[therapist.ts] Cancel error:", error.response?.data || error.message);
-    throw error;
-  }
+  // Return mock cancelled appointment
+  return {
+    id: id,
+    appointment_id: id.toString(),
+    patient_name: "Aziz Bahloul",
+    status: "cancelled",
+    cancelled_by: "Dr. Slimen Abyadh",
+    cancellation_date: new Date().toISOString(),
+    notes: "Appointment cancelled by therapist",
+  };
 };
 
 /**
@@ -145,19 +172,21 @@ export const cancelAppointment = async (id: number) => {
  * Status Change: confirmed → completed
  */
 export const completeAppointment = async (appointmentId: number | string) => {
-  console.log(`[therapist.ts] Completing appointment ${appointmentId}`);
+  // MOCK IMPLEMENTATION - Always succeeds
+  console.log(`[therapist.ts] Mock completeAppointment called: ${appointmentId}`);
   
-  const url = `${API_URL}/appointments/${appointmentId}/complete/`;
-  console.log("[therapist.ts] Complete URL:", url);
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 800));
   
-  try {
-    const response = await axios.post(url, {}, {
-      headers: await getAuthHeaders()
-    });
-    console.log("[therapist.ts] Complete response:", response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error("[therapist.ts] Complete error:", error.response?.data || error.message);
-    throw error;
-  }
+  // Return mock completed appointment
+  return {
+    id: appointmentId,
+    appointment_id: appointmentId.toString(),
+    patient_name: "Aziz Bahloul",
+    status: "completed",
+    completed_by: "Dr. Slimen Abyadh",
+    completion_date: new Date().toISOString(),
+    notes: "Session completed successfully",
+    duration: "60 minutes",
+  };
 };

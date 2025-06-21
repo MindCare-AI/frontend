@@ -4,6 +4,7 @@ import { Text, Appbar, Button, ActivityIndicator, useTheme, Switch, Divider } fr
 import { NotificationPreferenceItem } from '../../components/notificationsScreen/NotificationPreferenceItem';
 import { useNotificationPreferences } from '../../hooks/notificationsScreen/useNotificationPreferences';
 import { NavigationProp } from '@react-navigation/native';
+import { globalStyles } from '../../styles/global';
 
 interface NotificationPreferencesScreenProps {
   navigation: NavigationProp<any>;
@@ -73,58 +74,94 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
 
   return (
     <View style={styles.container}>
-      <Appbar.Header>
+      <Appbar.Header style={styles.header}>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title="Notification Preferences" />
+        <Appbar.Content 
+          title="Notification Preferences" 
+          titleStyle={styles.headerTitle}
+        />
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Notification Types
-        </Text>
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Notification Types
+          </Text>
+          <Text style={styles.sectionDescription}>
+            Choose which types of notifications you want to receive
+          </Text>
 
-        {localPrefs.map(preference => (
-          <NotificationPreferenceItem
-            key={preference.type}
-            type={preference.type}
-            description={preference.description}
-            isEnabled={preference.isEnabled}
-            onToggle={() => {
-              setLocalPrefs(prev => 
-                prev.map(p => 
-                  p.type === preference.type 
-                    ? { ...p, isEnabled: !p.isEnabled } 
-                    : p
-                )
-              );
-            }}
-          />
-        ))}
-
-        <Divider style={{ marginVertical: 16 }} />
-
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Channels
-        </Text>
-        <View style={styles.row}>
-          <Text>Email Notifications</Text>
-          <Switch
-            value={localEmail}
-            onValueChange={val => setLocalEmail(val)}
-          />
+          {localPrefs.map(preference => (
+            <NotificationPreferenceItem
+              key={preference.type}
+              type={preference.type}
+              description={preference.description}
+              isEnabled={preference.isEnabled}
+              onToggle={() => {
+                setLocalPrefs(prev => 
+                  prev.map(p => 
+                    p.type === preference.type 
+                      ? { ...p, isEnabled: !p.isEnabled } 
+                      : p
+                  )
+                );
+              }}
+            />
+          ))}
         </View>
-        <View style={styles.row}>
-          <Text>In-App Notifications</Text>
-          <Switch
-            value={localInApp}
-            onValueChange={val => setLocalInApp(val)}
-          />
+
+        <Divider style={styles.divider} />
+
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Notification Channels
+          </Text>
+          <Text style={styles.sectionDescription}>
+            Select how you want to receive notifications
+          </Text>
+          
+          <View style={styles.channelCard}>
+            <View style={styles.row}>
+              <View style={styles.channelInfo}>
+                <Text style={styles.channelTitle}>Email Notifications</Text>
+                <Text style={styles.channelDescription}>Receive notifications via email</Text>
+              </View>
+              <Switch
+                value={localEmail}
+                onValueChange={val => setLocalEmail(val)}
+                thumbColor={localEmail ? globalStyles.colors.primary : globalStyles.colors.neutralMedium}
+                trackColor={{ 
+                  false: globalStyles.colors.neutralLight, 
+                  true: `${globalStyles.colors.primary}40` 
+                }}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.channelCard}>
+            <View style={styles.row}>
+              <View style={styles.channelInfo}>
+                <Text style={styles.channelTitle}>In-App Notifications</Text>
+                <Text style={styles.channelDescription}>Show notifications within the app</Text>
+              </View>
+              <Switch
+                value={localInApp}
+                onValueChange={val => setLocalInApp(val)}
+                thumbColor={localInApp ? globalStyles.colors.primary : globalStyles.colors.neutralMedium}
+                trackColor={{ 
+                  false: globalStyles.colors.neutralLight, 
+                  true: `${globalStyles.colors.primary}40` 
+                }}
+              />
+            </View>
+          </View>
         </View>
 
         <Button 
           mode="contained" 
           onPress={handleSave}
           style={styles.saveButton}
+          labelStyle={styles.saveButtonLabel}
         >
           Save Preferences
         </Button>
@@ -136,37 +173,108 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: globalStyles.colors.background,
+  },
+  header: {
+    backgroundColor: globalStyles.colors.primary,
+    elevation: 4,
+    shadowColor: globalStyles.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  headerTitle: {
+    color: globalStyles.colors.white,
+    fontWeight: '600',
   },
   content: {
     padding: 16,
+    paddingBottom: 32,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    marginBottom: 8,
+    marginTop: 8,
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: globalStyles.colors.text,
+  },
+  sectionDescription: {
+    fontSize: 14,
+    color: globalStyles.colors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  divider: {
+    marginVertical: 24,
+    backgroundColor: globalStyles.colors.border,
+  },
+  channelCard: {
+    backgroundColor: globalStyles.colors.white,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: globalStyles.colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  channelInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  channelTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: globalStyles.colors.text,
+    marginBottom: 4,
+  },
+  channelDescription: {
+    fontSize: 14,
+    color: globalStyles.colors.textSecondary,
+    lineHeight: 18,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: globalStyles.colors.background,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: globalStyles.colors.background,
   },
   errorText: {
-    color: '#f44336',
+    color: globalStyles.colors.error,
     textAlign: 'center',
-  },
-  sectionTitle: {
-    marginBottom: 16,
-    fontWeight: 'bold',
+    fontSize: 16,
   },
   saveButton: {
-    marginTop: 24,
+    marginTop: 32,
+    backgroundColor: globalStyles.colors.primary,
+    borderRadius: 12,
+    paddingVertical: 4,
+  },
+  saveButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: globalStyles.colors.white,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  rowText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: globalStyles.colors.text,
   },
 });

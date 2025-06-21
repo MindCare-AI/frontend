@@ -75,7 +75,9 @@ export const ScrollArea = React.forwardRef<HTMLDivElement | ScrollView, ScrollAr
           }).start();
 
           // Hide scrollbar after scrolling stops
-          clearTimeout(hideScrollbarTimeout.current);
+          if (hideScrollbarTimeout.current) {
+            clearTimeout(hideScrollbarTimeout.current);
+          }
           hideScrollbarTimeout.current = setTimeout(() => {
             Animated.timing(fadeAnim, {
               toValue: 0,
@@ -87,7 +89,7 @@ export const ScrollArea = React.forwardRef<HTMLDivElement | ScrollView, ScrollAr
       }
     );
 
-    const hideScrollbarTimeout = useRef<NodeJS.Timeout>();
+    const hideScrollbarTimeout = useRef<NodeJS.Timeout | null>(null);
 
     const handleScrollBeginDrag = () => {
       Animated.timing(fadeAnim, {
@@ -98,7 +100,9 @@ export const ScrollArea = React.forwardRef<HTMLDivElement | ScrollView, ScrollAr
     };
 
     const handleScrollEndDrag = () => {
-      clearTimeout(hideScrollbarTimeout.current);
+      if (hideScrollbarTimeout.current) {
+        clearTimeout(hideScrollbarTimeout.current);
+      }
       hideScrollbarTimeout.current = setTimeout(() => {
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -224,6 +228,6 @@ const styles = StyleSheet.create({
   scrollbarThumb: {
     width: "100%",
     borderRadius: 3,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
   },
 });

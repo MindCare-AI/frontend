@@ -93,6 +93,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
               value={option.value}
               disabled={loading}
               status={currentTheme === option.value ? 'checked' : 'unchecked'}
+              color={globalStyles.colors.primary}
+              uncheckedColor={globalStyles.colors.neutralMedium}
+              labelStyle={styles.radioLabel}
             />
           </View>
         ))}
@@ -114,6 +117,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
               value={option.value}
               disabled={loading}
               status={currentColorScheme === option.value ? 'checked' : 'unchecked'}
+              color={globalStyles.colors.primary}
+              uncheckedColor={globalStyles.colors.neutralMedium}
+              labelStyle={styles.radioLabel}
             />
           </View>
         ))}
@@ -153,7 +159,11 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
           value={showOnlineStatus}
           onValueChange={handleOnlineStatusChange}
           disabled={loading}
-          trackColor={{ false: '#767577', true: globalStyles.colors.primary }}
+          trackColor={{ 
+            false: globalStyles.colors.neutralMedium, 
+            true: globalStyles.colors.primaryLight 
+          }}
+          thumbColor={showOnlineStatus ? globalStyles.colors.primary : globalStyles.colors.white}
         />
       </View>
     </View>
@@ -183,6 +193,7 @@ const styles = StyleSheet.create({
   radioLabel: {
     fontSize: 16,
     marginLeft: 8,
+    color: globalStyles.colors.text,
   },
   switchContainer: {
     flexDirection: 'row',
@@ -193,5 +204,6 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
+    color: globalStyles.colors.text,
   }
 });

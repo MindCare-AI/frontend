@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createGroupConversation } from '../../API/group';
+import { MOCK_USERS } from '../../data/tunisianMockData';
 
 export interface User {
   id: string | number;
@@ -72,8 +72,11 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
 
   // Separate effect for handling initialUsers updates
   useEffect(() => {
+    // If no initial users provided, use mock users
+    const usersToFilter = initialUsers.length > 0 ? initialUsers : MOCK_USERS;
+    
     // Only update users if the filtered result would be different
-    const filteredUsers = initialUsers.filter((user: User) => 
+    const filteredUsers = usersToFilter.filter((user: User) => 
       user.id !== currentUserId && String(user.id) !== String(currentUserId)
     );
     // Remove duplicates based on user ID
@@ -126,11 +129,15 @@ const UserSelectionModal: React.FC<UserSelectionModalProps> = ({
           description: trimmedDesc,
           participants: participantIds,
         });
-        const response = await createGroupConversation({
+        
+        // Mock group creation - simulate success
+        const mockResponse = {
+          id: `group_${Date.now()}`,
           name: trimmedName,
-          description: trimmedDesc || "", // Ensure empty string instead of undefined
+          description: trimmedDesc || "",
           participants: participantIds,
-        });
+          created_at: new Date().toISOString()
+        };
 
         if (onCreateConversation) {
           await onCreateConversation(selectedUsers, trimmedName, trimmedDesc);

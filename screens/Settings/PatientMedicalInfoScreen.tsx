@@ -22,6 +22,7 @@ import {
 } from '../../API/settings/patient_medicalinfo';
 import Slider from '@react-native-community/slider';
 import { Picker } from '@react-native-picker/picker';
+import { globalStyles } from '../../styles/global';
 
 // Types based on backend
 interface MedicalHistoryItem {
@@ -615,28 +616,28 @@ const styles = StyleSheet.create({
   },
   cardDesc: {
     fontSize: 15,
-    color: '#444',
+    color: globalStyles.colors.textSecondary,
     marginBottom: 2,
   },
   cardDate: {
     fontSize: 13,
-    color: '#888',
+    color: globalStyles.colors.textSecondary,
     fontStyle: 'italic',
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: globalStyles.colors.border,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#F9F9F9',
+    color: globalStyles.colors.text,
+    backgroundColor: globalStyles.colors.inputBackground,
     minHeight: 44,
     marginBottom: 10,
   },
   emptyText: {
     fontSize: 16,
-    color: '#888',
+    color: globalStyles.colors.textSecondary,
     fontStyle: 'italic',
     paddingVertical: 10,
   },

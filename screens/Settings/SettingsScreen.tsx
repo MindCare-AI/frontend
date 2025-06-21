@@ -1,11 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from 'react-native';
 import { Snackbar, Button } from 'react-native-paper';
-import { getAppSettings, updateAppSettings, AppSettings } from '../../API/settings/settings';
 import { AppearanceSettings } from '../../components/SettingsScreen/AppearanceSettings';
 import { TimeZoneSettings } from '../../components/SettingsScreen/TimeZoneSettings';
 import { globalStyles } from '../../styles/global';
 import LoadingSpinner from '../../components/LoadingSpinner';
+
+// Mock App Settings interface
+interface AppSettings {
+  theme?: 'light' | 'dark' | 'auto';
+  timezone?: string;
+  language?: string;
+  notifications?: {
+    push?: boolean;
+    email?: boolean;
+    messages?: boolean;
+    appointments?: boolean;
+  };
+  privacy?: {
+    showStatus?: boolean;
+    shareActivity?: boolean;
+  };
+}
+
+// Mock settings data
+const MOCK_SETTINGS: AppSettings = {
+  theme: 'light',
+  timezone: 'Africa/Tunis',
+  language: 'en',
+  notifications: {
+    push: true,
+    email: true,
+    messages: true,
+    appointments: true,
+  },
+  privacy: {
+    showStatus: true,
+    shareActivity: false,
+  },
+};
 
 const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -26,7 +59,9 @@ const SettingsScreen: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getAppSettings();
+      // Mock API call - simulate loading delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const data = MOCK_SETTINGS;
       setSettings(data);
       setOriginalSettings(data);
       setTempSettings(data);
@@ -54,7 +89,8 @@ const SettingsScreen: React.FC = () => {
   const handleSave = async () => {
     try {
       setUpdating(true);
-      await updateAppSettings(tempSettings);
+      // Mock API call - simulate update delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       setSettings(tempSettings);
       setOriginalSettings(tempSettings);
       setHasChanges(false);
@@ -166,6 +202,8 @@ const styles = StyleSheet.create({
   errorText: {
     color: globalStyles.colors.error,
     marginBottom: 20,
+    textAlign: 'center',
+    fontSize: 16,
   },
   retryButton: {
     backgroundColor: globalStyles.colors.primary,

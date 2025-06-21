@@ -274,9 +274,6 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
         keyboardDismissMode="on-drag"
         contentContainerStyle={{...styles.scrollContent, paddingBottom: 200}}
         scrollEventThrottle={16}
-        onWheel={(e) => {
-          // Handle mouse wheel scrolling events for web
-        }}
       >
         <Text style={styles.title}>Professional Profile</Text>
         <Text style={styles.subtitle}>Complete your professional information</Text>
@@ -286,7 +283,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="First Name *"
@@ -296,7 +293,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="Last Name *"
@@ -306,7 +303,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <Phone size={20} color="#002D62" />
+            <Phone size={20} />
             <TextInput
               style={styles.input}
               placeholder="Phone Number *"
@@ -334,7 +331,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Professional Information</Text>
           
           <View style={styles.inputGroup}>
-            <Briefcase size={20} color="#002D62" />
+            <Briefcase size={20} />
             <TextInput
               style={styles.input}
               placeholder="Years of Experience"
@@ -368,7 +365,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Business Settings</Text>
           
           <View style={styles.inputGroup}>
-            <DollarSign size={20} color="#002D62" />
+            <DollarSign size={20} />
             <TextInput
               style={styles.input}
               placeholder="Hourly Rate (USD)"
@@ -379,7 +376,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <Briefcase size={20} color="#002D62" />
+            <Briefcase size={20} />
             <TextInput
               style={styles.input}
               placeholder="Session Duration (minutes)"

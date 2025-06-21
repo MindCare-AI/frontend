@@ -19,13 +19,13 @@ const userTypes: UserTypeOption[] = [
     id: "patient",
     title: "I'm seeking support",
     description: "Access personalized mental wellness support and resources",
-    icon: <Brain size={24} color="#002D62" />,
+    icon: <Brain size={24} />,
   },
   {
     id: "therapist",
     title: "I'm a mental health professional",
     description: "Manage your practice and connect with patients digitally",
-    icon: <Users size={24} color="#002D62" />,
+    icon: <Users size={24} />,
   },
 ];
 

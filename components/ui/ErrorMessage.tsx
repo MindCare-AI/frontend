@@ -114,7 +114,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
       accessibilityLabel={`${severity} alert: ${message}`}
     >
       <View style={styles.content}>
-        <AlertTriangle size={20} color={getIconColor()} />
+        <AlertTriangle size={20} />
         <Text style={[styles.message, { color: getTextColor() }]}>{message}</Text>
       </View>
       {onDismiss && (
@@ -124,7 +124,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
           accessibilityRole="button"
           accessibilityLabel="Dismiss error message"
         >
-          <X size={20} color={getTextColor()} />
+          <X size={20} />
         </TouchableOpacity>
       )}
     </Animated.View>

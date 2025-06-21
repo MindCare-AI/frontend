@@ -32,7 +32,7 @@ const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
           ]}
           disabled={!onBack}
         >
-          <ArrowLeft size={20} color="#666" />
+          <ArrowLeft size={20} />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>MindCare AI</Text>

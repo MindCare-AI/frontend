@@ -19,6 +19,7 @@ import {
   TimeSlot,
   DayOfWeek
 } from '../../API/settings/therapist_availability';
+import { globalStyles } from '../../styles/global';
 
 const days: { key: DayOfWeek; label: string }[] = [
   { key: 'monday', label: 'Monday' },
@@ -331,12 +332,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: globalStyles.colors.text,
     marginBottom: 8,
   },
   sectionInfo: {
     fontSize: 14,
-    color: '#666',
+    color: globalStyles.colors.textSecondary,
     marginBottom: 16,
   },
   daysTabContainer: {
@@ -370,7 +371,7 @@ const styles = StyleSheet.create({
   },
   dayTabText: {
     fontSize: 14,
-    color: '#666',
+    color: globalStyles.colors.textSecondary,
   },
   selectedDayTabText: {
     color: 'white',

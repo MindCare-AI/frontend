@@ -362,11 +362,21 @@ const NotificationSettingsScreen: React.FC = () => {
                 <List.Item
                   key={type.id}
                   title={type.description || type.name}
+                  titleStyle={styles.listItemTitle}
+                  style={styles.listItem}
+                  theme={{
+                    colors: {
+                      onSurface: globalStyles.colors.text,
+                      surface: globalStyles.colors.white,
+                    }
+                  }}
                   right={() => (
                     <Checkbox
                       status={preferences.disabled_notification_types.includes(type.name) ? 'unchecked' : 'checked'}
                       onPress={() => handleDisabledTypesChange(type.name)}
                       disabled={updating}
+                      color={globalStyles.colors.primary}
+                      uncheckedColor={globalStyles.colors.neutralMedium}
                     />
                   )}
                 />
@@ -374,6 +384,14 @@ const NotificationSettingsScreen: React.FC = () => {
             ) : (
               <List.Item
                 title="No notification types available"
+                titleStyle={styles.listItemTitle}
+                style={styles.listItem}
+                theme={{
+                  colors: {
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                  }
+                }}
                 description="Notification settings couldn't be loaded"
               />
             )}
@@ -390,10 +408,29 @@ const NotificationSettingsScreen: React.FC = () => {
             {userType === 'patient' && (
               <List.Accordion
                 title="Appointment Reminders"
+                titleStyle={styles.accordionTitle}
+                style={styles.listAccordion}
+                theme={{
+                  colors: {
+                    primary: globalStyles.colors.primary,
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                    background: globalStyles.colors.white,
+                  }
+                }}
                 expanded={expandedSections.appointmentReminders}
                 onPress={() => toggleAdvancedSection('appointmentReminders')}
               >
-                <List.Subheader>When to receive reminders</List.Subheader>
+                <List.Subheader 
+                  style={styles.listSubheader}
+                  theme={{
+                    colors: {
+                      onSurface: globalStyles.colors.textSecondary,
+                    }
+                  }}
+                >
+                  When to receive reminders
+                </List.Subheader>
                 
                 {['24h', '1h', 'immediate'].map(option => {
                   const labels = {
@@ -408,9 +445,19 @@ const NotificationSettingsScreen: React.FC = () => {
                     <List.Item
                       key={option}
                       title={labels[option as keyof typeof labels]}
+                      titleStyle={styles.listItemTitle}
+                      style={styles.listItem}
+                      theme={{
+                        colors: {
+                          onSurface: globalStyles.colors.text,
+                          surface: globalStyles.colors.white,
+                        }
+                      }}
                       right={() => (
                         <Checkbox
                           status={timing.includes(option) ? 'checked' : 'unchecked'}
+                          color={globalStyles.colors.primary}
+                          uncheckedColor={globalStyles.colors.neutralMedium}
                           onPress={() => {
                             const currentTiming = [...timing];
                             if (currentTiming.includes(option)) {
@@ -437,10 +484,29 @@ const NotificationSettingsScreen: React.FC = () => {
             {userType === 'therapist' && (
               <List.Accordion
                 title="New Patient Assignments"
+                titleStyle={styles.accordionTitle}
+                style={styles.listAccordion}
+                theme={{
+                  colors: {
+                    primary: globalStyles.colors.primary,
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                    background: globalStyles.colors.white,
+                  }
+                }}
                 expanded={expandedSections.newPatientAssignments}
                 onPress={() => toggleAdvancedSection('newPatientAssignments')}
               >
-                <List.Subheader>Notification channels</List.Subheader>
+                <List.Subheader 
+                  style={styles.listSubheader}
+                  theme={{
+                    colors: {
+                      onSurface: globalStyles.colors.textSecondary,
+                    }
+                  }}
+                >
+                  Notification channels
+                </List.Subheader>
                 
                 {['email', 'in_app'].map(option => {
                   const labels = {
@@ -454,9 +520,19 @@ const NotificationSettingsScreen: React.FC = () => {
                     <List.Item
                       key={option}
                       title={labels[option as keyof typeof labels]}
+                      titleStyle={styles.listItemTitle}
+                      style={styles.listItem}
+                      theme={{
+                        colors: {
+                          onSurface: globalStyles.colors.text,
+                          surface: globalStyles.colors.white,
+                        }
+                      }}
                       right={() => (
                         <Checkbox
                           status={channels.includes(option) ? 'checked' : 'unchecked'}
+                          color={globalStyles.colors.primary}
+                          uncheckedColor={globalStyles.colors.neutralMedium}
                           onPress={() => {
                             const currentChannels = [...channels];
                             if (currentChannels.includes(option)) {
@@ -482,27 +558,66 @@ const NotificationSettingsScreen: React.FC = () => {
             {/* Common to all users */}
             <List.Accordion
               title="Quiet Hours"
+              titleStyle={styles.accordionTitle}
+              style={styles.listAccordion}
+              theme={{
+                colors: {
+                  primary: globalStyles.colors.primary,
+                  onSurface: globalStyles.colors.text,
+                  surface: globalStyles.colors.white,
+                  background: globalStyles.colors.white,
+                }
+              }}
               expanded={expandedSections.quietHours}
               onPress={() => toggleAdvancedSection('quietHours')}
             >
               <List.Item
                 title="Enable Quiet Hours"
+                titleStyle={styles.listItemTitle}
+                style={styles.listItem}
+                theme={{
+                  colors: {
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                  }
+                }}
                 right={() => (
                   <Switch
                     value={getAdvancedPreference('push.quiet_hours.enabled') || false}
                     onValueChange={(value) => updateAdvancedPreference('push.quiet_hours.enabled', value)}
+                    thumbColor={getAdvancedPreference('push.quiet_hours.enabled') ? globalStyles.colors.primary : globalStyles.colors.neutralMedium}
+                    trackColor={{ 
+                      false: globalStyles.colors.neutralLight, 
+                      true: `${globalStyles.colors.primary}40` 
+                    }}
                   />
                 )}
               />
               
               <List.Item
                 title="Start Time"
+                titleStyle={styles.listItemTitle}
+                style={styles.listItem}
+                theme={{
+                  colors: {
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                  }
+                }}
                 description={getAdvancedPreference('push.quiet_hours.start') || 'Not set'}
                 onPress={() => handleTimePickerPress('start')}
               />
               
               <List.Item
                 title="End Time"
+                titleStyle={styles.listItemTitle}
+                style={styles.listItem}
+                theme={{
+                  colors: {
+                    onSurface: globalStyles.colors.text,
+                    surface: globalStyles.colors.white,
+                  }
+                }}
                 description={getAdvancedPreference('push.quiet_hours.end') || 'Not set'}
                 onPress={() => handleTimePickerPress('end')}
               />
@@ -577,10 +692,12 @@ const styles = StyleSheet.create({
   errorContainer: {
     padding: 20,
     alignItems: 'center',
+    backgroundColor: globalStyles.colors.background,
   },
   errorText: {
     color: globalStyles.colors.error,
     marginBottom: 20,
+    textAlign: 'center',
   },
   retryButton: {
     backgroundColor: globalStyles.colors.primary,
@@ -608,13 +725,48 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 16,
+    backgroundColor: globalStyles.colors.border,
   },
   modalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: globalStyles.colors.white,
     padding: 20,
     margin: 20,
     borderRadius: 8,
     alignItems: 'center'
+  },
+  // Custom styles for List components to ensure light theme
+  listAccordion: {
+    backgroundColor: globalStyles.colors.white,
+    borderRadius: 8,
+    marginVertical: 4,
+    shadowColor: globalStyles.colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: globalStyles.colors.border,
+  },
+  listItem: {
+    backgroundColor: globalStyles.colors.white,
+    paddingVertical: 8,
+  },
+  listItemTitle: {
+    color: globalStyles.colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  listSubheader: {
+    color: globalStyles.colors.textSecondary,
+    backgroundColor: globalStyles.colors.background,
+    paddingLeft: 16,
+    paddingVertical: 8,
+  },
+  // Specific styles for accordion titles
+  accordionTitle: {
+    color: globalStyles.colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   }
 });
 

@@ -22,25 +22,25 @@ const wellnessGoals: WellnessGoal[] = [
     id: 'anxiety_management',
     title: 'Manage Anxiety',
     description: 'Learn coping strategies and techniques to reduce anxiety',
-    icon: <Brain size={24} color="#002D62" />,
+    icon: <Brain size={24} />,
   },
   {
     id: 'depression_support',
     title: 'Depression Support',
     description: 'Get support and tools to manage depressive episodes',
-    icon: <Heart size={24} color="#002D62" />,
+    icon: <Heart size={24} />,
   },
   {
     id: 'stress_reduction',
     title: 'Stress Reduction',
     description: 'Develop healthy stress management techniques',
-    icon: <Target size={24} color="#002D62" />,
+    icon: <Target size={24} />,
   },
   {
     id: 'relationship_improvement',
     title: 'Improve Relationships',
     description: 'Enhance communication and relationship skills',
-    icon: <Users size={24} color="#002D62" />,
+    icon: <Users size={24} />,
   },
 ];
 

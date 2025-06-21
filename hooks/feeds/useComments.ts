@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as FeedsApi from '../../API/feeds';
+import { MOCK_POSTS, MOCK_USERS } from '../../data/tunisianMockData';
 import type { Comment } from '../../types/feeds/index';
 
 export const useComments = (postId: number) => {
@@ -12,19 +12,46 @@ export const useComments = (postId: number) => {
   const loadComments = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await FeedsApi.fetchPostComments(postId) as { results: Comment[] } | Comment[];
-      let newComments: Comment[];
-      if (Array.isArray(response)) {
-        newComments = response;
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Find comments for this post from mock data
+      const mockPost = MOCK_POSTS.find(post => {
+        // Convert the numeric postId back to the original string format
+        const originalPostId = `post_${postId}`;
+        const postIdStr = typeof postId === 'string' ? postId : postId.toString();
+        const mockPostIdStr = typeof post.id === 'string' ? post.id : post.id.toString();
+        
+        // Try both the numeric string and the original format
+        return mockPostIdStr === postIdStr || mockPostIdStr === originalPostId;
+      });
+      
+      if (mockPost && mockPost.comments) {
+        const formattedComments: Comment[] = mockPost.comments.map((comment, index) => ({
+          id: parseInt(comment.id) || index + 1,
+          post: typeof postId === 'string' ? parseInt(postId) || 1 : postId,
+          author: typeof comment.author.id === 'string' ? parseInt(comment.author.id.toString().replace(/\D/g, '')) || Math.floor(Math.random() * 1000) : comment.author.id as number,
+          author_name: comment.author.full_name,
+          author_profile_pic: comment.author.profile_pic,
+          content: comment.content,
+          parent: undefined,
+          created_at: comment.created_at,
+          updated_at: comment.created_at,
+          is_edited: false,
+          reactions_count: Math.floor(Math.random() * 10),
+          replies_count: comment.replies?.length || 0,
+          current_user_reaction: null
+        }));
+        setComments(formattedComments);
       } else {
-        newComments = response.results || [];
+        setComments([]);
       }
-      setComments(newComments);
+      
       setError(null);
     } catch (err) {
       console.error('Error loading comments:', err);
       setError('Failed to load comments');
-      // Initialize with empty array to prevent UI errors
       setComments([]);
     } finally {
       setLoading(false);
@@ -40,32 +67,28 @@ export const useComments = (postId: number) => {
   const addComment = useCallback(async (content: string) => {
     try {
       setLoading(true);
-      const newComment = await FeedsApi.createComment(postId, { content }) as Comment;
       
-      // If the API call succeeds but doesn't return the expected data, create a mock comment
-      if (!newComment || typeof newComment !== 'object' || !newComment.id) {
-        const mockComment: Comment = {
-          id: Date.now(), // Use timestamp as temp ID
-          post: postId,
-          author: 1, // Current user ID - should come from auth context
-          author_name: "You", // Current user name
-          author_profile_pic: undefined,
-          content: content,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_edited: false,
-          reactions_count: 0,
-          replies_count: 0,
-          current_user_reaction: null
-        };
-        setComments(prev => [mockComment, ...prev]);
-        return mockComment;
-      }
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      // If API returns data, use it (ensure it's properly typed)
-      const typedComment: Comment = newComment;
-      setComments(prev => [typedComment, ...prev]);
-      return typedComment;
+      // Create a mock comment
+      const mockComment: Comment = {
+        id: Date.now(), // Use timestamp as temp ID
+        post: typeof postId === 'string' ? parseInt(postId) || 1 : postId,
+        author: 1, // Current user ID - should come from auth context
+        author_name: "You", // Current user name
+        author_profile_pic: undefined,
+        content: content,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_edited: false,
+        reactions_count: 0,
+        replies_count: 0,
+        current_user_reaction: null
+      };
+      
+      setComments(prev => [mockComment, ...prev]);
+      return mockComment;
     } catch (err) {
       console.error('Error adding comment:', err);
       setError('Failed to add comment');
@@ -78,7 +101,27 @@ export const useComments = (postId: number) => {
   const addReply = useCallback(async (parentId: number, content: string) => {
     try {
       setLoading(true);
-      const newReply = await FeedsApi.createComment(postId, { content, parent: parentId }) as Comment;
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Create a mock reply
+      const mockReply: Comment = {
+        id: Date.now(),
+        post: typeof postId === 'string' ? parseInt(postId) || 1 : postId,
+        author: 1,
+        author_name: "You",
+        author_profile_pic: undefined,
+        content: content,
+        parent: parentId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_edited: false,
+        reactions_count: 0,
+        replies_count: 0,
+        current_user_reaction: null
+      };
+      
       setComments(prev => prev.map(comment => {
         if (comment.id === parentId) {
           return {
@@ -89,7 +132,7 @@ export const useComments = (postId: number) => {
         return comment;
       }));
       setReplyingTo(null);
-      return newReply;
+      return mockReply;
     } catch (err) {
       console.error('Error adding reply:', err);
       setError('Failed to add reply');
@@ -122,13 +165,14 @@ export const useComments = (postId: number) => {
         }
         return comment;
       }));
-      // Make API call
-      if (comments.find(c => c.id === commentId)?.current_user_reaction === reactionType) {
-        // Remove reaction
-        await FeedsApi.deleteComment(commentId); // This should be a remove reaction endpoint if available
-      } else {
-        // Add reaction
-        await FeedsApi.addReaction(commentId, { reaction_type: reactionType });
+      
+      // Mock API call - simulate reaction success
+      try {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        console.log(`Mock reaction ${reactionType} applied to comment ${commentId}`);
+      } catch (err) {
+        console.error('Mock reaction error:', err);
+        await loadComments(); // Revert optimistic update if needed
       }
     } catch (err) {
       console.error('Error reacting to comment:', err);

@@ -8,7 +8,24 @@ import {
   completeAppointment
   // Add other API functions as you implement them
 } from '../../API/Appointment/therapist';
-import type { Appointment } from '../../types/appoint_therapist/index';
+import type { Appointment, AppointmentResponse } from '../../types/appoint_therapist/index';
+
+// Helper function to transform AppointmentResponse to Appointment
+const transformAppointmentResponse = (response: any): Appointment => {
+  return {
+    id: response.id,
+    patientName: response.patient_name,
+    time: response.appointment_date,
+    appointment_date: response.appointment_date,
+    status: response.status,
+    notes: response.notes || '',
+    video_session_link: response.video_session_link,
+    confirmation_date: response.confirmation_date,
+    confirmed_by: response.confirmed_by,
+    completion_date: response.completion_date,
+    completed_by: response.completed_by,
+  };
+};
 
 // Define your context types
 type AppContextType = {
@@ -101,7 +118,8 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
     setLoading(true);
     try {
       // Call the API to reschedule the appointment
-      const updatedAppointment = await rescheduleAppointment(appointmentId, newDateTime, notes) as Appointment;
+      const response = await rescheduleAppointment(appointmentId, newDateTime, notes);
+      const updatedAppointment = transformAppointmentResponse(response);
       
       // Refresh appointments to update the lists
       await refreshAppointments();
@@ -184,7 +202,8 @@ export const AppContextProvider = ({ children }: { children: React.ReactNode }) 
     setLoading(true);
     try {
       // Call the API to complete the appointment
-      const completedAppointment = await completeAppointment(appointmentId) as Appointment;
+      const response = await completeAppointment(appointmentId);
+      const completedAppointment = transformAppointmentResponse(response);
       
       // Refresh appointments to update the lists
       await refreshAppointments();

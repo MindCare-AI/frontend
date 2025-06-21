@@ -48,9 +48,10 @@ export const TimeZoneSettings: React.FC<TimeZoneSettingsProps> = ({
       <Card.Title 
         title="Timezone Settings" 
         titleStyle={styles.cardTitle}
+        style={styles.cardTitleContainer}
         right={() => loading && <ActivityIndicator size={20} style={styles.loader} />}
       />
-      <Card.Content>
+      <Card.Content style={styles.cardContent}>
         <View style={styles.inputContainer}>
           <TextInput
             label="Search timezone"
@@ -130,10 +131,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 8,
     overflow: 'hidden',
+    backgroundColor: globalStyles.colors.white,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: globalStyles.colors.text,
+  },
+  cardTitleContainer: {
+    backgroundColor: globalStyles.colors.white,
+  },
+  cardContent: {
+    backgroundColor: globalStyles.colors.white,
   },
   loader: {
     marginRight: 16,
@@ -152,7 +161,7 @@ const styles = StyleSheet.create({
   },
   currentTimezone: {
     fontSize: 14,
-    color: globalStyles.colors.textSecondary || globalStyles.colors.neutralMedium,
+    color: globalStyles.colors.textSecondary,
   },
   highlightedText: {
     color: globalStyles.colors.primary,
@@ -161,7 +170,7 @@ const styles = StyleSheet.create({
   listContainer: {
     maxHeight: 300,
     borderTopWidth: 1,
-    borderTopColor: globalStyles.colors.border || globalStyles.colors.neutralLight,
+    borderTopColor: globalStyles.colors.border,
     position: 'relative',
   },
   list: {
@@ -193,6 +202,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   closeButton: {
-    backgroundColor: `${globalStyles.colors.neutralLight}60`,
+    backgroundColor: globalStyles.colors.neutralLight,
+    margin: 4,
   }
 });

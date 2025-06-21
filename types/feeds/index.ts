@@ -24,6 +24,7 @@ export interface MediaFile {
   file: string;
   media_type: string;
   uploaded_by: User;
+  thumbnail_url?: string;
 }
 
 export interface Topic {

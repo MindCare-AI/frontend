@@ -13,7 +13,7 @@ const TherapistVerificationIntro: React.FC<TherapistVerificationIntroProps> = ({
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Shield size={60} color="#002D62" />
+          <Shield size={60} />
         </View>
         
         <Text style={styles.title}>Therapist Verification</Text>
@@ -25,17 +25,17 @@ const TherapistVerificationIntro: React.FC<TherapistVerificationIntroProps> = ({
           <Text style={styles.requirementsTitle}>You'll need to provide:</Text>
           
           <View style={styles.requirement}>
-            <FileText size={20} color="#002D62" />
+            <FileText size={20} />
             <Text style={styles.requirementText}>Professional license documentation</Text>
           </View>
           
           <View style={styles.requirement}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <Text style={styles.requirementText}>Identity verification photo</Text>
           </View>
           
           <View style={styles.requirement}>
-            <Shield size={20} color="#002D62" />
+            <Shield size={20} />
             <Text style={styles.requirementText}>Professional credentials</Text>
           </View>
         </View>

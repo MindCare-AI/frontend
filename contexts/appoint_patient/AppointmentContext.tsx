@@ -18,6 +18,14 @@ import { useAuth } from "../AuthContext"
 import { format } from "date-fns"
 import { isWithin15Minutes } from "../../utils/Appointment/dateUtils"
 import { API_URL } from "../../config"
+// Import Tunisian mock data
+import { 
+  MOCK_APPOINTMENTS, 
+  MOCK_THERAPISTS, 
+  MOCK_PATIENTS, 
+  AZIZ_BAHLOUL,
+  generateMockAppointments 
+} from "../../data/tunisianMockData"
 
 // Define appointment URL from the patient API file
 const APPOINTMENTS_URL = `${API_URL}/appointments`
@@ -32,7 +40,7 @@ type AppointmentContextType = {
   isSmallScreen: boolean
   platformOS: string
   addAppointment: (appointmentData: {
-    therapist_id: number;
+    therapist_id: number | string; // Allow both number and string IDs
     appointment_date: string;
     notes?: string;
   }) => Promise<void>
@@ -40,7 +48,7 @@ type AppointmentContextType = {
   rescheduleAppointment: (id: number, newDate: string, newTime: string) => Promise<void>
   submitFeedback: (id: number, rating: number, comment: string) => Promise<void>
   addToWaitingList: (entry: {
-    therapist_id: number;
+    therapist_id: number | string; // Allow both number and string IDs
     preferred_dates: string[];
     preferred_time_slots: string[];
     notes?: string;
@@ -62,6 +70,7 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentType | null>(null)
   const [loading, setLoading] = useState<boolean>(true)
   const [screenWidth, setScreenWidth] = useState<number>(Dimensions.get('window').width)
+  const [newAppointments, setNewAppointments] = useState<AppointmentType[]>([]) // Store newly created appointments
   const isSmallScreen = screenWidth < 768
   const platformOS = Platform.OS
   
@@ -122,98 +131,128 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   };
 
-  // Function to refresh all appointment data
+  // Function to refresh all appointment data using mock data
   const refreshAppointments = async () => {
     setLoading(true)
     try {
-      // Fetch all upcoming appointments
-      const allUpcoming = await fetchAllPaginated(getAppointments, { status: 'scheduled,confirmed,rescheduled' });
-      const upcoming = allUpcoming.map((appointment: any) => ({
-        id: appointment.id,
-        appointment_id: appointment.appointment_id,
-        therapist: appointment.therapist_name || `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`,
-        patient: appointment.patient_name,
-        appointment_date: appointment.appointment_date,
-        date: formatDateSafely(appointment.appointment_date, 'MMMM d, yyyy'),
-        time: formatDateSafely(appointment.appointment_date, 'h:mm a'),
-        status: (appointment.status || '').replace(/^./, (c: string) => c.toUpperCase()),
-        isWithin15Min: isWithin15Minutes(appointment.appointment_date),
-        is_upcoming: appointment.is_upcoming,
-        is_past: appointment.is_past,
-        can_cancel: appointment.can_cancel,
-        can_confirm: appointment.can_confirm,
-        can_complete: appointment.can_complete,
+      // Use mock data instead of API calls
+      const currentUserId = user?.id || AZIZ_BAHLOUL.id;
+      
+      // Filter mock appointments for current user (Aziz Bahloul)
+      const userAppointments = MOCK_APPOINTMENTS.filter(app => 
+        app.patient.id === currentUserId || app.patient.id === AZIZ_BAHLOUL.id
+      );
+      
+      console.log(`📊 Debug: Total appointments in system: ${MOCK_APPOINTMENTS.length}`);
+      console.log(`📊 Debug: User appointments for ${currentUserId}: ${userAppointments.length}`);
+      
+      const now = new Date();
+      
+      // Separate upcoming and past appointments
+      const upcomingMockApps = userAppointments.filter(app => {
+        const appointmentDate = new Date(`${app.date} ${app.time}`);
+        return appointmentDate >= now && ['pending', 'confirmed', 'scheduled'].includes(app.status);
+      });
+      
+      console.log(`📅 Debug: Upcoming appointments found: ${upcomingMockApps.length}`);
+      console.log(`📅 Debug: New appointments created: ${newAppointments.length}`);
+      
+      const pastMockApps = userAppointments.filter(app => {
+        const appointmentDate = new Date(`${app.date} ${app.time}`);
+        return appointmentDate < now || ['completed', 'cancelled'].includes(app.status);
+      });
+      
+      // Map mock appointments to the expected AppointmentType format
+      const upcoming = upcomingMockApps.map((appointment: any) => ({
+        id: Number(appointment.id),
+        appointment_id: String(appointment.id),
+        therapist: appointment.therapist.full_name,
+        patient: appointment.patient.full_name,
+        appointment_date: `${appointment.date} ${appointment.time}`,
+        date: formatDateSafely(`${appointment.date} ${appointment.time}`, 'MMMM d, yyyy'),
+        time: formatDateSafely(`${appointment.date} ${appointment.time}`, 'h:mm a'),
+        status: appointment.status.replace(/^./, (c: string) => c.toUpperCase()),
+        isWithin15Min: isWithin15Minutes(`${appointment.date} ${appointment.time}`),
+        is_upcoming: true,
+        is_past: false,
+        can_cancel: ['pending', 'confirmed'].includes(appointment.status),
+        can_confirm: appointment.status === 'pending',
+        can_complete: appointment.status === 'confirmed',
         notes: appointment.notes || undefined,
         duration: appointment.duration,
         created_at: appointment.created_at,
         updated_at: appointment.updated_at,
         video_session_link: appointment.video_session_link,
-        cancelled_by: appointment.cancelled_by,
-        cancelled_by_name: appointment.cancelled_by_name,
-        cancellation_reason: appointment.cancellation_reason,
-        reminder_sent: appointment.reminder_sent,
-        original_date: appointment.original_date,
-        reschedule_count: appointment.reschedule_count,
-        last_rescheduled: appointment.last_rescheduled,
-        rescheduled_by: appointment.rescheduled_by,
-        rescheduled_by_name: appointment.rescheduled_by_name,
-        pain_level: appointment.pain_level,
+        cancelled_by: undefined,
+        cancelled_by_name: undefined,
+        cancellation_reason: undefined,
+        reminder_sent: false,
+        original_date: undefined,
+        reschedule_count: 0,
+        last_rescheduled: undefined,
+        rescheduled_by: undefined,
+        rescheduled_by_name: undefined,
+        pain_level: undefined,
       }))
-      setUpcomingAppointments(upcoming)
+      
+      // Combine existing mock appointments with newly created ones
+      const allUpcomingAppointments = [...upcoming, ...newAppointments.filter(app => app.is_upcoming)];
+      setUpcomingAppointments(allUpcomingAppointments)
 
-      // Fetch all past appointments
-      const allPast = await fetchAllPaginated(getAppointments, { status: 'completed,cancelled,missed' });
-      const past = allPast.map((appointment: any) => ({
-        id: appointment.id,
-        appointment_id: appointment.appointment_id,
-        therapist: appointment.therapist_name || `${appointment.therapist?.first_name || ''} ${appointment.therapist?.last_name || ''}`,
-        patient: appointment.patient_name,
-        appointment_date: appointment.appointment_date,
-        date: formatDateSafely(appointment.appointment_date, 'MMMM d, yyyy'),
-        time: formatDateSafely(appointment.appointment_date, 'h:mm a'),
-        status: (appointment.status || '').replace(/^./, (c: string) => c.toUpperCase()),
-        feedbackSubmitted: Boolean(appointment.feedback),
-        is_upcoming: appointment.is_upcoming,
-        is_past: appointment.is_past,
-        can_cancel: appointment.can_cancel,
-        can_confirm: appointment.can_confirm,
-        can_complete: appointment.can_complete,
-        notes: appointment.notes || "No notes available",
+      // Map past appointments
+      const past = pastMockApps.map((appointment: any) => ({
+        id: Number(appointment.id),
+        appointment_id: String(appointment.id),
+        therapist: appointment.therapist.full_name,
+        patient: appointment.patient.full_name,
+        appointment_date: `${appointment.date} ${appointment.time}`,
+        date: formatDateSafely(`${appointment.date} ${appointment.time}`, 'MMMM d, yyyy'),
+        time: formatDateSafely(`${appointment.date} ${appointment.time}`, 'h:mm a'),
+        status: appointment.status.replace(/^./, (c: string) => c.toUpperCase()),
+        feedbackSubmitted: appointment.status === 'completed',
+        is_upcoming: false,
+        is_past: true,
+        can_cancel: false,
+        can_confirm: false,
+        can_complete: false,
+        notes: appointment.notes || "Session completed successfully",
         duration: appointment.duration,
         created_at: appointment.created_at,
         updated_at: appointment.updated_at,
         video_session_link: appointment.video_session_link,
-        cancelled_by: appointment.cancelled_by,
-        cancelled_by_name: appointment.cancelled_by_name,
-        cancellation_reason: appointment.cancellation_reason,
-        reminder_sent: appointment.reminder_sent,
-        original_date: appointment.original_date,
-        reschedule_count: appointment.reschedule_count,
-        last_rescheduled: appointment.last_rescheduled,
-        rescheduled_by: appointment.rescheduled_by,
-        rescheduled_by_name: appointment.rescheduled_by_name,
-        pain_level: appointment.pain_level,
+        cancelled_by: appointment.status === 'cancelled' ? 1 : undefined,
+        cancelled_by_name: appointment.status === 'cancelled' ? appointment.patient.full_name : undefined,
+        cancellation_reason: appointment.status === 'cancelled' ? 'Schedule conflict' : undefined,
+        reminder_sent: true,
+        original_date: undefined,
+        reschedule_count: 0,
+        last_rescheduled: undefined,
+        rescheduled_by: undefined,
+        rescheduled_by_name: undefined,
+        pain_level: undefined,
       }))
-      setPastAppointments(past)
+      
+      // Combine existing mock appointments with newly created ones
+      const allPastAppointments = [...past, ...newAppointments.filter(app => app.is_past)];
+      setPastAppointments(allPastAppointments)
 
-      // Fetch all waiting list entries
-      const allWaiting = await fetchAllPaginated(getWaitingList);
-      const waitingList = allWaiting.map((entry: any) => ({
-        id: entry.id,
-        therapist: `${entry.therapist?.first_name || ''} ${entry.therapist?.last_name || ''}`,
-        requestedDate: entry.requested_date
-          ? formatDateSafely(entry.requested_date, 'MMMM d, yyyy')
-          : '',
-        preferredTimeSlots: Array.isArray(entry.preferred_time_slots)
-          ? entry.preferred_time_slots.map((time: string) => {
-              if (time === 'morning') return 'Morning';
-              if (time === 'afternoon') return 'Afternoon';
-              if (time === 'evening') return 'Evening';
-              return time;
-            })
-          : [],
-        status: (entry.status || '').replace(/^./, (c: string) => c.toUpperCase()),
-      }))
+      // Generate mock waiting list entries for Aziz Bahloul
+      const waitingList = [
+        {
+          id: 1,
+          therapist: 'Dr. Sonia Hamdi',
+          requestedDate: formatDateSafely(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), 'MMMM d, yyyy'),
+          preferredTimeSlots: ['Morning', 'Afternoon'],
+          status: 'Pending',
+        },
+        {
+          id: 2,
+          therapist: 'Dr. Ahmed Gharbi',
+          requestedDate: formatDateSafely(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), 'MMMM d, yyyy'),
+          preferredTimeSlots: ['Evening'],
+          status: 'Notified',
+        }
+      ]
       setWaitingListEntries(waitingList)
 
     } catch (error) {
@@ -223,60 +262,127 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }
 
-  // Add a new appointment with platform-specific error handling
+  // Add a new appointment using mock data
   const addAppointment = async (appointmentData: {
-    therapist_id: number;
+    therapist_id: number | string; // Allow both number and string IDs
     appointment_date: string;
     notes?: string;
   }) => {
     try {
-      // Map therapist_id to therapist for API compatibility
-      const apiData = {
-        therapist: appointmentData.therapist_id,
+      setLoading(true);
+      console.log('Creating new appointment with data:', appointmentData);
+      
+      // Find the therapist from mock data - handle both string and number IDs
+      const therapist = MOCK_THERAPISTS.find(t => 
+        t.id === appointmentData.therapist_id || 
+        t.id === String(appointmentData.therapist_id)
+      ) || MOCK_THERAPISTS[0];
+      
+      console.log(`👨‍⚕️ Debug: Selected therapist: ${therapist.full_name} (ID: ${therapist.id})`);
+      
+      // Parse the appointment date and time
+      const appointmentDateTime = new Date(appointmentData.appointment_date);
+      const now = new Date();
+      
+      // Check if the appointment date is in the future (should be upcoming)
+      const isUpcoming = appointmentDateTime >= now;
+      
+      console.log(`📅 Debug: Appointment date: ${appointmentDateTime.toISOString()}`);
+      console.log(`📅 Debug: Current date: ${now.toISOString()}`);
+      console.log(`📅 Debug: Is appointment upcoming? ${isUpcoming}`);
+      
+      // Create new appointment object
+      const newAppointment: AppointmentType = {
+        id: Date.now(), // Use timestamp as unique ID
+        appointment_id: String(Date.now()),
+        therapist: therapist.full_name,
+        patient: AZIZ_BAHLOUL.full_name,
         appointment_date: appointmentData.appointment_date,
-        notes: appointmentData.notes,
+        date: formatDateSafely(appointmentData.appointment_date, 'MMMM d, yyyy'),
+        time: formatDateSafely(appointmentData.appointment_date, 'h:mm a'),
+        status: 'Confirmed',
+        isWithin15Min: false,
+        is_upcoming: isUpcoming,
+        is_past: !isUpcoming,
+        can_cancel: isUpcoming,
+        can_confirm: false,
+        can_complete: false,
+        notes: appointmentData.notes || 'New appointment booking',
+        duration: 60,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        video_session_link: undefined,
+        cancelled_by: undefined,
+        cancelled_by_name: undefined,
+        cancellation_reason: undefined,
+        reminder_sent: false,
+        original_date: undefined,
+        reschedule_count: 0,
+        last_rescheduled: undefined,
+        rescheduled_by: undefined,
+        rescheduled_by_name: undefined,
+        pain_level: undefined,
+        feedbackSubmitted: false,
       };
-      await apiCreateAppointment(apiData);
-      await refreshAppointments(); // Refresh the list after adding
+      
+      console.log('📋 Debug: Created new appointment object:', newAppointment);
+      
+      // Add to the new appointments array
+      setNewAppointments(prev => {
+        const updated = [...prev, newAppointment];
+        console.log(`📊 Debug: Total new appointments now: ${updated.length}`);
+        return updated;
+      });
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh to show the updated list
+      await refreshAppointments();
+      
+      console.log('✅ New appointment created successfully');
     } catch (error) {
       const errorMsg = Platform.OS === 'web' 
         ? "Error adding appointment in browser" 
         : `Error adding appointment on ${Platform.OS}`;
       console.error(`${errorMsg}:`, error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   }
 
-  // Cancel an appointment
+  // Cancel an appointment using mock data
   const cancelAppointment = async (id: number) => {
     try {
-      await apiCancelAppointment(id)
-      await refreshAppointments() // Refresh the list after cancellation
+      // For demo purposes, simulate successful cancellation
+      console.log('Demo: Cancelling appointment with ID:', id);
+      
+      // Simulate a delay for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, this would make an API call
+      // For demo, we'll just refresh to show updated status
+      await refreshAppointments();
     } catch (error) {
       console.error(`Error cancelling appointment on ${Platform.OS}:`, error)
       throw error
     }
   }
 
-  // Reschedule an appointment with improved cross-platform error handling
+  // Reschedule an appointment using mock data
   const rescheduleAppointment = async (id: number, newDate: string, newTime: string) => {
     try {
       setLoading(true)
-      // Format the appointment date
-      const appointmentDate = `${newDate}T${newTime}`
       
-      // Configure axios with timeout for better mobile experience
-      const axiosConfig = { 
-        timeout: Platform.OS === 'web' ? 30000 : 60000 // Longer timeout for mobile
-      };
+      // For demo purposes, simulate successful reschedule
+      console.log('Demo: Rescheduling appointment:', { id, newDate, newTime });
       
-      // Update the appointment with the new date
-      await axios.put(`${APPOINTMENTS_URL}/${id}/reschedule/`, { 
-        appointment_date: appointmentDate,
-        notes: "Rescheduled by patient" 
-      }, axiosConfig)
+      // Simulate a delay for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Refresh appointments to get the updated list
+      // In a real app, this would make an API call
+      // For demo, we'll just refresh to show updated appointments
       await refreshAppointments()
     } catch (error) {
       console.error(`Error rescheduling appointment on ${Platform.OS}:`, error)
@@ -286,38 +392,65 @@ export const AppointmentProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }
 
-  // Submit feedback for an appointment
+  // Submit feedback for an appointment using mock data
   const submitFeedback = async (id: number, rating: number, comment: string) => {
     try {
-      await submitAppointmentFeedback(id, { rating, comments: comment })
-      await refreshAppointments() // Refresh to update the feedback status
+      // For demo purposes, simulate successful feedback submission
+      console.log('Demo: Submitting feedback:', { id, rating, comment });
+      
+      // Simulate a delay for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, this would make an API call
+      // For demo, we'll just refresh to show updated feedback status
+      await refreshAppointments();
     } catch (error) {
       console.error(`Error submitting feedback on ${Platform.OS}:`, error)
       throw error
     }
   }
 
-  // Add to waiting list
+  // Add to waiting list using mock data
   const addToWaitingList = async (entryData: {
-    therapist_id: number;
+    therapist_id: number | string; // Allow both number and string IDs
     preferred_dates: string[];
     preferred_time_slots: string[];
     notes?: string;
   }) => {
     try {
-      await apiAddToWaitingList(entryData)
-      await refreshAppointments() // Refresh to show the new waiting list entry
+      // For demo purposes, simulate successful waiting list addition
+      console.log('Demo: Adding to waiting list:', entryData);
+      
+      // Find the therapist from mock data - handle both string and number IDs
+      const therapist = MOCK_THERAPISTS.find(t => 
+        t.id === entryData.therapist_id || 
+        t.id === String(entryData.therapist_id)
+      ) || MOCK_THERAPISTS[0];
+      
+      // Simulate a delay for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, this would make an API call
+      // For demo, we'll just refresh to show updated waiting list
+      await refreshAppointments();
     } catch (error) {
       console.error(`Error adding to waiting list on ${Platform.OS}:`, error)
       throw error
     }
   }
 
-  // Cancel waiting list entry
+  // Cancel waiting list entry using mock data
   const cancelWaitingListEntry = async (id: number) => {
     try {
-      await removeFromWaitingList(id)
-      await refreshAppointments() // Refresh to update the waiting list
+      // For demo purposes, simulate successful waiting list cancellation
+      console.log('Demo: Cancelling waiting list entry with ID:', id);
+      
+      // Simulate a delay for realistic UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // In a real app, this would make an API call
+      // For demo, we'll just refresh to show updated waiting list
+      await refreshAppointments();
     } catch (error) {
       console.error(`Error cancelling waiting list entry on ${Platform.OS}:`, error)
       throw error

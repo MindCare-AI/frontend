@@ -7,7 +7,7 @@ import { formatDistanceToNow } from "date-fns"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useComments } from "../../hooks/feeds/useComments"
-import Avatar from "./ui/Avatar"
+import { Avatar } from "../common/Avatar"
 import LoadingSpinner from "../LoadingSpinner"
 
 interface CommentSectionProps {
@@ -73,7 +73,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
   const renderComment = ({ item }: { item: any }) => (
     <View style={styles.commentItem}>
       <View style={styles.commentContent}>
-        <Avatar source={item.author_profile_pic} name={item.author_name} size="small" />
+        <Avatar source={item.author_profile_pic} name={item.author_name} size="sm" />
         <View style={styles.commentBody}>
           <View
             style={[
@@ -127,7 +127,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
           {/* Reply form */}
           {replyingTo === item.id && (
             <View style={styles.replyForm}>
-              <Avatar size="small" name="You" />
+              <Avatar size="sm" name="You" />
               <View style={styles.replyInputContainer}>
                 <TextInput
                   style={[
@@ -187,7 +187,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
             <View style={[styles.repliesList, { borderLeftColor: colors.border }]}>
               {item.replies.map((reply: any) => (
                 <View key={reply.id} style={styles.replyItem}>
-                  <Avatar size="small" source={reply.author_profile_pic} name={reply.author_name} />
+                  <Avatar size="sm" source={reply.author_profile_pic} name={reply.author_name} />
                   <View style={styles.replyBody}>
                     <View
                       style={[
@@ -276,7 +276,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
     >
       {/* Add comment form */}
       <View style={styles.commentForm}>
-        <Avatar size="small" name="You" />
+        <Avatar size="sm" name="You" />
         <View style={styles.inputContainer}>
           <TextInput
             style={[

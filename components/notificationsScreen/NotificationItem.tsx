@@ -3,6 +3,7 @@ import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Badge, useTheme } from 'react-native-paper';
 import { Notification } from '../../types/notifications';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { globalStyles } from '../../styles/global';
 
 // Notification type and priority should match backend API
 // id, type, title, message, timestamp, priority, read
@@ -35,8 +36,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         styles.container,
         {
           backgroundColor: notification.read
-            ? '#FFFFFF'
-            : '#E6F3FA', // Very light blue for unread notifications
+            ? globalStyles.colors.white
+            : `${globalStyles.colors.primary}10`, // Very light primary color for unread notifications
         },
       ]}
       onPress={onPress}
@@ -49,7 +50,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
             variant="titleSmall"
             style={[
               styles.title,
-              { color: notification.read ? '#333333' : '#0088CC' },
+              { color: notification.read ? globalStyles.colors.text : globalStyles.colors.primary },
             ]}
           >
             {notification.title}
@@ -73,7 +74,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         <Icon
           name="fiber-manual-record"
           size={16}
-          color="#0088CC" // Light blue
+          color={globalStyles.colors.primary}
           style={styles.unreadIndicator}
         />
       )}
@@ -112,10 +113,10 @@ const styles = StyleSheet.create({
   },
   message: {
     marginBottom: 4,
-    color: '#555555',
+    color: globalStyles.colors.textSecondary,
   },
   time: {
-    color: '#777777',
+    color: globalStyles.colors.textTertiary,
   },
   unreadIndicator: {
     alignSelf: 'center',

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../../config';
+import { AZIZ_BAHLOUL, MOCK_NOTIFICATIONS } from '../../data/tunisianMockData';
 
 /**
  * Gets the current user type from the API
@@ -12,18 +13,13 @@ interface UserData {
 
 export async function getCurrentUserType() {
   try {
-    const response = await axios.get<UserData>(`${API_URL}/users/me/`);
+    // MOCK IMPLEMENTATION - Always returns 'patient' for Aziz Bahloul
+    console.log("Mock getCurrentUserType called");
     
-    // Check if user has therapist_profile
-    if (response.data.therapist_profile && response.data.therapist_profile.id) {
-      return 'therapist';
-    } 
-    // Check if user has patient_profile (using profile_id as indicator)
-    else if (response.data.profile_id) {
-      return 'patient';
-    }
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    // Default fallback
+    // Return patient since we're using Aziz Bahloul as the main user
     return 'patient';
   } catch (error) {
     console.error('Error determining user type:', error);
@@ -44,27 +40,16 @@ interface UserPreferencesResponse {
 
 export async function saveUserPreferences(preferences: any) {
   try {
-    // First get the user data to find the preferences ID
-    const userResponse = await axios.get<UserPreferencesResponse>(`${API_URL}/users/me/`);
-    const preferencesId = userResponse.data.preferences?.id;
+    // MOCK IMPLEMENTATION - Always succeeds
+    console.log("Mock saveUserPreferences called with:", preferences);
     
-    if (!preferencesId) {
-      throw new Error('Could not determine preferences ID');
-    }
-
-    // Use the correct endpoint structure with the ID
-    const response = await axios.put(`${API_URL}/users/preferences/${preferencesId}/`, {
-      dark_mode: preferences.dark_mode,
-      language: preferences.language,
-      email_notifications: preferences.email_notifications,
-      in_app_notifications: preferences.in_app_notifications,
-      disabled_notification_types: preferences.disabled_notification_types,
-      notification_preferences: preferences.notification_preferences || {}
-    });
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    return response.data;
+    console.log("Mock preferences saved successfully");
+    return { success: true, message: "Preferences saved successfully" };
   } catch (error) {
-    console.error('Error saving preferences:', error);
+    console.error('Error saving user preferences:', error);
     throw error;
   }
 }
@@ -78,8 +63,25 @@ interface UserResponse {
 
 export async function getUserPreferences() {
   try {
-    const response = await axios.get<UserResponse>(`${API_URL}/users/me/`);
-    return response.data.preferences;
+    // MOCK IMPLEMENTATION - Return default notification preferences
+    console.log("Mock getUserPreferences called");
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    return {
+      dark_mode: false,
+      language: 'en',
+      email_notifications: true,
+      in_app_notifications: true,
+      disabled_notification_types: [],
+      notification_preferences: {
+        appointment_reminders: true,
+        message_notifications: true,
+        system_updates: true,
+        marketing_emails: false
+      }
+    };
   } catch (error) {
     console.error('Error fetching preferences:', error);
     throw error;
@@ -91,29 +93,34 @@ export async function getUserPreferences() {
  */
 export async function getNotificationTypes() {
   try {
-    const response = await axios.get(`${API_URL}/notifications/types/`);
+    // MOCK IMPLEMENTATION - Return predefined notification types
+    console.log("Mock getNotificationTypes called");
     
-    // Ensure we're returning an array, even if the response has a different structure
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && typeof response.data === 'object') {
-      // Use type assertion to access properties without TypeScript errors
-      const data = response.data as Record<string, unknown>;
-      
-      // Check if the data is nested within a property like 'results' or 'items'
-      if (data.results && Array.isArray(data.results)) {
-        return data.results;
-      } else if (data.items && Array.isArray(data.items)) {
-        return data.items;
-      } else if (data.data && Array.isArray(data.data)) {
-        return data.data;
-      } else {
-        // If we can't find an array, return an empty one
-        console.error('Expected array in notification types response, got:', response.data);
-        return [];
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    return [
+      {
+        id: 'appointment_reminders',
+        name: 'Appointment Reminders',
+        description: 'Notifications about upcoming appointments'
+      },
+      {
+        id: 'message_notifications', 
+        name: 'Message Notifications',
+        description: 'Notifications for new messages'
+      },
+      {
+        id: 'system_updates',
+        name: 'System Updates',
+        description: 'Important system announcements'
+      },
+      {
+        id: 'marketing_emails',
+        name: 'Marketing Emails',
+        description: 'Promotional content and updates'
       }
-    }
-    return []; // Return an empty array as fallback
+    ];
   } catch (error) {
     console.error('Error fetching notification types:', error);
     // Return an empty array instead of throwing

@@ -113,7 +113,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           <View style={styles.imagePreview}>
             <Image source={{ uri: image }} style={styles.image} />
             <View style={styles.successOverlay}>
-              <CheckCircle size={30} color="#4CAF50" />
+              <CheckCircle size={30} />
             </View>
           </View>
         ) : (
@@ -125,11 +125,11 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.imageButton} onPress={onCameraPress}>
-          <Camera size={16} color="#002D62" />
+          <Camera size={16} />
           <Text style={styles.imageButtonText}>Camera</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.imageButton} onPress={onGalleryPress}>
-          <Upload size={16} color="#002D62" />
+          <Upload size={16} />
           <Text style={styles.imageButtonText}>Gallery</Text>
         </TouchableOpacity>
       </View>
@@ -150,7 +150,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           licenseImage,
           () => pickImage('license', true),
           () => pickImage('license', false),
-          <FileText size={24} color="#002D62" />
+          <FileText size={24} />
         )}
 
         {renderImageSection(
@@ -159,7 +159,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           selfieImage,
           () => pickImage('selfie', true),
           () => pickImage('selfie', false),
-          <User size={24} color="#002D62" />
+          <User size={24} />
         )}
 
         <View style={styles.section}>

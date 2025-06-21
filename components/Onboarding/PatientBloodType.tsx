@@ -39,7 +39,7 @@ const PatientBloodType: React.FC<PatientBloodTypeProps> = ({ onNext, onBack, cur
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Droplets size={60} color="#002D62" />
+          <Droplets size={60} />
         </View>
         
         <Text style={styles.title}>What's your blood type?</Text>

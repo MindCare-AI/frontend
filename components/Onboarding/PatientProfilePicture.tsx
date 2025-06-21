@@ -236,7 +236,7 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
               <Image source={{ uri: profileImage }} style={styles.image} />
             ) : (
               <View style={styles.placeholder}>
-                <User size={60} color="#ccc" />
+                <User size={60} />
               </View>
             )}
           </View>
@@ -244,14 +244,14 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
 
         <View style={styles.buttonGroup}>
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(true)}>
-            <Camera size={20} color="#002D62" />
+            <Camera size={20} />
             <Text style={styles.actionButtonText}>
               {Platform.OS === 'web' ? 'Use Camera' : 'Take Photo'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(false)}>
-            <Upload size={20} color="#002D62" />
+            <Upload size={20} />
             <Text style={styles.actionButtonText}>
               {Platform.OS === 'web' ? 'Upload File' : 'Choose from Gallery'}
             </Text>
