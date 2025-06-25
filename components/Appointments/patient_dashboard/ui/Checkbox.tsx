@@ -55,7 +55,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       >
         {isChecked && <Ionicons name="checkmark" size={16} color="white" />}
       </View>
-      {children && <Text style={[styles.label, { color: theme.colors.gray[800] }]}>{children}</Text>}
+      {children && <Text style={[styles.label, { color: theme.colors.primary[600] }]}>{children}</Text>}
     </Pressable>
   )
 }

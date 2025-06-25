@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     borderRadius: 20,
     backgroundColor: '#fff',
-    shadowColor: '#000',
+    shadowColor: '#4a90e2',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.10,
     shadowRadius: 12,
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: "#666", // Updated to match settings screen
+    color: "#666",
   },
 })
 

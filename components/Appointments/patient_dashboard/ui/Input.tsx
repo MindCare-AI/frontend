@@ -118,7 +118,7 @@ export const Input: React.FC<InputProps> = ({
             style={[
               styles.input,
               {
-                color: theme.colors.gray[900],
+                color: theme.colors.primary[600],
                 paddingLeft: leftIcon ? 0 : 12,
                 paddingRight: rightIcon ? 0 : 12,
                 textAlignVertical: multiline ? "top" : "center",

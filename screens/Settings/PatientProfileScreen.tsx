@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../contexts/AuthContext';
 import { TextInput, Button, HelperText, RadioButton, IconButton } from 'react-native-paper';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import ThemedDateTimePicker from '../../components/common/ThemedDateTimePicker';
 import * as ImagePicker from 'expo-image-picker';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
@@ -29,6 +29,16 @@ import SectionHeader from '../../components/ui/SectionHeader';
 import { globalStyles } from '../../styles/global';
 import { SettingsStackParamList } from '../../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
+
+// Standardized input theme for consistency across all inputs
+const inputTheme = {
+  colors: {
+    text: globalStyles.colors.text,
+    placeholder: globalStyles.colors.textSecondary,
+    onSurfaceVariant: globalStyles.colors.primary, // Label color
+    background: globalStyles.colors.white
+  }
+};
 
 type NavigationProp = NativeStackNavigationProp<SettingsStackParamList>;
 
@@ -403,13 +413,7 @@ const PatientProfileScreen = () => {
                 error={!!errors.first_name}
                 outlineColor={globalStyles.colors.border}
                 activeOutlineColor={globalStyles.colors.primary}
-                theme={{ 
-                  colors: { 
-                    text: globalStyles.colors.text, 
-                    placeholder: globalStyles.colors.neutralLight,
-                    onSurfaceVariant: globalStyles.colors.text // This affects label color
-                  } 
-                }}
+                theme={inputTheme}
               />
               {errors.first_name && <HelperText type="error">{errors.first_name}</HelperText>}
               
@@ -423,13 +427,7 @@ const PatientProfileScreen = () => {
                 error={!!errors.last_name}
                 outlineColor={globalStyles.colors.border}
                 activeOutlineColor={globalStyles.colors.primary}
-                theme={{ 
-                  colors: { 
-                    text: globalStyles.colors.text, 
-                    placeholder: globalStyles.colors.neutralLight,
-                    onSurfaceVariant: globalStyles.colors.text // This affects label color
-                  } 
-                }}
+                theme={inputTheme}
               />
               {errors.last_name && <HelperText type="error">{errors.last_name}</HelperText>}
               
@@ -444,13 +442,7 @@ const PatientProfileScreen = () => {
                 error={!!errors.phone_number}
                 outlineColor={globalStyles.colors.border}
                 activeOutlineColor={globalStyles.colors.primary}
-                theme={{ 
-                  colors: { 
-                    text: globalStyles.colors.text, 
-                    placeholder: globalStyles.colors.neutralLight,
-                    onSurfaceVariant: globalStyles.colors.text // This affects label color
-                  } 
-                }}
+                theme={inputTheme}
               />
               {errors.phone_number && <HelperText type="error">{errors.phone_number}</HelperText>}
               
@@ -485,18 +477,17 @@ const PatientProfileScreen = () => {
                   <Text style={styles.dateInputText}>
                     {formData.date_of_birth || 'Select Date'}
                   </Text>
-                  <Ionicons name="calendar" size={20} color="#000000" />
+                  <Ionicons name="calendar" size={20} color={globalStyles.colors.text} />
                 </TouchableOpacity>
                 {errors.date_of_birth && <HelperText type="error">{errors.date_of_birth}</HelperText>}
               </View>
               
               {/* Keep DateTimePicker outside of the TouchableOpacity for correct rendering */}
               {showDatePicker && (
-                <DateTimePicker
+                <ThemedDateTimePicker
                   testID="dateTimePicker"
                   value={formData.date_of_birth ? new Date(formData.date_of_birth) : new Date()}
                   mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={(event, selectedDate) => {
                     setShowDatePicker(false);
                     if (selectedDate) {
@@ -570,7 +561,7 @@ const PatientProfileScreen = () => {
                       error={!!errors.emergency_contact_name}
                       outlineColor={globalStyles.colors.border}
                       activeOutlineColor={globalStyles.colors.primary}
-                      theme={{ colors: { text: globalStyles.colors.text, placeholder: globalStyles.colors.neutralLight } }}
+                      theme={inputTheme}
                     />
                     {errors.emergency_contact_name && <HelperText type="error">{errors.emergency_contact_name}</HelperText>}
                     
@@ -585,7 +576,7 @@ const PatientProfileScreen = () => {
                       error={!!errors.emergency_contact_phone}
                       outlineColor={globalStyles.colors.border}
                       activeOutlineColor={globalStyles.colors.primary}
-                      theme={{ colors: { text: globalStyles.colors.text, placeholder: globalStyles.colors.neutralLight } }}
+                      theme={inputTheme}
                     />
                     {errors.emergency_contact_phone && <HelperText type="error">{errors.emergency_contact_phone}</HelperText>}
                     
@@ -600,7 +591,7 @@ const PatientProfileScreen = () => {
                       error={!!errors.emergency_contact_email}
                       outlineColor={globalStyles.colors.border}
                       activeOutlineColor={globalStyles.colors.primary}
-                      theme={{ colors: { text: globalStyles.colors.text, placeholder: globalStyles.colors.neutralLight } }}
+                      theme={inputTheme}
                     />
                     {errors.emergency_contact_email && <HelperText type="error">{errors.emergency_contact_email}</HelperText>}
                     
@@ -793,7 +784,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dateInputText: {
-    color: '#000000', // Explicitly set to black
+    color: globalStyles.colors.text,
     fontSize: 16,
     fontWeight: '500',
   },

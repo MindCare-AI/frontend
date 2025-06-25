@@ -88,7 +88,8 @@ const SettingsScreen: React.FC = () => {
         {error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <Button mode="contained" onPress={loadSettings} style={styles.retryButton}>
+            <Button mode="contained" onPress={loadSettings} style={styles.retryButton} 
+              buttonColor={globalStyles.colors.primary}>
               Retry
             </Button>
           </View>
@@ -114,7 +115,8 @@ const SettingsScreen: React.FC = () => {
           <Button 
             mode="outlined" 
             onPress={handleCancel} 
-            style={styles.cancelButton} 
+            style={styles.cancelButton}
+            textColor={globalStyles.colors.primary}
             disabled={updating}
           >
             Cancel
@@ -122,7 +124,8 @@ const SettingsScreen: React.FC = () => {
           <Button 
             mode="contained" 
             onPress={handleSave} 
-            style={styles.saveButton} 
+            style={styles.saveButton}
+            buttonColor={globalStyles.colors.primary}
             loading={updating}
             disabled={updating}
           >
@@ -145,7 +148,7 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
   scrollContainer: {
     flex: 1,
@@ -174,7 +177,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
     borderTopWidth: 1,
     borderTopColor: globalStyles.colors.border,
     position: 'absolute',

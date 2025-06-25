@@ -65,6 +65,7 @@ const UserAvatarCard: React.FC<UserAvatarCardProps> = ({
             style={styles.uploadButton} 
             onPress={onAvatarChange ? handleAvatarPress : undefined}
             disabled={!onAvatarChange}
+            activeOpacity={0.8}
           >
             <Text style={styles.uploadButtonText}>
               {onAvatarChange ? 'Choose Image' : 'No Access'}
@@ -90,7 +91,11 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginVertical: 8,
-    ...globalStyles.shadow,
+    shadowColor: globalStyles.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   profilePictureSection: {
     position: 'relative',
@@ -131,16 +136,22 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: globalStyles.colors.primary,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 120,
+    width: 150,
+    shadowColor: globalStyles.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   uploadButtonText: {
     color: globalStyles.colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
+    fontSize: 16,
   },
   nameText: {
     fontSize: 20,

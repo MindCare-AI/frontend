@@ -9,7 +9,7 @@ import { Dimensions, StyleSheet, Platform } from 'react-native';
  */
 export const createShadow = (
   elevation: number = 2,
-  color: string = "#000",
+  color: string = "#4a90e2",
   opacity: number = 0.2
 ) => {
   const height = Math.max(1, Math.round(elevation / 2));

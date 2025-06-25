@@ -124,7 +124,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
               paddingLeft: 12,
               paddingRight: 12,
               fontSize: 16,
-              color: value ? theme.colors.gray[900] : theme.colors.gray[400],
+              color: value ? theme.colors.primary[600] : theme.colors.gray[400],
               outlineStyle: "none",
               cursor: isDisabled ? "not-allowed" : "pointer",
             }}
@@ -193,7 +193,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             style={[
               styles.inputText,
               {
-                color: value ? theme.colors.gray[900] : theme.colors.gray[400],
+                color: value ? theme.colors.primary[600] : theme.colors.gray[400],
               },
             ]}
           >
@@ -294,7 +294,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           style={[
             styles.inputText,
             {
-              color: value ? theme.colors.gray[900] : theme.colors.gray[400],
+              color: value ? theme.colors.primary[600] : theme.colors.gray[400],
             },
           ]}
         >

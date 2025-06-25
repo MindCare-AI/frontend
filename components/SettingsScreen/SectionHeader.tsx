@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: globalStyles.colors.text,
+    color: '#4a90e2',
     marginBottom: 4,
   },
   description: {

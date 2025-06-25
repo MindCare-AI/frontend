@@ -73,13 +73,13 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
 
   return (
     <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title="Notification Preferences" />
+      <Appbar.Header style={{ backgroundColor: '#4a90e2' }}>
+        <Appbar.BackAction onPress={() => navigation.goBack()} color="#fff" />
+        <Appbar.Content title="Notification Preferences" titleStyle={{ color: '#fff' }} />
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: '#4a90e2' }]}>
           Notification Types
         </Text>
 
@@ -103,21 +103,23 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
 
         <Divider style={{ marginVertical: 16 }} />
 
-        <Text variant="titleMedium" style={styles.sectionTitle}>
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: '#4a90e2' }]}>
           Channels
         </Text>
         <View style={styles.row}>
-          <Text>Email Notifications</Text>
+          <Text style={{ fontSize: 16, color: '#333' }}>Email Notifications</Text>
           <Switch
             value={localEmail}
             onValueChange={val => setLocalEmail(val)}
+            color="#4a90e2"
           />
         </View>
         <View style={styles.row}>
-          <Text>In-App Notifications</Text>
+          <Text style={{ fontSize: 16, color: '#333' }}>In-App Notifications</Text>
           <Switch
             value={localInApp}
             onValueChange={val => setLocalInApp(val)}
+            color="#4a90e2"
           />
         </View>
 
@@ -125,6 +127,8 @@ export const NotificationPreferencesScreen: React.FC<NotificationPreferencesScre
           mode="contained" 
           onPress={handleSave}
           style={styles.saveButton}
+          buttonColor="#4a90e2"
+          labelStyle={{ color: '#fff', fontWeight: '600' }}
         >
           Save Preferences
         </Button>
@@ -159,14 +163,21 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   saveButton: {
     marginTop: 24,
+    backgroundColor: '#4a90e2',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderColor: '#e0e0e0',
+    borderWidth: 1,
   },
 });

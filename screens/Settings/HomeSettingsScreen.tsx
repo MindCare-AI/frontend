@@ -65,22 +65,45 @@ const HomeSettingsScreen: React.FC = () => {
 
   // Get profile picture from patient_profile or therapist_profile
   const getProfilePic = () => {
-    if (user?.user_type === 'patient' && user.patient_profile?.profile_pic) {
-      const profilePic = user.patient_profile.profile_pic;
-      // Handle relative URLs
-      if (profilePic.startsWith('/media/')) {
-        return { uri: `http://127.0.0.1:8000${profilePic}` };
+    // Helper to construct the proper URL
+    const constructProfilePicUrl = (picPath: string) => {
+      if (!picPath) return null;
+      
+      // Handle relative URLs that start with /media/
+      if (picPath.startsWith('/media/')) {
+        return { uri: `http://127.0.0.1:8000${picPath}` };
       }
-      return { uri: profilePic };
-    }
-    if (user?.user_type === 'therapist' && user.therapist_profile?.profile_pic) {
-      const profilePic = user.therapist_profile.profile_pic;
-      // Handle relative URLs
-      if (profilePic.startsWith('/media/')) {
-        return { uri: `http://127.0.0.1:8000${profilePic}` };
+      
+      // Handle URLs that might be full URLs already
+      if (picPath.startsWith('http://') || picPath.startsWith('https://')) {
+        return { uri: picPath };
       }
-      return { uri: profilePic };
+      
+      // Handle other relative paths
+      return { uri: `http://127.0.0.1:8000/media/${picPath}` };
+    };
+
+    try {
+      // Check patient profile
+      if (user?.user_type === 'patient' && user.patient_profile) {
+        const profilePic = user.patient_profile.profile_pic;
+        if (profilePic) {
+          return constructProfilePicUrl(profilePic);
+        }
+      }
+      
+      // Check therapist profile
+      if (user?.user_type === 'therapist' && user.therapist_profile) {
+        const profilePic = user.therapist_profile.profile_pic;
+        if (profilePic) {
+          return constructProfilePicUrl(profilePic);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing profile picture:', error);
     }
+    
+    // Default fallback
     return require('../../assets/default-avatar.png');
   };
 
@@ -109,6 +132,9 @@ const HomeSettingsScreen: React.FC = () => {
               source={getProfilePic()}
               style={styles.avatar}
               defaultSource={require('../../assets/default-avatar.png')}
+              onError={(e) => {
+                console.log('Error loading profile image:', e.nativeEvent.error);
+              }}
             />
             <Text style={styles.name}>{getUserFullName()}</Text>
             <Text style={styles.subtitle}>{user?.user_type || 'Account'}</Text>

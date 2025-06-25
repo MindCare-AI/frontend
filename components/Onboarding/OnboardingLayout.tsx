@@ -8,64 +8,51 @@ interface OnboardingLayoutProps {
   totalSteps: number;
   currentStep: number;
   onBack?: () => void;
-  onSkip?: () => void;
+  onNext?: () => void;
   showProgress?: boolean;
 }
 
-const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
-  children,
-  totalSteps,
-  currentStep,
-  onBack,
-  onSkip,
-  showProgress = true,
-}) => {
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={onBack}
-          style={[
-            styles.headerButton,
-            !onBack && styles.invisible
-          ]}
-          disabled={!onBack}
-        >
-          <ArrowLeft size={20} color="#666" />
-        </TouchableOpacity>
+export const OnboardingLayout: React.FC<OnboardingLayoutProps> = ({
+  children, totalSteps, currentStep, onBack, onNext, showProgress = true
+}) => (
+  <SafeAreaView style={styles.container}>
+    {/* Header */}
+    <View style={styles.header}>
+      <TouchableOpacity
+        onPress={onBack}
+        disabled={!onBack}
+        style={styles.headerButton}
+      >
+        <ArrowLeft size={20} color="#666" />
+      </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>MindCare AI</Text>
+      <Text style={styles.headerTitle}>MindCare AI</Text>
 
-        <TouchableOpacity
-          onPress={onSkip}
-          style={[
-            styles.headerButton,
-            !onSkip && styles.invisible
-          ]}
-          disabled={!onSkip}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
+      <TouchableOpacity
+        onPress={onNext}
+        disabled={currentStep === totalSteps - 1}
+        style={styles.headerButton}
+      >
+        <Text style={styles.skipText}>Next</Text>
+      </TouchableOpacity>
+    </View>
+
+    {/* Content */}
+    <View style={styles.content}>
+      {children}
+    </View>
+
+    {/* Progress */}
+    {showProgress && (
+      <View style={styles.footer}>
+        <OnboardingProgress
+          currentStep={currentStep}
+          totalSteps={totalSteps}
+        />
       </View>
-
-      {/* Content */}
-      <View style={styles.content}>
-        {children}
-      </View>
-
-      {/* Progress */}
-      {showProgress && (
-        <View style={styles.footer}>
-          <OnboardingProgress
-            totalSteps={totalSteps}
-            currentStep={currentStep}
-          />
-        </View>
-      )}
-    </SafeAreaView>
-  );
-};
+    )}
+  </SafeAreaView>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -81,9 +68,6 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     padding: 8,
-  },
-  invisible: {
-    opacity: 0,
   },
   headerTitle: {
     fontSize: 20,

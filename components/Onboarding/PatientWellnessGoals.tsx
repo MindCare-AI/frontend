@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { Heart, Brain, Users, Target } from 'lucide-react-native';
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
@@ -22,25 +22,25 @@ const wellnessGoals: WellnessGoal[] = [
     id: 'anxiety_management',
     title: 'Manage Anxiety',
     description: 'Learn coping strategies and techniques to reduce anxiety',
-    icon: <Brain size={24} color="#002D62" />,
+    icon: <Ionicons name="medkit-outline" size={24} color="#002D62" />,
   },
   {
     id: 'depression_support',
     title: 'Depression Support',
     description: 'Get support and tools to manage depressive episodes',
-    icon: <Heart size={24} color="#002D62" />,
+    icon: <Ionicons name="heart-outline" size={24} color="#002D62" />,
   },
   {
     id: 'stress_reduction',
     title: 'Stress Reduction',
     description: 'Develop healthy stress management techniques',
-    icon: <Target size={24} color="#002D62" />,
+    icon: <Ionicons name="fitness-outline" size={24} color="#002D62" />,
   },
   {
     id: 'relationship_improvement',
     title: 'Improve Relationships',
     description: 'Enhance communication and relationship skills',
-    icon: <Users size={24} color="#002D62" />,
+    icon: <Ionicons name="people-outline" size={24} color="#002D62" />,
   },
 ];
 
@@ -57,40 +57,33 @@ const PatientWellnessGoals: React.FC<PatientWellnessGoalsProps> = ({ onNext, onB
     );
   };
 
-  const markOnboardingComplete = async (): Promise<void> => {
-    try {
-      await AsyncStorage.setItem('onboarding_completed', 'true');
-    } catch (error) {
-      console.error('Error marking onboarding complete:', error);
-      throw error;
-    }
+  // In fake mode, we don't actually save anything
+  const goToLoginScreen = () => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Auth' as never }],
+      })
+    );
   };
 
   const handleNext = async () => {
     setIsLoading(true);
-    try {
-      // Save selected goals to storage or send to API
-      if (selectedGoals.length > 0) {
-        await AsyncStorage.setItem('wellness_goals', JSON.stringify(selectedGoals));
-      }
-
-      // Mark onboarding as complete
-      await markOnboardingComplete();
-
-      // Navigate to the main app
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'App' as never }],
-        })
-      );
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-      // Fallback to onNext if navigation fails
-      onNext();
-    } finally {
+    
+    // Simulate saving data with a short delay
+    setTimeout(() => {
       setIsLoading(false);
-    }
+      
+      // Fake mode: pass goals to the next step without actually saving anything
+      const goalData = {
+        selectedGoals: wellnessGoals
+          .filter(goal => selectedGoals.includes(goal.id))
+          .map(goal => goal.title)
+      };
+      
+      // Pass the selected goals to the next component
+      onNext();
+    }, 1000);
   };
 
   return (
@@ -131,16 +124,25 @@ const PatientWellnessGoals: React.FC<PatientWellnessGoalsProps> = ({ onNext, onB
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
             <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
+          
           <TouchableOpacity 
             style={[styles.nextButton, isLoading && styles.disabledButton]} 
             onPress={handleNext}
-            disabled={isLoading}
+            disabled={isLoading || selectedGoals.length === 0}
           >
             <Text style={styles.nextButtonText}>
               {isLoading ? 'Completing...' : 'Continue'}
             </Text>
           </TouchableOpacity>
         </View>
+        
+        <TouchableOpacity 
+          style={styles.homeButton} 
+          onPress={goToLoginScreen}
+        >
+          <Ionicons name="home-outline" size={24} color="#fff" />
+          <Text style={styles.homeButtonText}>Go to Login</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -235,6 +237,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#002D62',
   },
   nextButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  homeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4A90A4',
+    paddingVertical: 16,
+    borderRadius: 10,
+    marginTop: 20,
+    gap: 10,
+  },
+  homeButtonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

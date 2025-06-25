@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Brain, Users } from 'lucide-react-native';
+import { Brain, Users, ArrowRight } from 'lucide-react-native';
 
 interface UserTypeOption {
   id: "patient" | "therapist";
@@ -19,13 +19,13 @@ const userTypes: UserTypeOption[] = [
     id: "patient",
     title: "I'm seeking support",
     description: "Access personalized mental wellness support and resources",
-    icon: <Brain size={24} color="#002D62" />,
+    icon: <Brain size={24} />,
   },
   {
     id: "therapist",
     title: "I'm a mental health professional",
     description: "Manage your practice and connect with patients digitally",
-    icon: <Users size={24} color="#002D62" />,
+    icon: <Users size={24} />,
   },
 ];
 
@@ -34,11 +34,18 @@ const UserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect, onBack 
 
   const handleSelect = (type: "patient" | "therapist") => {
     setSelected(type);
-    setTimeout(() => onSelect(type), 300);
+  };
+
+  const handleNext = () => {
+    if (selected) {
+      // Directly pass the selected type to the parent component
+      onSelect(selected);
+    }
   };
 
   return (
     <View style={styles.container}>
+      
       <View style={styles.contentContainer}>
         <Text style={styles.title}>How will you be using MindCare?</Text>
         <Text style={styles.subtitle}>
@@ -70,6 +77,15 @@ const UserTypeSelection: React.FC<UserTypeSelectionProps> = ({ onSelect, onBack 
             </TouchableOpacity>
           ))}
         </View>
+
+        <TouchableOpacity
+          style={[styles.nextButton, !selected && styles.disabledButton]}
+          disabled={!selected}
+          onPress={handleNext}
+        >
+          <Text style={styles.nextButtonText}>Continue</Text>
+          <ArrowRight size={20} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -102,6 +118,7 @@ const styles = StyleSheet.create({
   },
   optionsContainer: {
     gap: 16,
+    marginBottom: 40,
   },
   optionButton: {
     padding: 24,
@@ -145,6 +162,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  nextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#002D62',
+    paddingVertical: 16,
+    borderRadius: 10,
+    gap: 10,
+    marginTop: 20,
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  disabledButton: {
+    backgroundColor: '#9FB1C7',
+    opacity: 0.7,
   },
 });
 

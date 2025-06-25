@@ -34,6 +34,7 @@ export const NotificationPreferenceItem: React.FC<NotificationPreferenceItemProp
         value={isEnabled}
         onValueChange={onToggle}
         accessibilityLabel={`Toggle ${formattedType} notification`}
+        color="#4a90e2"
       />
     </View>
   );
@@ -45,7 +46,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderColor: '#e0e0e0',
+    borderWidth: 1,
+    marginBottom: 8,
   },
   textContainer: {
     flex: 1,
@@ -54,6 +60,7 @@ const styles = StyleSheet.create({
   type: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#333',
   },
   description: {
     fontSize: 14,

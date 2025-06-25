@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { View, Animated, Platform, StyleSheet } from "react-native"
+import { View, Animated, Platform, StyleSheet, Text } from "react-native"
 import UpcomingAppointments from "./UpcomingAppointments"
 import PastAppointments from "./PastAppointments"
 import WaitingList from "./WaitingList"
@@ -198,7 +198,7 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({ onOpenFeedback }) => 
             paddingHorizontal: isMobile ? 0 : 24,
             backgroundColor: '#fff',
             borderRadius: 999,
-            boxShadow: Platform.OS === 'web' ? '0 2px 8px rgba(0,0,0,0.04)' : undefined,
+            boxShadow: Platform.OS === 'web' ? '0 2px 8px rgba(74,144,226,0.04)' : undefined,
             alignSelf: 'center',
             marginTop: 0,
           },
@@ -252,14 +252,16 @@ const AppointmentTabs: React.FC<AppointmentTabsProps> = ({ onOpenFeedback }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
   tabsContainer: {
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   contentContainer: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
 })
 

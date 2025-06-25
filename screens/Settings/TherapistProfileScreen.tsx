@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Image,
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import ThemedDateTimePicker from '../../components/common/ThemedDateTimePicker';
 import { Ionicons } from '@expo/vector-icons';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
@@ -12,6 +12,17 @@ import {
   uploadProfilePicture,
   THERAPIST_PROFILE_CONSTANTS
 } from '../../API/settings/therapist_profile';
+import { globalStyles } from '../../styles/global';
+
+// Standardized input theme for consistency across the app
+const inputTheme = {
+  colors: {
+    text: globalStyles.colors.text,
+    placeholder: globalStyles.colors.textSecondary,
+    onSurfaceVariant: globalStyles.colors.primary, // Label color
+    background: globalStyles.colors.white
+  }
+};
 
 // Define SettingsStackParamList since it's not exported from the module
 type SettingsStackParamList = {
@@ -331,6 +342,7 @@ const TherapistProfileScreen = () => {
             value={profile.first_name}
             onChangeText={(text) => handleChange('first_name', text)}
             maxLength={150}
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.first_name && (
             <Text style={styles.fieldError}>{fieldErrors.first_name}</Text>
@@ -344,6 +356,7 @@ const TherapistProfileScreen = () => {
             value={profile.last_name}
             onChangeText={(text) => handleChange('last_name', text)}
             maxLength={150}
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.last_name && (
             <Text style={styles.fieldError}>{fieldErrors.last_name}</Text>
@@ -379,6 +392,7 @@ const TherapistProfileScreen = () => {
             value={profile.phone_number}
             onChangeText={(text) => handleChange('phone_number', text)}
             keyboardType="phone-pad"
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.phone_number && (
             <Text style={styles.fieldError}>{fieldErrors.phone_number}</Text>
@@ -397,6 +411,7 @@ const TherapistProfileScreen = () => {
             onChangeText={(text) => handleChange('bio', text)}
             multiline
             numberOfLines={5}
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.bio && (
             <Text style={styles.fieldError}>{fieldErrors.bio}</Text>
@@ -410,6 +425,7 @@ const TherapistProfileScreen = () => {
             value={String(profile.years_of_experience)}
             onChangeText={(text) => handleChange('years_of_experience', text)}
             keyboardType="number-pad"
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.years_of_experience && (
             <Text style={styles.fieldError}>{fieldErrors.years_of_experience}</Text>
@@ -455,6 +471,7 @@ const TherapistProfileScreen = () => {
             style={styles.input}
             value={profile.license_number || ''}
             onChangeText={(text) => handleChange('license_number', text)}
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.license_number && (
             <Text style={styles.fieldError}>{fieldErrors.license_number}</Text>
@@ -470,13 +487,12 @@ const TherapistProfileScreen = () => {
             }}
           >
             <Text>{profile.license_expiry ? formatDate(new Date(profile.license_expiry)) : 'Select Date'}</Text>
-            <Ionicons name="calendar" size={20} color="#666" />
+            <Ionicons name="calendar" size={20} color={globalStyles.colors.text} />
           </TouchableOpacity>
           {profile.showDatePicker && (
-            <DateTimePicker
+            <ThemedDateTimePicker
               value={profile.license_expiry ? new Date(profile.license_expiry) : new Date()}
               mode="date"
-              display="default"
               onChange={(_, selectedDate) => {
                 handleChange('showDatePicker', false);
                 if (selectedDate) {
@@ -502,6 +518,7 @@ const TherapistProfileScreen = () => {
             onChangeText={(text) => handleChange('hourly_rate', text)}
             keyboardType="decimal-pad"
             placeholder="Enter your hourly rate"
+            placeholderTextColor={inputTheme.colors.placeholder}
           />
           {fieldErrors.hourly_rate && (
             <Text style={styles.fieldError}>{fieldErrors.hourly_rate}</Text>
@@ -519,7 +536,7 @@ const TherapistProfileScreen = () => {
                 option => option.value === profile.session_duration
               )?.label || 'Select duration'}
             </Text>
-            <Ionicons name="chevron-down" size={20} color="#666" />
+            <Ionicons name="chevron-down" size={20} color={globalStyles.colors.text} />
           </TouchableOpacity>
           {fieldErrors.session_duration && (
             <Text style={styles.fieldError}>{fieldErrors.session_duration}</Text>
@@ -535,7 +552,7 @@ const TherapistProfileScreen = () => {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Select Session Duration</Text>
                   <TouchableOpacity onPress={() => handleChange('showDurationModal', false)}>
-                    <Ionicons name="close" size={24} color="#333" />
+                    <Ionicons name="close" size={24} color={globalStyles.colors.text} />
                   </TouchableOpacity>
                 </View>
                 
@@ -552,7 +569,7 @@ const TherapistProfileScreen = () => {
                     >
                       <Text style={styles.optionText}>{item.label}</Text>
                       {profile.session_duration === item.value && (
-                        <Ionicons name="checkmark" size={22} color="#2196F3" />
+                        <Ionicons name="checkmark" size={22} color={globalStyles.colors.primary} />
                       )}
                     </TouchableOpacity>
                   )}
@@ -581,6 +598,7 @@ const TherapistProfileScreen = () => {
                 multiline
                 numberOfLines={3}
                 placeholder="List insurance providers you accept (separated by commas)"
+                placeholderTextColor={inputTheme.colors.placeholder}
               />
               {fieldErrors.insurance_providers && (
                 <Text style={styles.fieldError}>{fieldErrors.insurance_providers}</Text>
@@ -653,7 +671,7 @@ const MultiSelect = ({
         <Text style={selectedValues.length ? styles.multiSelectValue : styles.multiSelectPlaceholder}>
           {selectedValues.length ? `${selectedValues.length} items selected` : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
+        <Ionicons name="chevron-down" size={20} color={globalStyles.colors.text} />
       </TouchableOpacity>
       
       {selectedValues.length > 0 && (
@@ -666,7 +684,7 @@ const MultiSelect = ({
             <View key={value} style={styles.selectedChip}>
               <Text style={styles.selectedChipText}>{value}</Text>
               <TouchableOpacity onPress={() => toggleSelection(value)}>
-                <Ionicons name="close-circle" size={18} color="#666" />
+                <Ionicons name="close-circle" size={18} color={globalStyles.colors.text} />
               </TouchableOpacity>
             </View>
           ))}
@@ -685,7 +703,7 @@ const MultiSelect = ({
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{`Select ${label}`}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color={globalStyles.colors.text} />
               </TouchableOpacity>
             </View>
             
@@ -699,7 +717,7 @@ const MultiSelect = ({
                 >
                   <Text style={styles.optionText}>{item}</Text>
                   {selectedValues.includes(item) && (
-                    <Ionicons name="checkmark" size={22} color="#2196F3" />
+                    <Ionicons name="checkmark" size={22} color={globalStyles.colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -722,20 +740,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: globalStyles.colors.white,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: globalStyles.colors.text,
     marginBottom: 20,
   },
   formSection: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: globalStyles.colors.backgroundLight,
     padding: 20,
     borderRadius: 8,
     marginBottom: 25,
-    shadowColor: '#000',
+    shadowColor: globalStyles.colors.primary,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -745,7 +763,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    color: globalStyles.colors.text,
   },
   formRow: {
     flexDirection: 'row',
@@ -764,42 +782,47 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: '600',
     marginBottom: 8,
+    color: globalStyles.colors.text,
   },
   input: {
     width: '100%',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: globalStyles.colors.border,
     borderRadius: 4,
     fontSize: 16,
+    color: globalStyles.colors.text,
+    backgroundColor: globalStyles.colors.white,
   },
   textarea: {
     width: '100%',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: globalStyles.colors.border,
     borderRadius: 4,
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
+    color: globalStyles.colors.text,
+    backgroundColor: globalStyles.colors.white,
   },
   disabledInput: {
-    backgroundColor: '#f2f2f2',
-    color: '#777',
+    backgroundColor: globalStyles.colors.neutralLight,
+    color: globalStyles.colors.textSecondary,
   },
   fieldError: {
-    color: '#d32f2f',
+    color: globalStyles.colors.error,
     fontSize: 14,
     marginTop: 5,
   },
   errorMessage: {
-    backgroundColor: '#ffebee',
-    color: '#d32f2f',
+    backgroundColor: globalStyles.colors.neutralLight,
+    color: globalStyles.colors.error,
     padding: 10,
     borderRadius: 4,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#d32f2f',
+    borderLeftColor: globalStyles.colors.error,
   },
   profilePictureSection: {
     flexDirection: 'row',
@@ -811,7 +834,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     overflow: 'hidden',
-    backgroundColor: '#eee',
+    backgroundColor: globalStyles.colors.neutralLight,
   },
   profileImage: {
     width: '100%',
@@ -824,7 +847,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeholderText: {
-    color: '#888',
+    color: globalStyles.colors.textSecondary,
     fontSize: 14,
   },
   uploadControls: {
@@ -832,7 +855,7 @@ const styles = StyleSheet.create({
     marginLeft: 20,
   },
   uploadButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: globalStyles.colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 4,
@@ -844,7 +867,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   smallText: {
-    color: '#777',
+    color: globalStyles.colors.textSecondary,
     fontSize: 12,
     marginTop: 5,
   },
@@ -856,7 +879,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 10,
-    backgroundColor: '#eee',
+    backgroundColor: globalStyles.colors.neutralLight,
     borderRadius: 5,
     marginHorizontal: 10,
     overflow: 'hidden',
@@ -864,15 +887,15 @@ const styles = StyleSheet.create({
   },
   progress: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: globalStyles.colors.success,
   },
   verificationNotice: {
-    backgroundColor: '#fffde7',
+    backgroundColor: globalStyles.colors.neutralLight,
     padding: 15,
     borderRadius: 4,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#fbc02d',
+    borderLeftColor: globalStyles.colors.accent,
   },
   boldText: {
     fontWeight: 'bold',
@@ -890,17 +913,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: globalStyles.colors.primary,
   },
   primaryButtonText: {
-    color: 'white',
+    color: globalStyles.colors.white,
     fontWeight: 'bold',
   },
   secondaryButton: {
-    backgroundColor: '#f2f2f2',
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
   secondaryButtonText: {
-    color: '#333',
+    color: globalStyles.colors.text,
   },
   disabledButton: {
     opacity: 0.7,
@@ -922,17 +945,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: globalStyles.colors.border,
     borderRadius: 4,
     marginBottom: 10,
+    backgroundColor: globalStyles.colors.white,
   },
   multiSelectValue: {
     fontSize: 16,
-    color: '#333',
+    color: globalStyles.colors.text,
   },
   multiSelectPlaceholder: {
     fontSize: 16,
-    color: '#999',
+    color: globalStyles.colors.textSecondary,
   },
   selectedChipsContainer: {
     flexDirection: 'row',
@@ -941,7 +965,7 @@ const styles = StyleSheet.create({
   selectedChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: globalStyles.colors.primaryLight,
     borderRadius: 16,
     paddingVertical: 5,
     paddingHorizontal: 10,
@@ -949,20 +973,25 @@ const styles = StyleSheet.create({
   },
   selectedChipText: {
     marginRight: 5,
-    color: '#333',
+    color: globalStyles.colors.text,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(74, 144, 226, 0.3)', // Use primary color with opacity
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '90%',
-    backgroundColor: '#fff',
+    backgroundColor: globalStyles.colors.white,
     borderRadius: 8,
     padding: 20,
     maxHeight: '80%',
+    shadowColor: globalStyles.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -973,6 +1002,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: globalStyles.colors.text,
   },
   modalFooter: {
     marginTop: 15,
@@ -983,14 +1013,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: globalStyles.colors.border,
   },
   optionText: {
     fontSize: 16,
-    color: '#333',
+    color: globalStyles.colors.text,
   },
   modalButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: globalStyles.colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 4,
@@ -998,7 +1028,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   modalButtonText: {
-    color: 'white',
+    color: globalStyles.colors.white,
     fontWeight: 'bold',
   },
   dateInput: {

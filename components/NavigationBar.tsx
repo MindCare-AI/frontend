@@ -14,7 +14,7 @@ interface NavigationBarProps {
 
 export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
   const navigation = useNavigation();
-  const route = useRoute();
+  const currentRoute = useRoute();
   const fadeAnims = React.useRef(
     routes.map(() => new Animated.Value(0))
   ).current;
@@ -24,7 +24,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
 
   useEffect(() => {
     // Animate the initial active tab
-    const activeIndex = routes.findIndex(r => r.name === route.name);
+    const activeIndex = routes.findIndex(r => r.name === currentRoute.name);
     if (activeIndex >= 0) {
       Animated.spring(fadeAnims[activeIndex], {
         toValue: 1,
@@ -72,13 +72,14 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({ routes }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    navigation.navigate(routeName);
+    navigation.navigate(routeName as any);
   };
 
   return (
     <View style={styles.container}>
       {routes.map((route, index) => {
-        const isActive = route.name === route.name;
+        // Check if this route is the currently active route by comparing with the current screen route name
+        const isActive = route.name === currentRoute.name;
 
         return (
           <TouchableOpacity

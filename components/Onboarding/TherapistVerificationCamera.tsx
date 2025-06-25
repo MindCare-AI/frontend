@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Animated, TextInput } from 'react-native';
 import { Camera, Upload, FileText, User, CheckCircle } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { submitTherapistVerification } from '../../utils/onboardingAPI';
+// Removed real API import - using fake data only
 
 interface TherapistVerificationCameraProps {
   onNext: () => void;
@@ -81,7 +81,9 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
       };
 
       if (currentUser?.profile_id) {
-        await submitTherapistVerification(currentUser.profile_id, verificationData);
+        // FAKE - Just simulate verification submission instead of real API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('FAKE: Therapist verification submitted:', verificationData);
         console.log('Verification submitted successfully');
       }
       onNext();
@@ -113,7 +115,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           <View style={styles.imagePreview}>
             <Image source={{ uri: image }} style={styles.image} />
             <View style={styles.successOverlay}>
-              <CheckCircle size={30} color="#4CAF50" />
+              <CheckCircle size={30} />
             </View>
           </View>
         ) : (
@@ -125,11 +127,11 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
 
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.imageButton} onPress={onCameraPress}>
-          <Camera size={16} color="#002D62" />
+          <Camera size={16} />
           <Text style={styles.imageButtonText}>Camera</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.imageButton} onPress={onGalleryPress}>
-          <Upload size={16} color="#002D62" />
+          <Upload size={16} />
           <Text style={styles.imageButtonText}>Gallery</Text>
         </TouchableOpacity>
       </View>
@@ -150,7 +152,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           licenseImage,
           () => pickImage('license', true),
           () => pickImage('license', false),
-          <FileText size={24} color="#002D62" />
+          <FileText size={24} />
         )}
 
         {renderImageSection(
@@ -159,7 +161,7 @@ const TherapistVerificationCamera: React.FC<TherapistVerificationCameraProps> = 
           selfieImage,
           () => pickImage('selfie', true),
           () => pickImage('selfie', false),
-          <User size={24} color="#002D62" />
+          <User size={24} />
         )}
 
         <View style={styles.section}>

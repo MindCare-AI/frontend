@@ -320,29 +320,33 @@ const NotificationSettingsScreen: React.FC = () => {
               description="Get notifications in the app"
             />
             
-            <SettingToggle
-              label="Dark Mode"
-              value={preferences.dark_mode}
-              onToggle={() => handleToggle('dark_mode')}
-              disabled={updating}
-              description="Toggle app theme"
-            />
+            {/* Dark Mode toggle removed as we're using light theme only */}
             
             <List.Item
               title="Language"
+              titleStyle={{ color: '#333' }}
               description={languageOptions.find(lang => lang.value === preferences.language)?.label}
+              descriptionStyle={{ color: '#666' }}
+              style={{
+                backgroundColor: '#fff', 
+                marginVertical: 4,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#e0e0e0'
+              }}
               onPress={() => setLanguageMenuVisible(true)}
               right={() => (
                 <Menu
                   visible={languageMenuVisible}
                   onDismiss={() => setLanguageMenuVisible(false)}
-                  anchor={<Button>Select</Button>}
+                  anchor={<Button textColor="#4a90e2">Select</Button>}
                 >
                   {languageOptions.map(lang => (
                     <Menu.Item
                       key={lang.value}
                       onPress={() => handleLanguageChange(lang.value)}
                       title={lang.label}
+                      titleStyle={{ color: '#333' }}
                     />
                   ))}
                 </Menu>
@@ -362,11 +366,20 @@ const NotificationSettingsScreen: React.FC = () => {
                 <List.Item
                   key={type.id}
                   title={type.description || type.name}
+                  titleStyle={{ color: '#333' }}
+                  style={{
+                    backgroundColor: '#fff', 
+                    marginVertical: 4,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#e0e0e0'
+                  }}
                   right={() => (
                     <Checkbox
                       status={preferences.disabled_notification_types.includes(type.name) ? 'unchecked' : 'checked'}
                       onPress={() => handleDisabledTypesChange(type.name)}
                       disabled={updating}
+                      color="#4a90e2"
                     />
                   )}
                 />
@@ -374,7 +387,16 @@ const NotificationSettingsScreen: React.FC = () => {
             ) : (
               <List.Item
                 title="No notification types available"
+                titleStyle={{ color: '#333' }}
                 description="Notification settings couldn't be loaded"
+                descriptionStyle={{ color: '#666' }}
+                style={{
+                  backgroundColor: '#fff', 
+                  marginVertical: 4,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#e0e0e0'
+                }}
               />
             )}
             
@@ -392,8 +414,16 @@ const NotificationSettingsScreen: React.FC = () => {
                 title="Appointment Reminders"
                 expanded={expandedSections.appointmentReminders}
                 onPress={() => toggleAdvancedSection('appointmentReminders')}
+                titleStyle={{ color: '#333' }}
+                style={{ 
+                  backgroundColor: '#fff', 
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#e0e0e0',
+                  marginBottom: 8 
+                }}
               >
-                <List.Subheader>When to receive reminders</List.Subheader>
+                <List.Subheader style={{ color: '#4a90e2' }}>When to receive reminders</List.Subheader>
                 
                 {['24h', '1h', 'immediate'].map(option => {
                   const labels = {
@@ -408,9 +438,17 @@ const NotificationSettingsScreen: React.FC = () => {
                     <List.Item
                       key={option}
                       title={labels[option as keyof typeof labels]}
+                      titleStyle={{ color: '#333' }}
+                      style={{ 
+                        backgroundColor: '#fff',
+                        marginHorizontal: 8,
+                        marginVertical: 4,
+                        borderRadius: 4
+                      }}
                       right={() => (
                         <Checkbox
                           status={timing.includes(option) ? 'checked' : 'unchecked'}
+                          color="#4a90e2"
                           onPress={() => {
                             const currentTiming = [...timing];
                             if (currentTiming.includes(option)) {
@@ -565,7 +603,7 @@ const NotificationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
   scrollContainer: {
     flex: 1,
@@ -589,7 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
     borderTopWidth: 1,
     borderTopColor: globalStyles.colors.border,
     position: 'absolute',
@@ -608,6 +646,8 @@ const styles = StyleSheet.create({
   },
   divider: {
     marginVertical: 16,
+    backgroundColor: '#e0e0e0',
+    height: 1,
   },
   modalContainer: {
     backgroundColor: 'white',

@@ -98,20 +98,23 @@ const DashboardScreen = () => {
       <Box
         flex={1}
       >
-        <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={{flex: 1, width: "100%"}}>
+        <Box 
+            style={{flex: 1, width: "100%", backgroundColor: "#FFFFFF"}}
+          >
           <Box 
             width="100%" 
             maxWidth={520} 
             alignSelf="center"
             flex={1}
             pt={4}
+            bg="#FFFFFF"
           >
             <AppointmentTabs 
               key={refreshKey} // Add key to force remount on refresh
               onOpenFeedback={handleOpenFeedback} 
             />
           </Box>
-        </LinearGradient>
+        </Box>
       </Box>
 
       {/* Fixed Bottom Button - Using our enhanced button */}
@@ -129,7 +132,7 @@ const DashboardScreen = () => {
         alignItems="center"
         style={{ 
           zIndex: 20,
-          shadowColor: '#000',
+          shadowColor: '#4a90e2',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.08,
           shadowRadius: 8,
