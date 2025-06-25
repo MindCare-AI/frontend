@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  ActivityIndicator, 
   TextInput, 
   Alert,
   Modal,
@@ -16,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useAuth } from '../../contexts/AuthContext';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import { 
   getMedicalInfo, 
   updateMedicalInfo
@@ -184,12 +184,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#002D62" />
-        <Text style={styles.loadingText}>Loading medical information...</Text>
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   if (!hasProfile) {
@@ -214,6 +209,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingSpinner visible={isSaving} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.title}>Medical Information</Text>
@@ -233,11 +229,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
                 onPress={handleSaveMedicalHistory}
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
-                )}
+                <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -280,11 +272,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
                 onPress={handleSaveMedicalHistory}
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                )}
+                <Text style={styles.saveButtonText}>Save Changes</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -373,11 +361,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
                 onPress={handleSaveHealthMetrics}
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
-                )}
+                <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -417,11 +401,7 @@ const PatientMedicalInfoScreen: React.FC = ({ navigation }: any) => {
                 onPress={handleSaveHealthMetrics}
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                )}
+                <Text style={styles.saveButtonText}>Save Changes</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -558,16 +538,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#002D62',
-    fontSize: 16,
   },
   header: {
     flexDirection: 'row',

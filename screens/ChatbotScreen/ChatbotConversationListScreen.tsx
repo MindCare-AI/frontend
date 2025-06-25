@@ -10,10 +10,11 @@ import {
   Alert,
   SafeAreaView,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { globalStyles } from '../../styles/global';
 import { useChatbot } from '../../hooks/ChatbotScreen/useChatbot';
 import { ChatbotStackParamList } from '../../navigation/types';
@@ -36,10 +37,44 @@ const ChatbotConversationListScreen: React.FC = () => {
     clearError,
   } = useChatbot();
   const [refreshing, setRefreshing] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  // Navigation functions for menu options
+  const navigateToMoodTracker = () => {
+    setMenuVisible(false);
+    navigation.navigate('MoodTracker' as any);
+  };
+  
+  const navigateToJournal = () => {
+    setMenuVisible(false);
+    navigation.navigate('Journal' as any);
+  };
 
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // Add header with menu button
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity 
+          style={styles.headerButton} 
+          onPress={() => setMenuVisible(true)}
+        >
+          <MaterialIcons name="menu" size={24} color="white" />
+        </TouchableOpacity>
+      ),
+      title: 'Chatbot',
+      headerTitleStyle: {
+        fontWeight: '600',
+        color: 'white', // Set the title text color to white
+      },
+      headerStyle: {
+        backgroundColor: globalStyles.colors.primary, // Optional: Adjust background to make white text visible
+      },
+    });
+  }, [navigation]);
 
   const loadConversations = async () => {
     try {
@@ -141,6 +176,38 @@ const ChatbotConversationListScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Menu Modal */}
+      <Modal
+        transparent={true}
+        visible={menuVisible}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={navigateToMoodTracker}
+            >
+              <Ionicons name="happy-outline" size={24} color={globalStyles.colors.primary} style={styles.menuItemIcon} />
+              <Text style={styles.menuItemText}>Mood Tracker</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={navigateToJournal}
+            >
+              <Ionicons name="book-outline" size={24} color={globalStyles.colors.primary} style={styles.menuItemIcon} />
+              <Text style={styles.menuItemText}>Journal</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <FlatList
         data={conversations}
         renderItem={renderConversationItem}
@@ -166,6 +233,45 @@ const ChatbotConversationListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  headerButton: {
+    padding: 12,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  menuContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    marginTop: 60, // Position below header
+    marginLeft: 10,
+    paddingVertical: 10,
+    width: 220,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  menuItemIcon: {
+    marginRight: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: globalStyles.colors.text,
+  },
   container: {
     flex: 1,
     backgroundColor: globalStyles.colors.background,
@@ -226,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   newButtonText: {
-    color: 'white',
+    color: 'white', // Ensuring this is explicitly white
     fontSize: 16,
     fontWeight: '500',
   },
@@ -245,8 +351,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 4.65,
-    transform: [{ scale: 1 }],  // For animations
-    // Add animation properties
+    transform: [{ scale: 1 }],
     zIndex: 10,
   },
   // Add animation related styles
@@ -255,18 +360,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
   },
   conversationItem: {
-    marginVertical: 6,
+    marginVertical: 8,
     marginHorizontal: 12,
     backgroundColor: globalStyles.colors.white,
-    borderRadius: 10,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: globalStyles.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderColor: 'rgba(74, 144, 226, 0.1)',
     transform: [{ scale: 1 }], // For animations
   },
   conversationItemPressed: {

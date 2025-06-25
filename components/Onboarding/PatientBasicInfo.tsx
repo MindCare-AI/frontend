@@ -9,8 +9,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { User, Phone } from 'lucide-react-native';
-import { updatePatientProfile } from '../../API/settings/patient_profile';
+import { Ionicons } from "@expo/vector-icons";
+// Removed real API import - using fake data only
 
 interface PatientBasicData {
   first_name: string;
@@ -29,6 +29,9 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
   onNext,
   onBack 
 }) => {
+  // Use appropriate props for Lucide icons
+  const primaryColor = "#002D62";
+  
   const [formData, setFormData] = useState<PatientBasicData>({
     first_name: '',
     last_name: '',
@@ -37,9 +40,13 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
   });
   const [loading, setLoading] = useState(false);
 
+  const validateForm = () => {
+    return formData.first_name.trim() !== '' && formData.last_name.trim() !== '';
+  };
+
   const handleNext = async () => {
     // Basic validation
-    if (!formData.first_name || !formData.last_name) {
+    if (!validateForm()) {
       Alert.alert('Required Fields', 'Please fill in your first and last name.');
       return;
     }
@@ -47,8 +54,9 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
     try {
       setLoading(true);
       
-      // Update patient profile with form data
-      await updatePatientProfile(formData);
+      // FAKE - Just simulate a delay instead of real API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('FAKE: Patient profile updated with:', formData);
       
       setLoading(false);
       onNext(formData);
@@ -71,7 +79,7 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <Ionicons name="person-outline" size={20} color="#002D62" />
             <TextInput
               style={styles.input}
               placeholder="First Name *"
@@ -81,7 +89,7 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
           </View>
 
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <Ionicons name="person-outline" size={20} color="#002D62" />
             <TextInput
               style={styles.input}
               placeholder="Last Name *"
@@ -91,7 +99,7 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
           </View>
 
           <View style={styles.inputGroup}>
-            <Phone size={20} color="#002D62" />
+            <Ionicons name="call-outline" size={20} color="#002D62" />
             <TextInput
               style={styles.input}
               placeholder="Phone Number"
@@ -133,9 +141,12 @@ const PatientBasicInfo: React.FC<PatientBasicInfoProps> = ({
             </TouchableOpacity>
           )}
           <TouchableOpacity 
-            style={[styles.nextButton, loading && styles.disabledButton]} 
+            style={[
+              styles.nextButton, 
+              (loading || !validateForm()) && styles.disabledButton
+            ]} 
             onPress={handleNext}
-            disabled={loading}
+            disabled={loading || !validateForm()}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />

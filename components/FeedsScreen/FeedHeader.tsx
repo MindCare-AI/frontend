@@ -11,6 +11,7 @@ import SortModal from "./SortModal"
 import SearchModal from "./SearchModal"
 import Badge from "./ui/Badge"
 import TabBar from "./ui/TabBar"
+import { useNavigation } from "@react-navigation/native"
 
 interface FeedHeaderProps {
   onFiltersChange: (filters: FilterState) => void
@@ -83,6 +84,13 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
     setIsFiltersOpen(!isFiltersOpen);
   };
 
+  // Add a navigation handler for the notifications
+  const navigation = useNavigation();
+  
+  const handleNotificationsPress = () => {
+    navigation.navigate('Notifications');
+  };
+
   return (
     <View style={styles.container}>
       {/* Tabs */}
@@ -139,6 +147,22 @@ const FeedHeader: React.FC<FeedHeaderProps> = ({
             >
               Trending
             </Text>
+          </TouchableOpacity>
+
+          {/* Add the notification icon on the right side */}
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={handleNotificationsPress}
+          >
+            <Ionicons 
+              name="notifications-outline" 
+              size={24} 
+              color={colors.text} 
+            />
+            {/* Optional: Add a notification badge */}
+            <View style={[styles.notificationBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.notificationBadgeText}>3</Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -255,6 +279,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
     paddingHorizontal: 16,
+    alignItems: 'center', // Add this to vertically align the tabs with the icon
   },
   tab: {
     paddingVertical: 8,
@@ -319,6 +344,26 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     height: 40,
     fontSize: 16,
+  },
+  notificationButton: {
+    marginLeft: 'auto', // This will push the button to the right
+    padding: 8,
+    position: 'relative', // For the badge positioning
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

@@ -3,9 +3,10 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, View, StyleSheet } from 'react-native';
 import { Appbar } from 'react-native-paper';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { useAuth } from '../contexts/AuthContext';
 
 // Existing imports
@@ -67,97 +68,186 @@ const FeedsStack = createStackNavigator<FeedsStackParamList>();
 
 // Your existing Tab Navigator
 const TabNavigator = () => {
-  const { user } = useAuth(); // Add this line to access the auth context
+  const { user } = useAuth();
   const userType = user?.user_type || 'patient'; // Default to patient if not set
+
+  // Define tab screens based on user type
+  const tabScreens = userType === 'therapist' 
+    ? [
+      // Tabs for therapists
+      {
+        name: "Feeds",
+        component: FeedsStackNavigator,
+        options: { 
+          tabBarLabel: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Appointments",
+        component: DashboardScreenT,
+        options: { 
+          tabBarLabel: 'Appointments',
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      // Chatbot tab with floating hexagon button
+      {
+        name: "Chatbot",
+        component: ChatbotNavigator,
+        options: { 
+          tabBarLabel: '',
+          headerShown: false,
+          tabBarIcon: ({ focused, color }: { focused: boolean, color: string, size: number }) => (
+            <View style={styles.hexagonContainer}>
+              <View style={styles.hexagon}>
+                <FontAwesome5 
+                  name="brain" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+            </View>
+          ),
+        }
+      },
+      {
+        name: "Messaging",
+        component: MessagingNavigator,
+        options: { 
+          tabBarLabel: 'Messages',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Settings",
+        component: SettingsStack,
+        options: { 
+          tabBarLabel: 'Settings',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+          ),
+        }
+      },
+    ]
+    : [
+      // Tabs for patients - Left side: Home, Appointments, Journal
+      {
+        name: "Feeds",
+        component: FeedsStackNavigator,
+        options: { 
+          tabBarLabel: 'Home',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Appointments",
+        component: DashboardScreen,
+        options: { 
+          tabBarLabel: 'Appointments',
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Journal",
+        component: JournalNavigator,
+        options: { 
+          tabBarLabel: 'Journal',
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'book' : 'book-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      // Chatbot tab in the middle with floating hexagon button
+      {
+        name: "Chatbot",
+        component: ChatbotNavigator,
+        options: { 
+          tabBarLabel: '',
+          headerShown: false,
+          tabBarIcon: ({ focused, color }: { focused: boolean, color: string, size: number }) => (
+            <View style={styles.hexagonContainer}>
+              <View style={styles.hexagon}>
+                <FontAwesome5 
+                  name="brain" 
+                  size={28} 
+                  color="#FFFFFF" 
+                />
+              </View>
+            </View>
+          ),
+        }
+      },
+      // Right side: Mood, Messages, Settings
+      {
+        name: "MoodTracker",
+        component: MoodNavigator,
+        options: { 
+          tabBarLabel: 'Mood',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Feather name="smile" size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Messaging",
+        component: MessagingNavigator,
+        options: { 
+          tabBarLabel: 'Messages',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />
+          ),
+        }
+      },
+      {
+        name: "Settings",
+        component: SettingsStack,
+        options: { 
+          tabBarLabel: 'Settings',
+          headerShown: false,
+          tabBarIcon: ({ focused, color, size }: { focused: boolean, color: string, size: number }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+          ),
+        }
+      },
+    ];
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'alert';
-
-          switch (route.name) {
-            case 'Feeds':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'Chatbot':
-              iconName = focused ? 'chatbubble' : 'chatbubble-outline';
-              break;
-            case 'Notifications':
-              iconName = focused ? 'notifications' : 'notifications-outline';
-              break;
-            case 'Settings':
-              iconName = focused ? 'settings' : 'settings-outline';
-              break;
-            case 'MoodTracker':
-              return <Feather name="smile" size={size} color={color} />;
-            case 'Journal':
-              iconName = focused ? 'book' : 'book-outline';
-              break;
-            case 'Messaging':
-              iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-              break;
-            default:
-              iconName = 'alert';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
+      screenOptions={{
         tabBarActiveTintColor: globalStyles.colors.primary,
         tabBarInactiveTintColor: globalStyles.colors.neutralMedium,
-      })}
+        tabBarStyle: {
+          height: 60,
+          position: 'relative',
+          paddingBottom: 5,
+        },
+      }}
     >
-      <Tab.Screen 
-        name="Feeds" 
-        component={FeedsStackNavigator} 
-        options={{ 
-          tabBarLabel: 'Home',
-          headerShown: false 
-        }}
-      />
-      <Tab.Screen 
-        name="Appointments" 
-        // Dynamically select the dashboard component based on user type
-        component={userType === 'therapist' ? DashboardScreenT : DashboardScreen}
-        options={{ tabBarLabel: 'Appointments' }}
-      />
-      <Tab.Screen 
-        name="Journal"
-        component={JournalNavigator} 
-        options={{ tabBarLabel: 'Journal' }}
-      />
-      <Tab.Screen 
-        name="Chatbot" 
-        component={ChatbotNavigator} 
-        options={{ 
-          tabBarLabel: 'Chatbot',
-          headerShown: false 
-        }}
-      />
-      <Tab.Screen
-        name="MoodTracker"
-        component={MoodNavigator}
-        options={{ 
-          tabBarLabel: 'Mood',
-          headerShown: false
-        }}
-      />
-      <Tab.Screen
-        name="Messaging"
-        component={MessagingNavigator}
-        options={{ 
-          tabBarLabel: 'Messages',
-          headerShown: false
-        }}
-      />
-      <Tab.Screen 
-        name="Settings" 
-        component={SettingsStack} 
-        options={{ 
-          tabBarLabel: 'Settings',
-          headerShown: false
-        }}
-      />
+      {tabScreens.map((screen) => (
+        <Tab.Screen
+          key={screen.name}
+          name={screen.name as keyof AppStackParamList}
+          component={screen.component}
+          options={screen.options}
+        />
+      ))}
     </Tab.Navigator>
   );
 };
@@ -266,5 +356,31 @@ const AppNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  hexagonContainer: {
+    alignItems: 'center',
+    width: 80,
+    height: 80,
+    marginBottom: 30, // Lift it above the tab bar
+  },
+  hexagon: {
+    width: 60,
+    height: 60,
+    backgroundColor: globalStyles.colors.primary,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    transform: [{ translateY: -15 }], // Move up to float above tab bar
+    // For hexagon effect (simplified with border radius)
+    position: 'absolute',
+    bottom: 0,
+  },
+});
 
 export default AppNavigator;

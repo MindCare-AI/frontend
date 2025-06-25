@@ -56,10 +56,11 @@ const UpcomingAppointments: React.FC<UpcomingAppointmentsProps> = ({ appointment
   return (
     <>
       <ScrollView 
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: "#FFFFFF" }}
         contentContainerStyle={{
           padding: 16,
           paddingBottom: 120, // Add extra padding at the bottom for FAB
+          backgroundColor: "#FFFFFF",
         }}
         showsVerticalScrollIndicator={true}
       >
@@ -113,7 +114,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, onCancel
           <View style={styles.headerTop}>
             <View style={styles.therapistInfo}>
               <Ionicons name="person-circle-outline" size={24} color="#4A5568" style={styles.therapistIcon} />
-              <Text style={styles.therapistName}>{appointment.therapist}</Text>
+              <Text style={styles.therapistName}>Therapist: {appointment.therapist}</Text>
             </View>
             <Badge 
               colorScheme={getStatusColor(appointment.status)} 
@@ -122,6 +123,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({ appointment, onCancel
             >
               {appointment.status}
             </Badge>
+          </View>
+          <View style={styles.patientInfo}>
+            <Ionicons name="people-outline" size={16} color="#4A5568" style={styles.patientIcon} />
+            <Text style={styles.patientName}>
+              Patient: {appointment.patient || "You"}
+            </Text>
           </View>
           <View style={styles.dateTimeContainer}>
             <View style={styles.dateTimeItem}>
@@ -217,6 +224,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    shadowColor: "#4a90e2",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   appointmentCardPressed: {
     backgroundColor: "#F0F4F8",
@@ -242,7 +256,7 @@ const styles = StyleSheet.create({
   therapistName: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#2D3748",
+    color: "#4a90e2",
   },
   dateTimeContainer: {
     flexDirection: "row",
@@ -262,7 +276,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(74, 144, 226, 0.4)",
     justifyContent: "flex-end",
   },
   actionSheetContainer: {
@@ -270,7 +284,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: "#4a90e2",
     shadowOffset: {
       width: 0,
       height: -2,
@@ -297,6 +311,21 @@ const styles = StyleSheet.create({
   actionSheetButtonText: {
     fontSize: 16,
     color: "#2D3748",
+  },
+  patientInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    marginBottom: 6,
+    paddingLeft: 2,
+  },
+  patientIcon: {
+    marginRight: 6,
+  },
+  patientName: {
+    fontSize: 14,
+    color: "#4A5568",
+    fontWeight: "500",
   },
 });
 

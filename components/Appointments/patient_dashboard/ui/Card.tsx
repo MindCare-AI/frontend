@@ -74,7 +74,7 @@ export const Card: React.FC<CardProps> = ({
   centered = false
 }) => {
   const nbTheme = useNativeBase()
-  const { isDarkMode, colors } = useTheme()
+  const { colors } = useTheme()
   const responsive = useResponsiveValues()
   
   // Animation values
@@ -120,22 +120,22 @@ export const Card: React.FC<CardProps> = ({
     // Platform-specific shadows
     ...Platform.select({
       ios: {
-        shadowColor: isDarkMode ? '#000' : '#000',
+        shadowColor: '#4a90e2',
         shadowOffset: { width: 0, height: elevation },
-        shadowOpacity: isDarkMode ? 0.4 : 0.2,
+        shadowOpacity: 0.2,
         shadowRadius: elevation * 2,
       },
       android: {
         elevation: elevation,
       },
       web: {
-        boxShadow: `0px ${elevation}px ${elevation * 2}px rgba(0, 0, 0, ${isDarkMode ? 0.4 : 0.2})`,
+        boxShadow: `0px ${elevation}px ${elevation * 2}px rgba(74, 144, 226, 0.2)`,
         transition: 'all 0.2s ease-in-out',
         cursor: onPress ? 'pointer' : 'default',
         ...(isHovered && onPress && hoverStyle ? hoverStyle : {}),
         ...(isHovered && onPress && !hoverStyle ? {
           transform: 'translateY(-2px)',
-          boxShadow: `0px ${elevation + 2}px ${elevation * 3}px rgba(0, 0, 0, ${isDarkMode ? 0.5 : 0.3})`,
+          boxShadow: `0px ${elevation + 2}px ${elevation * 3}px rgba(74, 144, 226, 0.3)`,
         } : {})
       }
     })
@@ -185,8 +185,8 @@ export const Card: React.FC<CardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: isDarkMode ? colors.card.dark : colors.card.light,
-          borderColor: isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200],
+          backgroundColor: colors.card.light,
+          borderColor: nbTheme.colors.gray[200],
         },
         responsiveStyles,
         animationStyle,
@@ -218,7 +218,6 @@ interface CardHeaderProps {
 }
 
 export const CardHeader: React.FC<CardHeaderProps> = ({ children, style, border = false }) => {
-  const { isDarkMode } = useTheme()
   const responsive = useResponsiveValues()
   const nbTheme = useNativeBase()
   
@@ -227,7 +226,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({ children, style, border 
       styles.cardHeader, 
       {
         borderBottomWidth: border ? 1 : 0,
-        borderBottomColor: isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200],
+        borderBottomColor: nbTheme.colors.gray[200],
         padding: responsive.isSmallScreen ? 12 : 16,
       },
       style
@@ -279,7 +278,6 @@ export const CardFooter: React.FC<CardFooterProps> = ({
   border = false,
   alignment = 'end'
 }) => {
-  const { isDarkMode } = useTheme()
   const nbTheme = useNativeBase()
   const responsive = useResponsiveValues()
   
@@ -296,7 +294,7 @@ export const CardFooter: React.FC<CardFooterProps> = ({
       styles.cardFooter, 
       {
         borderTopWidth: border ? 1 : 0,
-        borderTopColor: isDarkMode ? nbTheme.colors.gray[700] : nbTheme.colors.gray[200],
+        borderTopColor: nbTheme.colors.gray[200],
         padding: responsive.isSmallScreen ? 12 : 16,
         justifyContent: justifyContentMap[alignment]
       },
@@ -320,7 +318,6 @@ export const CardTitle: React.FC<CardTitleProps> = ({
   size = 'medium',
   weight = 'semibold'
 }) => {
-  const { isDarkMode } = useTheme()
   const responsive = useResponsiveValues()
 
   // Map size to fontSize
@@ -343,7 +340,7 @@ export const CardTitle: React.FC<CardTitleProps> = ({
       style={[
         styles.cardTitle,
         {
-          color: isDarkMode ? "#FFFFFF" : "#000000",
+          color: "#444444",
           fontSize: fontSizeMap[size],
           fontWeight: fontWeightMap[weight]
         },
@@ -367,7 +364,6 @@ export const CardDescription: React.FC<CardDescriptionProps> = ({
   size = 'medium'
 }) => {
   const nbTheme = useNativeBase()
-  const { isDarkMode } = useTheme()
   const responsive = useResponsiveValues()
 
   // Map size to fontSize
@@ -382,7 +378,7 @@ export const CardDescription: React.FC<CardDescriptionProps> = ({
       style={[
         styles.cardDescription,
         {
-          color: isDarkMode ? nbTheme.colors.gray[400] : nbTheme.colors.gray[500],
+          color: nbTheme.colors.gray[500],
           fontSize: fontSizeMap[size]
         },
         style,
@@ -398,7 +394,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
-    shadowColor: "#000",
+    shadowColor: "#4a90e2",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.10,
     shadowRadius: 12,
@@ -420,7 +416,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+    borderBottomColor: 'rgba(74, 144, 226, 0.06)',
     backgroundColor: '#fff',
   },
   cardContent: {
@@ -437,7 +433,7 @@ const styles = StyleSheet.create({
     rowGap: 12,
     columnGap: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.06)',
+    borderTopColor: 'rgba(74, 144, 226, 0.06)',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     backgroundColor: '#fff',

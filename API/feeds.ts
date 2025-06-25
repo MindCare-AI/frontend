@@ -43,17 +43,31 @@ export const createPost = async (postData: any) => {
     if (postData instanceof FormData) {
       console.log("DEBUG: postData is FormData, using directly");
       
-      // Additional debugging for FormData - React Native web compatible
-      console.log("DEBUG: FormData type check passed");
+      // Log all entries in FormData for debugging
+      if (Platform.OS === 'web') {
+        for (let [key, value] of postData.entries()) {
+          console.log(`DEBUG: FormData entry - ${key}:`, 
+            value instanceof File || value instanceof Blob ? 
+            `${value.constructor.name}, size: ${value.size}, type: ${value.type}` : 
+            value);
+        }
+      } else {
+        console.log("DEBUG: FormData entries logging not supported on this platform");
+      }
       
-      // Critical fix: NEVER set Content-Type header for multipart/form-data
-      // Let the browser/platform set it with the correct boundary automatically
-      // Also don't set custom headers that might trigger CORS preflight checks
+      // Ensure we're not setting any conflicting headers
+      const response = await axios.post(`${FEEDS_URL}/posts/`, postData, {
+        headers: {
+          // Explicitly set to undefined to ensure axios doesn't add its own
+          'Content-Type': undefined
+        },
+        // Add more detailed debugging
+        validateStatus: (status) => {
+          console.log(`DEBUG: API response status: ${status}`);
+          return status >= 200 && status < 300;
+        }
+      });
       
-      console.log('DEBUG: Sending FormData with automatic Content-Type handling');
-      console.log('DEBUG: Platform:', Platform.OS || 'unknown');
-      
-      const response = await axios.post(`${FEEDS_URL}/posts/`, postData);
       console.log("DEBUG: Post created successfully:", response.data);
       return response.data;
     } else {

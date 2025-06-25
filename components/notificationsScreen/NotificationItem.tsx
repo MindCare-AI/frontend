@@ -18,12 +18,12 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
 }) => {
   const theme = useTheme();
 
-  // Priority colors as per backend: "low", "medium", "high", "critical"
+  // Updated color palette with light blue focus
   const priorityColors: Record<'low' | 'medium' | 'high' | 'critical', string> = {
     low: '#4CAF50',
-    medium: theme.colors.primary,
+    medium: '#0088CC', // Light blue
     high: '#FF9800',
-    critical: theme.colors.error,
+    critical: '#f44336',
   };
 
   // Use timestamp field from backend, fallback to created_at for backward compatibility
@@ -35,8 +35,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         styles.container,
         {
           backgroundColor: notification.read
-            ? theme.colors.background
-            : theme.colors.surfaceVariant,
+            ? '#FFFFFF'
+            : '#E6F3FA', // Very light blue for unread notifications
         },
       ]}
       onPress={onPress}
@@ -45,7 +45,13 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text variant="titleSmall" style={styles.title}>
+          <Text
+            variant="titleSmall"
+            style={[
+              styles.title,
+              { color: notification.read ? '#333333' : '#0088CC' },
+            ]}
+          >
             {notification.title}
           </Text>
           <Badge
@@ -67,7 +73,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         <Icon
           name="fiber-manual-record"
           size={16}
-          color={theme.colors.primary}
+          color="#0088CC" // Light blue
           style={styles.unreadIndicator}
         />
       )}
@@ -79,8 +85,15 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     padding: 16,
-    marginVertical: 4,
-    borderRadius: 8,
+    marginVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   content: {
     flex: 1,
@@ -99,9 +112,10 @@ const styles = StyleSheet.create({
   },
   message: {
     marginBottom: 4,
+    color: '#555555',
   },
   time: {
-    color: '#666',
+    color: '#777777',
   },
   unreadIndicator: {
     alignSelf: 'center',

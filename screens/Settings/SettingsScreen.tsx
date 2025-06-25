@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, SafeAreaView, Text } from 'react-native';
-import { ActivityIndicator, Snackbar, Button } from 'react-native-paper';
+import { Snackbar, Button } from 'react-native-paper';
 import { getAppSettings, updateAppSettings, AppSettings } from '../../API/settings/settings';
 import { AppearanceSettings } from '../../components/SettingsScreen/AppearanceSettings';
 import { TimeZoneSettings } from '../../components/SettingsScreen/TimeZoneSettings';
 import { globalStyles } from '../../styles/global';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const SettingsScreen: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -74,15 +75,12 @@ const SettingsScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={globalStyles.colors.primary} />
-      </View>
-    );
+    return <LoadingSpinner visible={true} />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      <LoadingSpinner visible={updating} />
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.contentContainer}
@@ -90,7 +88,8 @@ const SettingsScreen: React.FC = () => {
         {error ? (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <Button mode="contained" onPress={loadSettings} style={styles.retryButton}>
+            <Button mode="contained" onPress={loadSettings} style={styles.retryButton} 
+              buttonColor={globalStyles.colors.primary}>
               Retry
             </Button>
           </View>
@@ -116,7 +115,8 @@ const SettingsScreen: React.FC = () => {
           <Button 
             mode="outlined" 
             onPress={handleCancel} 
-            style={styles.cancelButton} 
+            style={styles.cancelButton}
+            textColor={globalStyles.colors.primary}
             disabled={updating}
           >
             Cancel
@@ -124,7 +124,8 @@ const SettingsScreen: React.FC = () => {
           <Button 
             mode="contained" 
             onPress={handleSave} 
-            style={styles.saveButton} 
+            style={styles.saveButton}
+            buttonColor={globalStyles.colors.primary}
             loading={updating}
             disabled={updating}
           >
@@ -147,7 +148,7 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
   },
   scrollContainer: {
     flex: 1,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: globalStyles.colors.background,
+    backgroundColor: globalStyles.colors.backgroundLight,
     borderTopWidth: 1,
     borderTopColor: globalStyles.colors.border,
     position: 'absolute',

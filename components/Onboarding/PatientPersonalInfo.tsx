@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { User, Phone } from 'lucide-react-native';
-import { updatePatientProfile, PatientProfile } from '../../API/settings/patient_profile';
+// Removed real API imports - using fake data only
 
 interface PatientPersonalData {
   first_name: string;
@@ -41,8 +41,9 @@ const PatientPersonalInfo: React.FC<PatientPersonalInfoProps> = ({ onNext, onBac
         gender: formData.gender,
       };
       
-      const updatedProfile = await updatePatientProfile(updateData);
-      console.log('Patient profile updated successfully:', updatedProfile);
+      // FAKE - Just simulate update delay instead of real API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('FAKE: Patient profile updated successfully:', updateData);
       
       onNext(formData);
     } catch (error) {

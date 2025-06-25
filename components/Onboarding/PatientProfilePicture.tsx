@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Platform } from 'react-native';
 import { Camera, Upload, User } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadPatientProfilePicture } from '../../API/settings/patient_profile';
+// Removed real API import - using fake data only
 
 interface PatientProfilePictureProps {
   onNext: () => void;
@@ -206,8 +206,9 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
           };
         }
         
-        await uploadPatientProfilePicture(imageData);
-        console.log('Profile picture uploaded successfully');
+        // FAKE - Just simulate upload delay instead of real API call
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('FAKE: Profile picture uploaded successfully:', imageData);
       } catch (error) {
         console.error('Error uploading profile picture:', error);
         Alert.alert('Error', 'Failed to upload profile picture. You can add it later.');
@@ -236,7 +237,7 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
               <Image source={{ uri: profileImage }} style={styles.image} />
             ) : (
               <View style={styles.placeholder}>
-                <User size={60} color="#ccc" />
+                <User size={60} />
               </View>
             )}
           </View>
@@ -244,14 +245,14 @@ const PatientProfilePicture: React.FC<PatientProfilePictureProps> = ({ onNext, o
 
         <View style={styles.buttonGroup}>
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(true)}>
-            <Camera size={20} color="#002D62" />
+            <Camera size={20} />
             <Text style={styles.actionButtonText}>
               {Platform.OS === 'web' ? 'Use Camera' : 'Take Photo'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.actionButton} onPress={() => pickImage(false)}>
-            <Upload size={20} color="#002D62" />
+            <Upload size={20} />
             <Text style={styles.actionButtonText}>
               {Platform.OS === 'web' ? 'Upload File' : 'Choose from Gallery'}
             </Text>

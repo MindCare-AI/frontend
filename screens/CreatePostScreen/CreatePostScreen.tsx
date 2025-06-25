@@ -27,6 +27,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import * as FeedsApi from '../../API/feeds';
 import { useAuth } from '../../contexts/AuthContext';
 import { prepareMediaForUpload } from '../../utils/mediaUtils';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const { width } = Dimensions.get('window');
 
@@ -71,6 +72,7 @@ const CreatePostScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<any>(null);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
 
   // Video player for expo-video
   const videoPlayer = useVideoPlayer(
@@ -151,6 +153,7 @@ const CreatePostScreen = () => {
     
     try {
       setIsSubmitting(true);
+      setShowLoadingSpinner(true);
       
       const formData = new FormData();
       formData.append('content', content);
@@ -180,73 +183,40 @@ const CreatePostScreen = () => {
 
       // Add media if selected
       if (selectedMedia && (postType === 'image' || postType === 'video')) {
-        // Parse the mime type from the data URL correctly for both platforms
-        let mimeType = postType === 'image' ? 'image/jpeg' : 'video/mp4';
-        let fileName = `media_${Date.now()}.${postType === 'image' ? 'jpg' : 'mp4'}`;
+        const fileExtension = postType === 'image' ? 'jpg' : 'mp4';
+        const mimeType = postType === 'image' ? 'image/jpeg' : 'video/mp4';
+        const fileName = `media_${Date.now()}.${fileExtension}`;
         
-        // Try to extract the actual mime type from URI if it's a data URL
-        if (selectedMedia.uri.startsWith('data:')) {
-          const mimeMatch = selectedMedia.uri.match(/data:([^;]+);/);
-          if (mimeMatch && mimeMatch[1]) {
-            mimeType = mimeMatch[1];
-            const fileExt = mimeType.split('/')[1] || (postType === 'image' ? 'jpg' : 'mp4');
-            fileName = `media_${Date.now()}.${fileExt}`;
-          }
-        }
+        console.log('DEBUG: Adding media with URI:', selectedMedia.uri);
+        console.log('DEBUG: File name:', fileName);
+        console.log('DEBUG: MIME type:', mimeType);
         
-        console.log('DEBUG: Media MIME type detected:', mimeType);
-        
-        // Enhanced platform-specific file handling
         if (Platform.OS === 'web') {
-          if (selectedMedia.uri.startsWith('data:')) {
-            // Convert data URL to blob for web
-            try {
-              const response = await fetch(selectedMedia.uri);
-              const blob = await response.blob();
-              
-              // Create a File object from the blob with correct name and mime type
-              const file = new File([blob], fileName, { 
-                type: mimeType,
-                lastModified: new Date().getTime()
-              });
-              
-              // Append as File object (more compatible with FormData)
-              formData.append('file', file);
-              console.log('DEBUG: Added File object for web platform with name:', fileName, 'and type:', mimeType);
-            } catch (blobError) {
-              console.error('DEBUG: Error with blob conversion:', blobError);
-              // Fallback method - try direct blob append
-              try {
-                const response = await fetch(selectedMedia.uri);
-                const blob = await response.blob();
-                formData.append('file', blob, fileName);
-                console.log('DEBUG: Added blob with filename for web platform');
-              } catch (e) {
-                console.error('DEBUG: Blob fallback failed, using standard approach:', e);
-                // Last resort fallback
-                formData.append('file', {
-                  uri: selectedMedia.uri,
-                  name: fileName,
-                  type: mimeType,
-                } as any);
-              }
-            }
-          } else {
-            // Already a file object
-            formData.append('file', selectedMedia as any);
-            console.log('DEBUG: Added existing file object for web');
+          // For web, fetch the file as a blob first
+          try {
+            const response = await fetch(selectedMedia.uri);
+            const blob = await response.blob();
+            formData.append('file', blob, fileName);
+            console.log('DEBUG: Added blob with filename for web platform');
+          } catch (e) {
+            console.error('DEBUG: Error with blob conversion:', e);
+            formData.append('file', {
+              uri: selectedMedia.uri,
+              name: fileName,
+              type: mimeType,
+            } as any);
           }
         } else {
-          // Create proper file object for mobile platforms
-          const fileObject = {
+          // For native platforms, use a structured file object
+          formData.append('file', {
             uri: selectedMedia.uri,
             name: fileName,
             type: mimeType,
-          };
+          } as any);
           
-          // Standard React Native file object
-          formData.append('file', fileObject as any);
-          console.log('DEBUG: Added standard React Native file object:', fileName, mimeType);
+          // Ensure the server expects these exact field names
+          // Some servers are strict about field naming
+          console.log('DEBUG: Added standard React Native file object');
         }
       }
       
@@ -274,7 +244,15 @@ const CreatePostScreen = () => {
         type: "success"
       });
       
-      navigation.goBack();
+      // Trigger refresh and navigate back
+      if (navigation.canGoBack()) {
+        // Pass refresh param back to previous screen
+        navigation.navigate({
+          name: navigation.getState().routes[navigation.getState().routes.length - 2].name,
+          params: { refresh: Date.now() },
+          merge: true,
+        });
+      }
       
     } catch (error) {
       console.error("Error creating post:", error);
@@ -285,6 +263,7 @@ const CreatePostScreen = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setShowLoadingSpinner(false);
     }
   };
 
@@ -422,7 +401,7 @@ const CreatePostScreen = () => {
                     disabled={mediaLoading}
                   >
                     {mediaLoading ? (
-                      <ActivityIndicator size="large" color={colors.primary} />
+                      <LoadingSpinner visible={mediaLoading} />
                     ) : (
                       <>
                         <Ionicons 
@@ -541,6 +520,9 @@ const CreatePostScreen = () => {
             </View>
           </ScrollView>
         </Animated.View>
+        
+        {/* Global loading spinner */}
+        <LoadingSpinner visible={showLoadingSpinner} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

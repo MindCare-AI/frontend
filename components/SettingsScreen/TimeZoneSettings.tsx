@@ -44,11 +44,12 @@ export const TimeZoneSettings: React.FC<TimeZoneSettingsProps> = ({
   };
 
   return (
-    <Card style={styles.container} elevation={2}>
+    <Card style={styles.container} elevation={1}>
       <Card.Title 
         title="Timezone Settings" 
         titleStyle={styles.cardTitle}
-        right={() => loading && <ActivityIndicator size={20} style={styles.loader} />}
+        titleVariant="titleLarge"
+        right={() => loading && <ActivityIndicator size={20} color={globalStyles.colors.primary} style={styles.loader} />}
       />
       <Card.Content>
         <View style={styles.inputContainer}>
@@ -61,10 +62,14 @@ export const TimeZoneSettings: React.FC<TimeZoneSettingsProps> = ({
               <TextInput.Icon 
                 icon={searchQuery ? "close" : "magnify"} 
                 onPress={() => searchQuery ? setSearchQuery('') : null}
+                color={globalStyles.colors.textSecondary}
               />
             }
             style={styles.input}
             mode="outlined"
+            outlineStyle={{ borderColor: globalStyles.colors.border }}
+            activeOutlineColor={globalStyles.colors.primary}
+            textColor={globalStyles.colors.text}
           />
           
           <View style={styles.currentTimezoneContainer}>
@@ -93,7 +98,7 @@ export const TimeZoneSettings: React.FC<TimeZoneSettingsProps> = ({
                   title={item}
                   onPress={() => handleSelectTimezone(item)}
                   style={item === currentTimezone ? styles.selectedItem : styles.listItem}
-                  titleStyle={item === currentTimezone ? styles.selectedItemText : {}}
+                  titleStyle={item === currentTimezone ? styles.selectedItemText : { color: globalStyles.colors.text }}
                   left={item === currentTimezone ? 
                     props => <List.Icon {...props} icon="check" color={globalStyles.colors.primary} /> : 
                     props => <List.Icon {...props} icon="clock-outline" color="transparent" />
@@ -130,10 +135,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 8,
     overflow: 'hidden',
+    backgroundColor: globalStyles.colors.white,
+    borderColor: globalStyles.colors.border,
+    borderWidth: 1,
   },
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: globalStyles.colors.text,
   },
   loader: {
     marginRight: 16,
@@ -143,6 +152,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: globalStyles.colors.white,
+    color: globalStyles.colors.text,
   },
   currentTimezoneContainer: {
     flexDirection: 'row',
@@ -152,7 +162,7 @@ const styles = StyleSheet.create({
   },
   currentTimezone: {
     fontSize: 14,
-    color: globalStyles.colors.textSecondary || globalStyles.colors.neutralMedium,
+    color: globalStyles.colors.textSecondary,
   },
   highlightedText: {
     color: globalStyles.colors.primary,
@@ -161,8 +171,9 @@ const styles = StyleSheet.create({
   listContainer: {
     maxHeight: 300,
     borderTopWidth: 1,
-    borderTopColor: globalStyles.colors.border || globalStyles.colors.neutralLight,
+    borderTopColor: globalStyles.colors.border,
     position: 'relative',
+    backgroundColor: globalStyles.colors.white,
   },
   list: {
     backgroundColor: globalStyles.colors.white,
@@ -182,6 +193,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: globalStyles.colors.white,
   },
   emptyText: {
     color: globalStyles.colors.textSecondary,
@@ -193,6 +205,6 @@ const styles = StyleSheet.create({
     right: 0,
   },
   closeButton: {
-    backgroundColor: `${globalStyles.colors.neutralLight}60`,
+    backgroundColor: `${globalStyles.colors.primaryLight}40`,
   }
 });

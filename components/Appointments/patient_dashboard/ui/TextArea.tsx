@@ -52,7 +52,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
           style={[
             styles.input,
             {
-              color: theme.colors.gray[900],
+              color: theme.colors.primary[600],
               height: "100%",
               fontSize: isSmallScreen ? 14 : 16,
             },

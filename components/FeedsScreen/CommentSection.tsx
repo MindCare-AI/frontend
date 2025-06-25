@@ -2,12 +2,13 @@
 
 import type React from "react"
 import { useState } from "react"
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from "react-native"
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList } from "react-native"
 import { formatDistanceToNow } from "date-fns"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import { useComments } from "../../hooks/feeds/useComments"
 import Avatar from "./ui/Avatar"
+import LoadingSpinner from "../LoadingSpinner"
 
 interface CommentSectionProps {
   postId: number
@@ -251,7 +252,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ postId }) => {
   if (loading && comments.length === 0) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <LoadingSpinner visible={true} />
       </View>
     );
   }

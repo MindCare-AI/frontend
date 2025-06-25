@@ -17,10 +17,16 @@ import EnhancedOnboardingScreen from './EnhancedOnboardingScreen';
 import UserTypeSelection from '../../components/Onboarding/UserTypeSelection';
 import PatientBasicInfo from '../../components/Onboarding/PatientBasicInfo';
 import PatientWellnessGoals from '../../components/Onboarding/PatientWellnessGoals';
+import PatientMedicalInfo from '../../components/Onboarding/PatientMedicalInfo';
+import PatientEmergencyContact from '../../components/Onboarding/PatientEmergencyContact';
 import TherapistVerificationIntro from '../../components/Onboarding/TherapistVerificationIntro';
 import TherapistBasicInfo from '../../components/Onboarding/TherapistBasicInfo';
+import TherapistCredentials from '../../components/Onboarding/TherapistCredentials';
 import OnboardingProgress from '../../components/Onboarding/OnboardingProgress';
 import PatientProfilePicture from '../../components/Onboarding/PatientProfilePicture';
+import OnboardingLoadingScreen from '../../components/Onboarding/OnboardingLoadingScreen';
+import OnboardingLayout from '../../components/Onboarding/OnboardingLayout';
+import TherapistProfessionalCard from '../../components/Onboarding/TherapistProfessionalCard';
 
 const { width } = Dimensions.get('window');
 
@@ -30,9 +36,13 @@ type OnboardingStep =
   | 'userType'
   | 'patientBasic'
   | 'patientProfilePicture'
+  | 'patientMedicalInfo'
+  | 'patientEmergencyContact'
   | 'patientGoals'
   | 'therapistVerification'
   | 'therapistBasic'
+  | 'therapistCredentials'
+  | 'loading'
   | 'complete';
 
 interface OnboardingData {
@@ -57,11 +67,16 @@ const OnboardingScreen: React.FC = () => {
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const getStepsForUserType = (userType: 'patient' | 'therapist'): OnboardingStep[] => {
+  const getStepsForUserType = (userType: 'patient'|'therapist'): OnboardingStep[] => {
     if (userType === 'patient') {
-      return ['welcome', 'userType', 'patientBasic', 'patientProfilePicture', 'patientGoals', 'complete'];
+      return ['welcome','userType','loading','patientBasic','patientProfilePicture','patientMedicalInfo','patientEmergencyContact','patientGoals','complete'];
     } else {
-      return ['welcome', 'userType', 'therapistVerification', 'therapistBasic', 'complete'];
+      return [
+        'welcome','userType','loading',
+        'therapistVerification', 
+        'therapistProfessionalCard',   // ← NEW
+        'therapistBasic','therapistCredentials','complete'
+      ];
     }
   };
 
@@ -104,23 +119,41 @@ const OnboardingScreen: React.FC = () => {
       console.log('Setting user type:', selectedUserType);
       
       // Update user role for both patient and therapist users
-      await updateUserRole(selectedUserType);
+      // In fake mode, we'll just simulate this
+      // await updateUserRole(selectedUserType);
       console.log(`User role updated successfully to: ${selectedUserType}`);
       
       // Update local state
       setOnboardingData(prev => ({ ...prev, userType: selectedUserType }));
       
-      // Navigate to next step
+      // Navigate to loading screen first
       animateToNext();
-      if (selectedUserType === 'patient') {
-        setCurrentStep('patientBasic');
-      } else {
-        setCurrentStep('therapistVerification');
-      }
+      setCurrentStep('loading');
+      
+      // The actual navigation to the next step after loading will happen
+      // in the loading screen's completion handler
+      console.log('Moving to loading screen after selecting user type:', selectedUserType);
     } catch (error) {
       console.error('Error setting user type:', error);
       // Handle error appropriately - maybe show an alert
     }
+  };
+  
+  // Handler for when loading is complete
+  const handleLoadingComplete = () => {
+    // After loading is done, navigate to the appropriate next screen immediately
+    console.log('Loading complete, moving to next screen for user type:', onboardingData.userType);
+    
+    if (onboardingData.userType === 'patient') {
+      console.log('Navigating to patientBasic');
+      setCurrentStep('patientBasic');
+    } else {
+      console.log('Navigating to therapistVerification');
+      setCurrentStep('therapistVerification');
+    }
+    
+    // Force a refresh of the current step
+    animateToNext();
   };
 
   const handleNext = async (stepData?: any) => {
@@ -144,6 +177,24 @@ const OnboardingScreen: React.FC = () => {
         setCurrentStep('patientProfilePicture');
         break;
       case 'patientProfilePicture':
+        setOnboardingData(prev => ({
+          ...prev,
+          patientData: { ...prev.patientData, profilePic: stepData }
+        }));
+        setCurrentStep('patientMedicalInfo');
+        break;
+      case 'patientMedicalInfo':
+        setOnboardingData(prev => ({
+          ...prev,
+          patientData: { ...prev.patientData, medicalInfo: stepData }
+        }));
+        setCurrentStep('patientEmergencyContact');
+        break;
+      case 'patientEmergencyContact':
+        setOnboardingData(prev => ({
+          ...prev,
+          patientData: { ...prev.patientData, emergencyContact: stepData }
+        }));
         setCurrentStep('patientGoals');
         break;
       case 'patientGoals':
@@ -161,6 +212,13 @@ const OnboardingScreen: React.FC = () => {
           ...prev, 
           therapistData: { ...prev.therapistData, ...stepData }
         }));
+        setCurrentStep('therapistCredentials');
+        break;
+      case 'therapistCredentials':
+        setOnboardingData(prev => ({ 
+          ...prev, 
+          therapistData: { ...prev.therapistData, credentials: stepData }
+        }));
         await handleComplete();
         break;
       default:
@@ -175,20 +233,32 @@ const OnboardingScreen: React.FC = () => {
       case 'userType':
         setCurrentStep('welcome');
         break;
-      case 'patientBasic':
+      case 'loading':
         setCurrentStep('userType');
+        break;
+      case 'patientBasic':
+        setCurrentStep('loading');
         break;
       case 'patientProfilePicture':
         setCurrentStep('patientBasic');
         break;
-      case 'patientGoals':
+      case 'patientMedicalInfo':
         setCurrentStep('patientProfilePicture');
         break;
+      case 'patientEmergencyContact':
+        setCurrentStep('patientMedicalInfo');
+        break;
+      case 'patientGoals':
+        setCurrentStep('patientEmergencyContact');
+        break;
       case 'therapistVerification':
-        setCurrentStep('userType');
+        setCurrentStep('loading');
         break;
       case 'therapistBasic':
         setCurrentStep('therapistVerification');
+        break;
+      case 'therapistCredentials':
+        setCurrentStep('therapistBasic');
         break;
       default:
         break;
@@ -237,6 +307,17 @@ const OnboardingScreen: React.FC = () => {
             />
           </Animated.View>
         );
+        
+      case 'loading':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <OnboardingLoadingScreen 
+              userType={onboardingData.userType as 'patient' | 'therapist'} 
+              onLoadingComplete={handleLoadingComplete}
+              duration={3000} // 3 seconds as requested
+            />
+          </Animated.View>
+        );
 
       case 'patientBasic':
         return (
@@ -254,6 +335,34 @@ const OnboardingScreen: React.FC = () => {
             <PatientProfilePicture 
               onNext={handleNext}
               onBack={handleBack}
+            />
+          </Animated.View>
+        );
+        
+      case 'patientMedicalInfo':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <PatientMedicalInfo 
+              onNext={handleNext}
+              onBack={handleBack}
+              onSkip={() => {
+                animateToNext();
+                setCurrentStep('patientEmergencyContact');
+              }}
+            />
+          </Animated.View>
+        );
+        
+      case 'patientEmergencyContact':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <PatientEmergencyContact 
+              onNext={handleNext}
+              onBack={handleBack}
+              onSkip={() => {
+                animateToNext();
+                setCurrentStep('patientGoals');
+              }}
             />
           </Animated.View>
         );
@@ -279,14 +388,36 @@ const OnboardingScreen: React.FC = () => {
           </Animated.View>
         );
 
-      // For the therapistBasic case, make it a direct ScrollView without the animation wrapper
+      case 'therapistProfessionalCard':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <TherapistProfessionalCard
+              onNext={handleNext}
+              onBack={handleBack}
+            />
+          </Animated.View>
+        );
+
       case 'therapistBasic':
         return (
-          <TherapistBasicInfo 
-            onNext={handleNext}
-            onBack={handleBack}
-            currentUser={onboardingData?.therapistData}
-          />
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <TherapistBasicInfo 
+              onNext={handleNext}
+              onBack={handleBack}
+              currentUser={onboardingData?.therapistData}
+            />
+          </Animated.View>
+        );
+        
+      case 'therapistCredentials':
+        return (
+          <Animated.View style={[styles.stepContainer, animatedStyle]}>
+            <TherapistCredentials 
+              onNext={handleNext}
+              onBack={handleBack}
+              currentUser={onboardingData?.therapistData}
+            />
+          </Animated.View>
         );
 
       default:
@@ -301,7 +432,14 @@ const OnboardingScreen: React.FC = () => {
         totalSteps={getTotalSteps()}
       />
       <View style={styles.contentContainer}>
-        {renderCurrentStep()}
+        <OnboardingLayout
+          totalSteps={getTotalSteps()}
+          currentStep={getCurrentStepIndex()}
+          onBack={handleBack}
+          onNext={() => handleNext()}
+        >
+          {renderCurrentStep()}
+        </OnboardingLayout>
       </View>
     </SafeAreaView>
   );

@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Droplets } from 'lucide-react-native';
+// Removed real API import - using fake data onlyrt React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Droplets } from 'lucide-react-native';
 import { updatePatientProfile } from '../../utils/onboardingAPI';
@@ -19,7 +22,9 @@ const PatientBloodType: React.FC<PatientBloodTypeProps> = ({ onNext, onBack, cur
     if (selectedBloodType && currentUser?.profile_id) {
       try {
         setSaving(true);
-        await updatePatientProfile(currentUser.profile_id, { blood_type: selectedBloodType });
+        // FAKE - Just simulate update instead of real API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('FAKE: Patient blood type updated:', selectedBloodType);
         console.log('Blood type saved successfully');
       } catch (error) {
         console.error('Error saving blood type:', error);

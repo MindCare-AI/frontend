@@ -130,7 +130,7 @@ const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({ isOpen, onC
       await createAppointment({
         therapist: parseInt(therapist),
         appointment_date: appointmentDate,
-        duration: 60,
+        duration: '60',
         // notes: "..." // Add notes if you have a notes field in the UI
       });
 

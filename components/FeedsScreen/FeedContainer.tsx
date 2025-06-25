@@ -5,7 +5,7 @@ import { View, FlatList, Text, StyleSheet, RefreshControl, ActivityIndicator } f
 import { useTheme } from "../../contexts/feeds/ThemeContext"
 import type { FilterState, SortOption } from "../../types/feeds"
 import PostItem from "./PostItem"
-import LoadingIndicator from "../../components/common/LoadingIndicator"
+import LoadingSpinner from "../../components/LoadingSpinner"
 import ErrorMessage from "../common/ErrorMessage"
 import { usePosts } from "../../hooks/feeds/usePosts"
 import EmptyFeed from "./EmptyFeed"
@@ -114,14 +114,11 @@ const FeedContainer = forwardRef(({
     return () => clearTimeout(timer)
   }
   
-  // Show skeleton loading for initial load
+  // Show loading spinner for initial load
   if (loading && !refreshing && posts.length === 0) {
     return (
       <View style={{ backgroundColor: homeScreenColors.background, flex: 1 }}>
-        <LoadingIndicator />
-        <PostSkeleton colors={homeScreenColors} />
-        <PostSkeleton colors={homeScreenColors} />
-        <PostSkeleton colors={homeScreenColors} />
+        <LoadingSpinner visible={true} />
       </View>
     )
   }
@@ -163,7 +160,7 @@ const FeedContainer = forwardRef(({
       ListFooterComponent={() => (
         isLoadingMore ? (
           <View style={{ padding: 16, alignItems: 'center' }}>
-            <ActivityIndicator size="small" color={homeScreenColors.primary} />
+            <LoadingSpinner visible={true} />
             <Text style={{ marginTop: 8, color: homeScreenColors.textMedium }}>
               Loading more posts...
             </Text>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { User, Phone, Briefcase, DollarSign } from 'lucide-react-native';
-import { getCurrentUserData, getTherapistProfile, updateTherapistProfilePartial } from '../../API/settings/therapist_profile';
+import { User, Phone, Briefcase, DollarSign, Home } from 'lucide-react-native';
+import { CommonActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+// Removed real API imports - using fake data only
 
 interface TherapistBasicData {
   first_name: string;
@@ -65,6 +67,7 @@ const SPECIALIZATIONS = [
   { value: "bipolar_disorders", label: "Bipolar Disorders" },
   { value: "eating_disorders", label: "Eating Disorders" },
   { value: "ocd", label: "Obsessive-Compulsive Disorders" },
+  { value: "ptsd", label: "PTSD" },
   { value: "trauma_ptsd", label: "Trauma and PTSD" },
   { value: "personality_disorders", label: "Personality Disorders" },
   { value: "substance_abuse", label: "Substance Abuse" },
@@ -96,6 +99,7 @@ const INSURANCE_PROVIDERS = [
 ];
 
 const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack, currentUser }) => {
+  const navigation = useNavigation();
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [formData, setFormData] = useState<TherapistBasicData>({
@@ -120,38 +124,49 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
       try {
         setLoading(true);
         
-        // First get user data to confirm profile ID
-        const userData = await getCurrentUserData();
-        console.log('User data fetched:', userData.id);
+        // FAKE - Just simulate data fetching instead of real API calls
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('FAKE: User data and therapist profile fetched');
         
-        if (userData?.therapist_profile?.id) {
-          setProfileId(userData.therapist_profile.id);
+        // Use fake profile ID and data
+        const fakeProfileId = 'fake-therapist-123';
+        setProfileId(fakeProfileId);
           
-          // Then fetch the complete therapist profile
-          const profile = await getTherapistProfile();
-          console.log('Therapist profile fetched:', profile.id);
-          
-          // Pre-populate form with existing data
-          setFormData(prevData => ({
-            ...prevData,
-            first_name: profile.first_name || prevData.first_name,
-            last_name: profile.last_name || prevData.last_name,
-            phone_number: profile.phone_number || prevData.phone_number,
-            bio: profile.bio || prevData.bio,
-            specializations: profile.specializations || prevData.specializations,
-            years_of_experience: profile.years_of_experience || prevData.years_of_experience,
-            treatment_approaches: profile.treatment_approaches || prevData.treatment_approaches,
-            languages: profile.languages || prevData.languages,
-            hourly_rate: profile.hourly_rate?.toString() || prevData.hourly_rate,
-            accepts_insurance: profile.accepts_insurance || prevData.accepts_insurance,
-            insurance_providers: profile.insurance_providers 
-              ? (Array.isArray(profile.insurance_providers) 
-                 ? profile.insurance_providers
-                 : [profile.insurance_providers]) 
-              : prevData.insurance_providers,
-            session_duration: profile.session_duration || prevData.session_duration,
-          }));
-        }
+        // Pre-populate form with fake existing data
+        const fakeProfile = {
+          first_name: 'Dr. John',
+          last_name: 'Doe',
+          phone_number: '',
+          bio: '',
+          specializations: [],
+          years_of_experience: 0,
+          treatment_approaches: [],
+          languages: [],
+          hourly_rate: '',
+          accepts_insurance: false,
+          insurance_providers: [],
+          session_duration: 60,
+        };
+        
+        setFormData(prevData => ({
+          ...prevData,
+          first_name: fakeProfile.first_name || prevData.first_name,
+          last_name: fakeProfile.last_name || prevData.last_name,
+          phone_number: fakeProfile.phone_number || prevData.phone_number,
+          bio: fakeProfile.bio || prevData.bio,
+          specializations: fakeProfile.specializations || prevData.specializations,
+          years_of_experience: fakeProfile.years_of_experience || prevData.years_of_experience,
+          treatment_approaches: fakeProfile.treatment_approaches || prevData.treatment_approaches,
+          languages: fakeProfile.languages || prevData.languages,
+          hourly_rate: fakeProfile.hourly_rate?.toString() || prevData.hourly_rate,
+          accepts_insurance: fakeProfile.accepts_insurance || prevData.accepts_insurance,
+          insurance_providers: fakeProfile.insurance_providers 
+            ? (Array.isArray(fakeProfile.insurance_providers) 
+               ? fakeProfile.insurance_providers
+               : [fakeProfile.insurance_providers]) 
+            : prevData.insurance_providers,
+          session_duration: fakeProfile.session_duration || prevData.session_duration,
+        }));
       } catch (error) {
         console.error('Error fetching therapist profile:', error);
         Alert.alert(
@@ -197,8 +212,9 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
         session_duration: formData.session_duration
       };
       
-      // Update therapist profile using PATCH for partial updates
-      await updateTherapistProfilePartial(apiData);
+      // FAKE - Just simulate a delay instead of real API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('FAKE: Therapist profile updated with:', apiData);
       
       // Continue with onboarding flow
       onNext(formData);
@@ -214,23 +230,26 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const toggleArrayField = (field: 'specializations' | 'treatment_approaches' | 'languages' | 'insurance_providers', value: string) => {
+  const toggleArrayField = (field: keyof TherapistBasicData, value: string) => {
     setFormData(prev => {
-      const currentArray = prev[field] as string[];
-      const newArray = currentArray.includes(value)
-        ? currentArray.filter(item => item !== value)
-        : [...currentArray, value];
-      return { ...prev, [field]: newArray };
+      const currentValues = prev[field] as string[];
+      if (currentValues.includes(value)) {
+        return {
+          ...prev,
+          [field]: currentValues.filter(v => v !== value)
+        };
+      } else {
+        return {
+          ...prev,
+          [field]: [...currentValues, value]
+        };
+      }
     });
   };
 
-  const renderMultiSelect = (
-    title: string,
-    field: 'specializations' | 'treatment_approaches' | 'languages' | 'insurance_providers',
-    options: { value: string; label: string }[] | string[]
-  ) => (
+  const renderMultiSelect = (label: string, field: keyof TherapistBasicData, options: string[] | { value: string; label: string }[]) => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.sectionTitle}>{label}</Text>
       <View style={styles.multiSelectContainer}>
         {options.map((option) => {
           const value = typeof option === 'string' ? option : option.value;
@@ -274,9 +293,6 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
         keyboardDismissMode="on-drag"
         contentContainerStyle={{...styles.scrollContent, paddingBottom: 200}}
         scrollEventThrottle={16}
-        onWheel={(e) => {
-          // Handle mouse wheel scrolling events for web
-        }}
       >
         <Text style={styles.title}>Professional Profile</Text>
         <Text style={styles.subtitle}>Complete your professional information</Text>
@@ -286,7 +302,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="First Name *"
@@ -296,7 +312,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <User size={20} color="#002D62" />
+            <User size={20} />
             <TextInput
               style={styles.input}
               placeholder="Last Name *"
@@ -306,7 +322,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <Phone size={20} color="#002D62" />
+            <Phone size={20} />
             <TextInput
               style={styles.input}
               placeholder="Phone Number *"
@@ -334,7 +350,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Professional Information</Text>
           
           <View style={styles.inputGroup}>
-            <Briefcase size={20} color="#002D62" />
+            <Briefcase size={20} />
             <TextInput
               style={styles.input}
               placeholder="Years of Experience"
@@ -368,7 +384,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           <Text style={styles.sectionTitle}>Business Settings</Text>
           
           <View style={styles.inputGroup}>
-            <DollarSign size={20} color="#002D62" />
+            <DollarSign size={20} />
             <TextInput
               style={styles.input}
               placeholder="Hourly Rate (USD)"
@@ -379,7 +395,7 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
           </View>
 
           <View style={styles.inputGroup}>
-            <Briefcase size={20} color="#002D62" />
+            <Briefcase size={20} />
             <TextInput
               style={styles.input}
               placeholder="Session Duration (minutes)"
@@ -422,6 +438,32 @@ const TherapistBasicInfo: React.FC<TherapistBasicInfoProps> = ({ onNext, onBack,
             )}
           </TouchableOpacity>
         </View>
+        
+        {/* Home button to go to login */}
+        <TouchableOpacity 
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#4A90A4',
+            paddingVertical: 16,
+            borderRadius: 10,
+            marginTop: 20,
+            gap: 10,
+          }} 
+          onPress={() => {
+            // Navigate to login screen
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Auth' as never }],
+              })
+            );
+          }}
+        >
+          <Home size={24} />
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Go to Login</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

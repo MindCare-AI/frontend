@@ -93,6 +93,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
               value={option.value}
               disabled={loading}
               status={currentTheme === option.value ? 'checked' : 'unchecked'}
+              labelStyle={{ color: globalStyles.colors.text }}
+              color={globalStyles.colors.primary}
             />
           </View>
         ))}
@@ -114,6 +116,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
               value={option.value}
               disabled={loading}
               status={currentColorScheme === option.value ? 'checked' : 'unchecked'}
+              labelStyle={{ color: globalStyles.colors.text }}
+              color={globalStyles.colors.primary}
             />
           </View>
         ))}
@@ -163,11 +167,17 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
+    padding: 16,
+    backgroundColor: globalStyles.colors.white,
+    borderRadius: 8,
+    borderColor: globalStyles.colors.border,
+    borderWidth: 1,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: globalStyles.colors.text,
   },
   option: {
     marginBottom: 8,
@@ -183,6 +193,7 @@ const styles = StyleSheet.create({
   radioLabel: {
     fontSize: 16,
     marginLeft: 8,
+    color: globalStyles.colors.text,
   },
   switchContainer: {
     flexDirection: 'row',
@@ -193,5 +204,6 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
+    color: globalStyles.colors.text,
   }
 });

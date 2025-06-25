@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { Platform, ScrollView, View } from "react-native"
-import { Box, Fab, Icon, useBreakpointValue, VStack, HStack, useSafeArea } from "native-base"
+import { useState, useCallback, useRef } from "react"
+import { Platform, ScrollView, View, Animated } from "react-native"
+import { Box, Fab, Icon, useBreakpointValue, VStack, HStack } from "native-base"
 import { Ionicons } from "@expo/vector-icons"
 import { useAppointments } from "../../../contexts/appoint_patient/AppointmentContext"
 import { useTheme } from "../../../theme/ThemeProvider"
@@ -10,8 +10,8 @@ import AppointmentTabs from "../../../components/Appointments/patient_dashboard/
 import BookAppointmentModal from "../../../components/Appointments/patient_dashboard/BookAppointmentModal"
 import WaitingListModal from "../../../components/Appointments/patient_dashboard/WaitingListModal"
 import FeedbackModal from "../../../components/Appointments/patient_dashboard/FeedbackModal"
-import Header from "../../../components/Appointments/patient_dashboard/Header"
 import { LinearGradient } from "expo-linear-gradient"
+import { Button } from "../../../components/Appointments/patient_dashboard/ui"
 
 const DashboardScreen = () => {
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
@@ -19,9 +19,12 @@ const DashboardScreen = () => {
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0) // Added to trigger refresh
 
+  // Animation for the FAB
+  const fabAnim = useRef(new Animated.Value(0)).current
+
   const { setSelectedAppointment } = useAppointments()
-  const { isDarkMode, colors } = useTheme()
-  const safeArea = useSafeArea({ edges: ['bottom'] })
+  // Always use light theme
+  const { colors } = useTheme()
 
   // Responsive layout
   const isMobile = useBreakpointValue({
@@ -36,6 +39,20 @@ const DashboardScreen = () => {
   })
 
   const handleOpenBooking = () => {
+    // Animate button press
+    Animated.sequence([
+      Animated.timing(fabAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true
+      }),
+      Animated.timing(fabAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true
+      })
+    ]).start()
+    
     setBookingModalOpen(true)
   }
 
@@ -73,83 +90,94 @@ const DashboardScreen = () => {
   return (
     <Box 
       flex={1} 
-      bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
-      safeArea
+      bg="#FFFFFF"
+      safeAreaTop
+      safeAreaBottom
     >
-      {/* Fixed Header */}
-      <Box 
-        position="absolute" 
-        top={0} 
-        left={0} 
-        right={0} 
-        zIndex={10}
-        bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
-      >
-        <Header />
-      </Box>
-
       {/* Main Content with TabsContainer and ScrollView */}
       <Box
         flex={1}
-        pt={70} // Add padding top to account for header height
       >
-        <LinearGradient colors={['#E4F0F6', '#FFFFFF']} style={{flex: 1, width: "100%"}}>
+        <Box 
+            style={{flex: 1, width: "100%", backgroundColor: "#FFFFFF"}}
+          >
           <Box 
             width="100%" 
             maxWidth={520} 
             alignSelf="center"
             flex={1}
+            pt={4}
+            bg="#FFFFFF"
           >
             <AppointmentTabs 
               key={refreshKey} // Add key to force remount on refresh
               onOpenFeedback={handleOpenFeedback} 
             />
           </Box>
-        </LinearGradient>
+        </Box>
       </Box>
 
-      {/* Fixed Bottom Button */}
+      {/* Fixed Bottom Button - Using our enhanced button */}
       <Box
         position="absolute"
         bottom={0}
         left={0}
         right={0}
-        bg={isDarkMode ? colors.background.dark : "#FFFFFF"}
+        bg="#FFFFFF"
         borderTopWidth={1}
-        borderTopColor={isDarkMode ? "#2D3748" : "#E2E8F0"}
-        px={0}
+        borderTopColor="#E2E8F0"
+        px={4}
         py={6}
         safeAreaBottom
         alignItems="center"
-        style={{ zIndex: 20 }}
+        style={{ 
+          zIndex: 20,
+          shadowColor: '#4a90e2',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 4,
+        }}
       >
-        <Box
-          width={isMobile ? '90%' : 360}
-          maxWidth={400}
-          alignItems="center"
-          style={{
-            shadowColor: '#002D62',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.18,
-            shadowRadius: 12,
-            elevation: 6,
-          }}
+        <Animated.View
+          style={[
+            {
+              width: isMobile ? '100%' : 360,
+              maxWidth: 400,
+              transform: [{ 
+                scale: fabAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0.95]
+                })
+              }]
+            },
+            Platform.select({
+              web: {
+                filter: 'drop-shadow(0 4px 10px rgba(0, 45, 98, 0.16))'
+              }
+            })
+          ]}
         >
-          <Fab
-            renderInPortal={false}
-            shadow={0}
-            size={useBreakpointValue({ base: "md", md: "lg" })}
-            icon={<Icon color="white" as={Ionicons} name="add" size="sm" />}
-            label={Platform.OS !== "web" ? undefined : "Book New Appointment"}
-            bg="#002D62"
+          <Button
             onPress={handleOpenBooking}
-            width={"100%"}
-            minWidth={isMobile ? undefined : 200}
+            variant="solid"
+            colorScheme="blue"
+            size={isMobile ? "md" : "lg"}
+            fullWidth
             borderRadius={999}
-            _text={{ fontWeight: '700', fontSize: 18 }}
-            py={4}
-          />
-        </Box>
+            leftIcon={<Ionicons name="add-circle" size={20} color="white" />}
+            style={{
+              backgroundColor: "#002D62",
+              paddingVertical: 16,
+            }}
+            textStyle={{
+              fontWeight: '700',
+              fontSize: isMobile ? 16 : 18
+            }}
+          >
+            Book New Appointment
+          </Button>
+        </Animated.View>
       </Box>
 
       {/* Modals */}
